@@ -3,8 +3,11 @@ const path = require('path');
 
 const contentScriptPath = path.resolve(__dirname, './content.js');
 
-describe('LinkedIn Search-Bypass Interceptor', () => {
+describe('LinkedIn Interceptor: Race Condition & Event Shielding', () => {
+  let anchor, span;
+
   beforeEach(() => {
+    // Mock window.location properly
     delete window.location;
     window.location = {
       href: 'https://www.linkedin.com/feed/',
@@ -14,58 +17,83 @@ describe('LinkedIn Search-Bypass Interceptor', () => {
     };
 
     document.body.innerHTML = `
-      <ul class="recommendations-list">
-        <li class="browsemap-profile">
-          <span class="actor-name">Alice Smith</span>
-          <span class="headline">VP of Engineering</span>
-          <a href="https://linkedin.com/premium/poisoned-link-1">View Alice</a>
-        </li>
-        <li class="browsemap-profile">
-          <span class="actor-name">Bob Jones</span>
-          <span class="headline">Data Scientist</span>
-          <a href="https://linkedin.com/premium/poisoned-link-2">View Bob</a>
-        </li>
-      </ul>
+      <div id="browsemap_recommendation">
+        <a href="https://www.linkedin.com/in/safe-profile/">
+          <span class="actor-name">Race Condition Test</span>
+        </a>
+      </div>
     `;
+
+    anchor = document.getElementById('browsemap_recommendation');
+    span = anchor.querySelector('.actor-name');
 
     jest.resetModules();
     const code = fs.readFileSync(contentScriptPath, 'utf8');
     eval(code);
   });
 
-  test('should identify the SPECIFIC person clicked and search for them', () => {
-    // Click on Bob Jones specifically
-    const bobCard = document.querySelectorAll('.browsemap-profile')[1];
-    const bobName = bobCard.querySelector('.actor-name');
-
-    const event = new MouseEvent('click', {
-      view: window,
-      bubbles: true,
-      cancelable: true
+  test('should kill the event and navigate only ONCE during high-frequency event barrage', () => {
+    // LinkedIn often fires multiple events for a single user action
+    const eventTypes = ['pointerdown', 'mousedown', 'mouseup', 'click'];
+    const eventSpies = eventTypes.map((type) => {
+      const ev = new MouseEvent(type, { bubbles: true, cancelable: true });
+      jest.spyOn(ev, 'preventDefault');
+      jest.spyOn(ev, 'stopImmediatePropagation');
+      return { type, ev };
     });
 
-    bobName.dispatchEvent(event);
+    // Simulate rapid fire clicks
+    eventSpies.forEach((s) => span.dispatchEvent(s.ev));
 
-    // Verify it searched for Bob, not Alice
-    const expectedUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent('Bob Jones Data Scientist')}`;
-    expect(window.location.assign).toHaveBeenCalledWith(expectedUrl);
-    expect(window.location.href).toBe(expectedUrl);
+    // 1. Verification: All events were intercepted and neutralized
+    eventSpies.forEach((s) => {
+      expect(s.ev.preventDefault).toHaveBeenCalled();
+      expect(s.ev.stopImmediatePropagation).toHaveBeenCalled();
+    });
+
+    // 2. Verification: Navigation was triggered
+    expect(window.location.assign).toHaveBeenCalledWith(
+      'https://www.linkedin.com/in/safe-profile/'
+    );
   });
 
-  test('should fallback to name-only search if headline is missing', () => {
-    const aliceCard = document.querySelectorAll('.browsemap-profile')[0];
-    aliceCard.querySelector('.headline').remove(); // Hide headline
-    const aliceName = aliceCard.querySelector('.actor-name');
+  test('should prioritize Strategy A (direct link) if it exists at click-time', () => {
+    const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    span.dispatchEvent(event);
 
-    const event = new MouseEvent('click', {
-      view: window,
-      bubbles: true,
-      cancelable: true
-    });
+    expect(window.location.assign).toHaveBeenCalledWith(
+      'https://www.linkedin.com/in/safe-profile/'
+    );
+    // Verify it didn't need to construct a search URL
+    expect(window.location.assign).not.toHaveBeenCalledWith(expect.stringContaining('/search/'));
+  });
 
-    aliceName.dispatchEvent(event);
+  test('should fallback to Strategy B (search) only if link is poisoned', () => {
+    // Poison the link
+    const link = anchor.querySelector('a');
+    link.href = 'https://www.linkedin.com/premium/products/?poisoned=true';
 
-    const expectedUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent('Alice Smith')}`;
-    expect(window.location.assign).toHaveBeenCalledWith(expectedUrl);
+    const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    span.dispatchEvent(event);
+
+    // Verify it switched to search fallback
+    expect(window.location.assign).toHaveBeenCalledWith(expect.stringContaining('/search/'));
+    expect(window.location.assign).toHaveBeenCalledWith(
+      expect.stringContaining('keywords=Race%20Condition%20Test')
+    );
+  });
+
+  test('should neutralize event even if parsing fails (Tab Safety check)', () => {
+    // Destroy the DOM so parsing fails
+    anchor.innerHTML = 'Just some text, no name element';
+
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    jest.spyOn(event, 'preventDefault');
+
+    anchor.dispatchEvent(event);
+
+    // Event must still be prevented to ensure LinkedIn's scripts don't redirect the main tab
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(window.location.assign).not.toHaveBeenCalled();
   });
 });

@@ -1,31 +1,30 @@
 /**
  * LinkedIn: Direct Profile Access - Content Script
  * -------------------------------------------
- * Intercepts clicks on "poisoned" recommendation links and redirects
- * to a LinkedIn search for that person to bypass the Premium gatekeeper.
+ * Intercepts clicks on recommendation links.
+ * If a valid profile URL is found, it navigates directly.
+ * If the link is "poisoned", it falls back to a name-based search.
  */
 
 (function () {
   'use strict';
 
-  /**
-   * Cleans text by removing LinkedIn-specific noise (degree connections, comment nodes, etc.)
-   */
   function cleanLinkedInText(text) {
     if (!text) {
       return '';
     }
     return text
-      .replace(/<!---->/g, '') // Remove comment nodes
-      .replace(/·/g, '') // Remove middle dots
-      .replace(/\b(1st|2nd|3rd|Third degree connection|degree connection)\b/gi, '') // Remove degree markers
-      .replace(/\s+/g, ' ') // Collapse multiple spaces
+      .replace(/<!---->/g, '')
+      .replace(/·/g, '')
+      .replace(/\b(1st|2nd|3rd|Third degree connection|degree connection)\b/gi, '')
+      .replace(/\s+/g, ' ')
       .trim();
   }
 
   function handleIntercept(e) {
-    // 1. Find the recommendation card container
-    const card =
+    // Kill the event immediately at the capture phase.
+    // This is the primary defense to prevent LinkedIn's scripts from triggering the upsell.
+    const isRecommendation =
       e.target.closest('#browsemap_recommendation') ||
       e.target.closest('.pv-profile-card__anchor') ||
       e.target.closest('.browsemap-profile') ||
@@ -33,16 +32,33 @@
       e.target.closest('li.artdeco-list__item') ||
       e.target.closest('.artdeco-list__item');
 
-    if (!card) {
+    if (!isRecommendation) {
       return;
     }
 
-    // Kill the event immediately to stop LinkedIn's tracking/popup logic
+    // Total Event Annihilation
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
 
-    // 2. Extract the person's identity
+    // 1. STRATEGY A: Direct URL Capture
+    // Check if the clicked element or any parent is an <a> tag with a valid profile link
+    const linkEl = e.target.closest('a');
+    if (
+      linkEl &&
+      linkEl.href &&
+      linkEl.href.includes('/in/') &&
+      !linkEl.href.includes('premium/')
+    ) {
+      console.log('[LinkedIn Fix] Caught direct profile link:', linkEl.href);
+      window.location.assign(linkEl.href);
+      return;
+    }
+
+    // 2. STRATEGY B: Search-Bypass Fallback
+    // If we didn't find a direct link, or the link was already poisoned, use the text-scraping logic.
+    const card = isRecommendation; // card container found in step 1
+
     const nameSelectors = [
       'span[aria-hidden="true"]',
       '.name',
@@ -55,7 +71,6 @@
     let name = '';
     let headline = '';
 
-    // Extract Name
     for (const selector of nameSelectors) {
       const el = card.querySelector(selector);
       if (el) {
@@ -67,7 +82,6 @@
       }
     }
 
-    // Extract Headline (specifically avoiding the name element we just found)
     const allTextElements = Array.from(
       card.querySelectorAll('span[aria-hidden="true"], .headline, .inline-show-more-text')
     );
@@ -82,18 +96,15 @@
     if (name) {
       const query = encodeURIComponent(`${name} ${headline}`.trim());
       const searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${query}`;
-
       console.log(`[LinkedIn Fix] Bypassing poisoned link for: ${name}. Searching...`);
       window.location.assign(searchUrl);
-    } else {
-      console.warn('[LinkedIn Fix] Could not extract identifying text from card.');
     }
   }
 
-  // Triple-event capture shield
-  ['mousedown', 'click', 'pointerdown'].forEach((eventType) => {
+  // Expanded event shield to catch all possible interaction vectors
+  ['mousedown', 'click', 'pointerdown', 'mouseup', 'auxclick'].forEach((eventType) => {
     document.addEventListener(eventType, handleIntercept, true);
   });
 
-  console.log('[LinkedIn Fix] Cleaned Search-Bypass active.');
+  console.log('[LinkedIn Fix] Aggressive Triple-Shield active.');
 })();
