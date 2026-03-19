@@ -197,7 +197,14 @@
    * @returns {boolean}
    */
   function isContextValid() {
-    return !!(typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id);
+    return !!(
+      typeof chrome !== 'undefined' &&
+      chrome.runtime &&
+      chrome.runtime.id &&
+      chrome.storage &&
+      chrome.storage.sync &&
+      chrome.storage.local
+    );
   }
 
   /**
@@ -210,61 +217,72 @@
     if (!document.body) {
       return;
     }
-    chrome.storage.sync.get(['enabled', 'mode', 'whitelist', 'blacklist'], (prefs) => {
-      if (!isContextValid()) {
-        return;
-      }
-      if (prefs.enabled === false) {
-        return;
-      }
-
-      const host = window.location.hostname;
-
-      // 1. Check Whitelist (highest priority)
-      if (prefs.whitelist && prefs.whitelist.some((s) => host.includes(s))) {
-        log('Site is whitelisted, skipping.');
-        return;
-      }
-
-      // 2. Check Execution Mode
-      if (prefs.mode === 'selective') {
-        const inBlacklist = prefs.blacklist && prefs.blacklist.some((s) => host.includes(s));
-        if (!inBlacklist) {
-          log('Selective mode active and site not in blacklist, skipping.');
+    try {
+      chrome.storage.sync.get(['enabled', 'mode', 'whitelist', 'blacklist'], (prefs) => {
+        if (chrome.runtime.lastError || !isContextValid()) {
           return;
         }
-      }
-
-      // 3. Site-specific handling
-      Object.keys(SITE_MODULES).forEach((m) => {
-        if (host.includes(m)) {
-          SITE_MODULES[m]();
+        if (prefs.enabled === false) {
+          return;
         }
-      });
 
-      // 4. Apply automatic detection
-      scanDOM(document.body, (el) => {
-        if (scoreElement(el) > 0.6) {
-          hideDetector(el);
+        const host = window.location.hostname;
+
+        // 1. Check Whitelist (highest priority)
+        if (prefs.whitelist && prefs.whitelist.some((s) => host.includes(s))) {
+          log('Site is whitelisted, skipping.');
+          return;
         }
-      });
 
-      // 5. Apply custom user-defined selectors
-      chrome.storage.local.get(['customSelectors'], (result) => {
-        const selectors = result.customSelectors ? result.customSelectors[host] : null;
-        if (selectors && Array.isArray(selectors)) {
-          selectors.forEach((selector) => {
-            try {
-              document.querySelectorAll(selector).forEach((el) => {
-                el.style.setProperty('display', 'none', 'important');
+        // 2. Check Execution Mode
+        if (prefs.mode === 'selective') {
+          const inBlacklist = prefs.blacklist && prefs.blacklist.some((s) => host.includes(s));
+          if (!inBlacklist) {
+            log('Selective mode active and site not in blacklist, skipping.');
+            return;
+          }
+        }
+
+        // 3. Site-specific handling
+        Object.keys(SITE_MODULES).forEach((m) => {
+          if (host.includes(m)) {
+            SITE_MODULES[m]();
+          }
+        });
+
+        // 4. Apply automatic detection
+        scanDOM(document.body, (el) => {
+          if (scoreElement(el) > 0.6) {
+            hideDetector(el);
+          }
+        });
+
+        // 5. Apply custom user-defined selectors
+        try {
+          chrome.storage.local.get(['customSelectors'], (result) => {
+            if (chrome.runtime.lastError || !isContextValid()) {
+              return;
+            }
+            const selectors = result.customSelectors ? result.customSelectors[host] : null;
+            if (selectors && Array.isArray(selectors)) {
+              selectors.forEach((selector) => {
+                try {
+                  document.querySelectorAll(selector).forEach((el) => {
+                    el.style.setProperty('display', 'none', 'important');
+                  });
+                } catch (e) {
+                  log('Invalid custom selector:', selector);
+                }
               });
-            } catch (e) {
-              log('Invalid custom selector:', selector);
             }
           });
+        } catch (e) {
+          log('Local storage access failed:', e);
         }
       });
-    });
+    } catch (e) {
+      log('Sync storage access failed:', e);
+    }
   }
 
   // Initial run

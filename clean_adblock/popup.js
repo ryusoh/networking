@@ -3,6 +3,9 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (typeof chrome === 'undefined' || !chrome.storage) {
+    return;
+  }
   const enabledToggle = document.getElementById('enabled');
   const modeSelect = document.getElementById('mode');
   const scanBtn = document.getElementById('scan');

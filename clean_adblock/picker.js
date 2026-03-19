@@ -3,6 +3,9 @@
  */
 
 (function () {
+  if (typeof chrome === 'undefined' || !chrome.storage) {
+    return;
+  }
   if (window.__bypassPickerActive) {
     return;
   }
@@ -80,6 +83,9 @@
   }
 
   function saveCustomSelector(selector) {
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
+      return;
+    }
     const host = window.location.hostname;
     chrome.storage.local.get(['customSelectors'], (result) => {
       const selectors = result.customSelectors || {};
