@@ -211,7 +211,9 @@
       return;
     }
     chrome.storage.sync.get(['enabled', 'mode', 'whitelist', 'blacklist'], (prefs) => {
-      if (!isContextValid()) return;
+      if (!isContextValid()) {
+        return;
+      }
       if (prefs.enabled === false) {
         return;
       }
@@ -293,7 +295,9 @@
   // Message listener
   if (isContextValid()) {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      if (!isContextValid()) return;
+      if (!isContextValid()) {
+        return;
+      }
       if (request.action === 'scan') {
         log('Manual scan triggered');
         run();

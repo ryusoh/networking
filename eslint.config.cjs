@@ -40,7 +40,8 @@ module.exports = [
         MouseEvent: 'readonly',
         PointerEvent: 'readonly',
         CustomEvent: 'readonly',
-        Event: 'readonly'
+        Event: 'readonly',
+        DOMParser: 'readonly'
       }
     },
     rules: {
