@@ -36,10 +36,14 @@ const validateRules = (hostnames) => {
       const id1 = baseId;
       const id2 = baseId + 1;
 
-      if (ids.has(id1)) {throw new Error(`Duplicate ID: ${id1}`);}
+      if (ids.has(id1)) {
+        throw new Error(`Duplicate ID: ${id1}`);
+      }
       ids.add(id1);
 
-      if (ids.has(id2)) {throw new Error(`Duplicate ID: ${id2}`);}
+      if (ids.has(id2)) {
+        throw new Error(`Duplicate ID: ${id2}`);
+      }
       ids.add(id2);
 
       addRules.push({ id: id1, host });
