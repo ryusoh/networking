@@ -157,6 +157,33 @@ describe('X Tab Switcher - Nuclear Option', () => {
     expect(liveOnX.style.display).toBe('none');
   });
 
+  test('should hide Japanese versions of right sidebar boxes', () => {
+    document.body.innerHTML = `
+      <div data-testid="sidebarColumn">
+        <aside aria-label="プレミアムにサブスクライブ">
+          <h2><span>プレミアムにサブスクライブ</span></h2>
+        </aside>
+        <aside aria-label="おすすめユーザー">
+          <h2><span>おすすめユーザー</span></h2>
+        </aside>
+      </div>
+    `;
+
+    chrome.storage.sync.get.mockImplementation((defaults, callback) =>
+      callback({ preferredTab: 'Finance' })
+    );
+
+    eval(fs.readFileSync(contentScriptPath, 'utf8'));
+
+    jest.advanceTimersByTime(100);
+
+    const jpPremium = document.querySelector('aside[aria-label="プレミアムにサブスクライブ"]');
+    const jpWhoToFollow = document.querySelector('aside[aria-label="おすすめユーザー"]');
+
+    expect(jpPremium.style.display).toBe('none');
+    expect(jpWhoToFollow.style.display).toBe('none');
+  });
+
   test('should hide floating Grok and Messages buttons in bottom right', () => {
     chrome.storage.sync.get.mockImplementation((defaults, callback) =>
       callback({ preferredTab: 'Finance' })

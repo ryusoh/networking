@@ -73,7 +73,7 @@
 
       // 1. Hide "Subscribe to Premium" in the left sidebar
       const premiumElements = document.querySelectorAll(
-        'a[aria-label="Premium"], a[href="/i/premium_sign_up"]'
+        'a[aria-label="Premium"], a[aria-label="プレミアム"], a[href="/i/premium_sign_up"]'
       );
       premiumElements.forEach((el) => {
         el.style.setProperty('display', 'none', 'important');
@@ -83,14 +83,19 @@
       const navItems = document.querySelectorAll('nav[role="navigation"] a');
       navItems.forEach((item) => {
         const text = (item.innerText || item.textContent || '').trim().toLowerCase();
-        if (text === 'premium' || text === 'subscribe') {
+        if (
+          text === 'premium' ||
+          text === 'subscribe' ||
+          text === 'プレミアム' ||
+          text === 'サブスクライブ'
+        ) {
           item.style.setProperty('display', 'none', 'important');
         }
       });
 
       // 2. Hide "Subscribe to Premium", "Who to follow", and "Live on X" boxes in the right sidebar
       const rightSidebarCards = document.querySelectorAll(
-        'aside[aria-label="Subscribe to Premium"], aside[aria-label="Who to follow"], aside[aria-label="Live on X"]'
+        'aside[aria-label="Subscribe to Premium"], aside[aria-label="プレミアムにサブスクライブ"], aside[aria-label="Who to follow"], aside[aria-label="おすすめユーザー"], aside[aria-label="Live on X"]'
       );
       rightSidebarCards.forEach((el) => {
         el.style.setProperty('display', 'none', 'important');
@@ -112,7 +117,13 @@
       );
       spans.forEach((span) => {
         const text = (span.innerText || span.textContent || '').trim().toLowerCase();
-        if (text === 'subscribe to premium' || text === 'who to follow' || text === 'live on x') {
+        if (
+          text === 'subscribe to premium' ||
+          text === 'who to follow' ||
+          text === 'live on x' ||
+          text === 'プレミアムにサブスクライブ' ||
+          text === 'おすすめユーザー'
+        ) {
           const aside = span.closest('aside');
           if (aside) {
             aside.style.setProperty('display', 'none', 'important');
