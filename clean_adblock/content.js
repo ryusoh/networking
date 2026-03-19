@@ -197,14 +197,18 @@
    * @returns {boolean}
    */
   function isContextValid() {
-    return !!(
-      typeof chrome !== 'undefined' &&
-      chrome.runtime &&
-      chrome.runtime.id &&
-      chrome.storage &&
-      chrome.storage.sync &&
-      chrome.storage.local
-    );
+    try {
+      // Use optional chaining and check for runtime.id which is cleared on invalidation
+      return !!(
+        typeof chrome !== 'undefined' &&
+        chrome?.runtime?.id &&
+        chrome?.runtime?.onMessage &&
+        chrome?.storage?.sync &&
+        chrome?.storage?.local
+      );
+    } catch (e) {
+      return false;
+    }
   }
 
   /**
@@ -218,66 +222,85 @@
       return;
     }
     try {
-      chrome.storage.sync.get(['enabled', 'mode', 'whitelist', 'blacklist'], (prefs) => {
-        if (chrome.runtime.lastError || !isContextValid()) {
-          return;
-        }
-        if (prefs.enabled === false) {
-          return;
-        }
+      // Check for sync storage specifically
+      const syncStorage = typeof chrome !== 'undefined' ? chrome?.storage?.sync : null;
+      if (!syncStorage) {
+        return;
+      }
 
-        const host = window.location.hostname;
-
-        // 1. Check Whitelist (highest priority)
-        if (prefs.whitelist && prefs.whitelist.some((s) => host.includes(s))) {
-          log('Site is whitelisted, skipping.');
-          return;
-        }
-
-        // 2. Check Execution Mode
-        if (prefs.mode === 'selective') {
-          const inBlacklist = prefs.blacklist && prefs.blacklist.some((s) => host.includes(s));
-          if (!inBlacklist) {
-            log('Selective mode active and site not in blacklist, skipping.');
+      syncStorage.get(['enabled', 'mode', 'whitelist', 'blacklist'], (prefs) => {
+        try {
+          if (!isContextValid() || chrome?.runtime?.lastError) {
             return;
           }
-        }
-
-        // 3. Site-specific handling
-        Object.keys(SITE_MODULES).forEach((m) => {
-          if (host.includes(m)) {
-            SITE_MODULES[m]();
+          if (prefs?.enabled === false) {
+            return;
           }
-        });
 
-        // 4. Apply automatic detection
-        scanDOM(document.body, (el) => {
-          if (scoreElement(el) > 0.6) {
-            hideDetector(el);
+          const host = window.location.hostname;
+
+          // 1. Check Whitelist (highest priority)
+          if (prefs?.whitelist && prefs.whitelist.some((s) => host.includes(s))) {
+            log('Site is whitelisted, skipping.');
+            return;
           }
-        });
 
-        // 5. Apply custom user-defined selectors
-        try {
-          chrome.storage.local.get(['customSelectors'], (result) => {
-            if (chrome.runtime.lastError || !isContextValid()) {
+          // 2. Check Execution Mode
+          if (prefs?.mode === 'selective') {
+            const inBlacklist = prefs?.blacklist && prefs.blacklist.some((s) => host.includes(s));
+            if (!inBlacklist) {
+              log('Selective mode active and site not in blacklist, skipping.');
               return;
             }
-            const selectors = result.customSelectors ? result.customSelectors[host] : null;
-            if (selectors && Array.isArray(selectors)) {
-              selectors.forEach((selector) => {
-                try {
-                  document.querySelectorAll(selector).forEach((el) => {
-                    el.style.setProperty('display', 'none', 'important');
-                  });
-                } catch (e) {
-                  log('Invalid custom selector:', selector);
-                }
-              });
+          }
+
+          // 3. Site-specific handling
+          Object.keys(SITE_MODULES).forEach((m) => {
+            if (host.includes(m)) {
+              SITE_MODULES[m]();
             }
           });
+
+          // 4. Apply automatic detection
+          scanDOM(document.body, (el) => {
+            if (scoreElement(el) > 0.6) {
+              hideDetector(el);
+            }
+          });
+
+          // 5. Apply custom user-defined selectors
+          try {
+            const localStorage = chrome?.storage?.local;
+            if (!localStorage) {
+              return;
+            }
+
+            localStorage.get(['customSelectors'], (result) => {
+              try {
+                if (!isContextValid() || chrome?.runtime?.lastError) {
+                  return;
+                }
+                const selectors = result?.customSelectors ? result.customSelectors[host] : null;
+                if (selectors && Array.isArray(selectors)) {
+                  selectors.forEach((selector) => {
+                    try {
+                      document.querySelectorAll(selector).forEach((el) => {
+                        el.style.setProperty('display', 'none', 'important');
+                      });
+                    } catch (e) {
+                      log('Invalid custom selector:', selector);
+                    }
+                  });
+                }
+              } catch (e) {
+                log('Local storage callback failed:', e);
+              }
+            });
+          } catch (e) {
+            log('Local storage access failed:', e);
+          }
         } catch (e) {
-          log('Local storage access failed:', e);
+          log('Sync storage callback failed:', e);
         }
       });
     } catch (e) {
@@ -312,7 +335,7 @@
 
   // Message listener
   if (isContextValid()) {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    chrome?.runtime?.onMessage?.addListener((request, sender, sendResponse) => {
       if (!isContextValid()) {
         return;
       }

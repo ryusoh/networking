@@ -3,16 +3,11 @@
   "name": "Tianditu Hybrid Accelerator",
   "version": "1.6",
   "description": "Fast-path spoofing with automatic multi-source proxy failover.",
-  "permissions": [
-    "proxy",
-    "storage",
-    "alarms",
-    "offscreen",
-    "webRequest",
-    "declarativeNetRequest"
-  ],
+  "permissions": ["proxy", "storage", "alarms", "offscreen", "webRequest", "declarativeNetRequest"],
   "host_permissions": [
+    "https://freeproxy.world/*",
     "https://*.freeproxy.world/*",
+    "https://databay.com/*",
     "https://*.databay.com/*",
     "*://*.tianditu.gov.cn/*",
     "*://*.tianditu.cn/*"

@@ -9,7 +9,11 @@
   let preferredTab = 'finance';
   let manualLock = false;
 
-  chrome.storage.sync.get({ preferredTab: 'finance' }, (items) => {
+  const syncStorage = typeof chrome !== 'undefined' ? chrome?.storage?.sync : null;
+  if (!syncStorage) {
+    return;
+  }
+  syncStorage.get({ preferredTab: 'finance' }, (items) => {
     preferredTab = items.preferredTab.toLowerCase();
     injectCSS();
     startNuclearLoop();

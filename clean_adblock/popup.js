@@ -12,18 +12,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const pickerBtn = document.getElementById('picker');
 
   // Load current settings
-  chrome.storage.sync.get(['enabled', 'mode'], (prefs) => {
-    enabledToggle.checked = prefs.enabled !== false;
-    modeSelect.value = prefs.mode || 'all';
-  });
+  try {
+    chrome.storage.sync.get(['enabled', 'mode'], (prefs) => {
+      if (
+        typeof chrome === 'undefined' ||
+        !chrome.storage ||
+        (chrome.runtime && chrome.runtime.lastError)
+      ) {
+        return;
+      }
+      enabledToggle.checked = prefs.enabled !== false;
+      modeSelect.value = prefs.mode || 'all';
+    });
+  } catch (e) {
+    console.error('Popup sync storage access failed:', e);
+  }
 
   // Save settings on change
   enabledToggle.addEventListener('change', () => {
-    chrome.storage.sync.set({ enabled: enabledToggle.checked });
+    try {
+      chrome.storage.sync.set({ enabled: enabledToggle.checked });
+    } catch (e) {
+      console.error('Popup sync storage set failed:', e);
+    }
   });
 
   modeSelect.addEventListener('change', () => {
-    chrome.storage.sync.set({ mode: modeSelect.value });
+    try {
+      chrome.storage.sync.set({ mode: modeSelect.value });
+    } catch (e) {
+      console.error('Popup sync storage set failed:', e);
+    }
   });
 
   // Site list buttons
@@ -32,52 +51,94 @@ document.addEventListener('DOMContentLoaded', () => {
   const addJsBlockBtn = document.getElementById('addJsBlock');
 
   function updateButtonStates() {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const url = new URL(tabs[0].url);
-      const host = url.hostname;
-      if (!host) {
-        return;
-      }
+    try {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (
+          typeof chrome === 'undefined' ||
+          !chrome.tabs ||
+          (chrome.runtime && chrome.runtime.lastError)
+        ) {
+          return;
+        }
+        if (!tabs || !tabs[0] || !tabs[0].url) {
+          return;
+        }
+        const url = new URL(tabs[0].url);
+        const host = url.hostname;
+        if (!host) {
+          return;
+        }
 
-      chrome.storage.sync.get(['whitelist', 'blacklist', 'jsBlocked'], (result) => {
-        const isWhitelisted = (result.whitelist || []).includes(host);
-        const isBlacklisted = (result.blacklist || []).includes(host);
-        const isJsBlocked = (result.jsBlocked || []).includes(host);
+        chrome.storage.sync.get(['whitelist', 'blacklist', 'jsBlocked'], (result) => {
+          if (
+            typeof chrome === 'undefined' ||
+            !chrome.storage ||
+            (chrome.runtime && chrome.runtime.lastError)
+          ) {
+            return;
+          }
+          const isWhitelisted = (result.whitelist || []).includes(host);
+          const isBlacklisted = (result.blacklist || []).includes(host);
+          const isJsBlocked = (result.jsBlocked || []).includes(host);
 
-        addWhitelistBtn.textContent = isWhitelisted ? 'Un-Whitelist' : 'Whitelist';
-        addBlacklistBtn.textContent = isBlacklisted ? 'Un-Blacklist' : 'Blacklist';
-        addJsBlockBtn.textContent = isJsBlocked ? 'Un-Block JS' : 'Block JS';
+          addWhitelistBtn.textContent = isWhitelisted ? 'Un-Whitelist' : 'Whitelist';
+          addBlacklistBtn.textContent = isBlacklisted ? 'Un-Blacklist' : 'Blacklist';
+          addJsBlockBtn.textContent = isJsBlocked ? 'Un-Block JS' : 'Block JS';
+        });
       });
-    });
+    } catch (e) {
+      console.error('Popup tab query failed:', e);
+    }
   }
 
   function toggleCurrentIn(listKey) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const url = new URL(tabs[0].url);
-      const host = url.hostname;
-      if (!host) {
-        return;
-      }
-
-      chrome.storage.sync.get([listKey], (result) => {
-        const list = result[listKey] || [];
-        const index = list.indexOf(host);
-
-        if (index > -1) {
-          // Remove if exists
-          list.splice(index, 1);
-          chrome.storage.sync.set({ [listKey]: list }, () => {
-            updateButtonStates();
-          });
-        } else {
-          // Add if not exists
-          list.push(host);
-          chrome.storage.sync.set({ [listKey]: list }, () => {
-            updateButtonStates();
-          });
+    try {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (
+          typeof chrome === 'undefined' ||
+          !chrome.tabs ||
+          (chrome.runtime && chrome.runtime.lastError)
+        ) {
+          return;
         }
+        if (!tabs || !tabs[0] || !tabs[0].url) {
+          return;
+        }
+        const url = new URL(tabs[0].url);
+        const host = url.hostname;
+        if (!host) {
+          return;
+        }
+
+        chrome.storage.sync.get([listKey], (result) => {
+          if (
+            typeof chrome === 'undefined' ||
+            !chrome.storage ||
+            (chrome.runtime && chrome.runtime.lastError)
+          ) {
+            return;
+          }
+          const list = result[listKey] || [];
+          const index = list.indexOf(host);
+
+          if (index > -1) {
+            // Remove if exists
+            list.splice(index, 1);
+            chrome.storage.sync.set({ [listKey]: list }, () => {
+              updateButtonStates();
+            });
+          } else {
+            // Add if not exists
+            list.push(host);
+            chrome.storage.sync.set({ [listKey]: list }, () => {
+              updateButtonStates();
+            });
+          }
+        });
       });
-    });
+    } catch (e) {
+      console.error('Popup toggle current in list failed:', e);
+    }
   }
 
   addWhitelistBtn.addEventListener('click', () => toggleCurrentIn('whitelist'));

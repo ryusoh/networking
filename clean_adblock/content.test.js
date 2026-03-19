@@ -23,7 +23,10 @@ describe('Clean AdBlock Content Script', () => {
 
   test('should not crash when chrome.storage is missing', () => {
     global.chrome = {
-      runtime: { id: 'test-id' }
+      runtime: {
+        id: 'test-id',
+        onMessage: { addListener: jest.fn() }
+      }
     };
     expect(() => loadContentScript()).not.toThrow();
   });

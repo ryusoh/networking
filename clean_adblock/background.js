@@ -65,31 +65,50 @@ const updateBlockingRules = async (hostnames) => {
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    chrome.storage.sync.set({
-      enabled: true,
-      mode: 'all',
-      whitelist: [],
-      blacklist: [],
-      jsBlocked: ['bild.de']
-    });
+    try {
+      chrome.storage.sync.set({
+        enabled: true,
+        mode: 'all',
+        whitelist: [],
+        blacklist: [],
+        jsBlocked: ['bild.de']
+      });
+    } catch (e) {
+      console.error('Background onInstalled storage set failed:', e);
+    }
   }
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'sync') {
-    if (changes.enabled || changes.mode) {
-      updateBadge();
-    }
-    if (changes.jsBlocked) {
-      updateBlockingRules(changes.jsBlocked.newValue || []);
+    try {
+      if (changes.enabled || changes.mode) {
+        updateBadge();
+      }
+      if (changes.jsBlocked) {
+        updateBlockingRules(changes.jsBlocked.newValue || []);
+      }
+    } catch (e) {
+      console.error('Background storage onChanged handler failed:', e);
     }
   }
 });
 
 // Initialize on startup
-chrome.storage.sync.get(['enabled', 'mode', 'jsBlocked'], (prefs) => {
-  updateBadge();
-  if (prefs.jsBlocked) {
-    updateBlockingRules(prefs.jsBlocked);
-  }
-});
+try {
+  chrome.storage.sync.get(['enabled', 'mode', 'jsBlocked'], (prefs) => {
+    if (
+      typeof chrome === 'undefined' ||
+      !chrome.storage ||
+      (chrome.runtime && chrome.runtime.lastError)
+    ) {
+      return;
+    }
+    updateBadge();
+    if (prefs.jsBlocked) {
+      updateBlockingRules(prefs.jsBlocked);
+    }
+  });
+} catch (e) {
+  console.error('Background startup storage access failed:', e);
+}

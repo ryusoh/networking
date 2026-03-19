@@ -87,16 +87,31 @@
       return;
     }
     const host = window.location.hostname;
-    chrome.storage.local.get(['customSelectors'], (result) => {
-      const selectors = result.customSelectors || {};
-      if (!selectors[host]) {
-        selectors[host] = [];
-      }
-      if (!selectors[host].includes(selector)) {
-        selectors[host].push(selector);
-        chrome.storage.local.set({ customSelectors: selectors });
-      }
-    });
+    try {
+      chrome.storage.local.get(['customSelectors'], (result) => {
+        try {
+          if (
+            typeof chrome === 'undefined' ||
+            !chrome.storage ||
+            (chrome.runtime && chrome.runtime.lastError)
+          ) {
+            return;
+          }
+          const selectors = result.customSelectors || {};
+          if (!selectors[host]) {
+            selectors[host] = [];
+          }
+          if (!selectors[host].includes(selector)) {
+            selectors[host].push(selector);
+            chrome.storage.local.set({ customSelectors: selectors });
+          }
+        } catch (e) {
+          console.error('Picker local storage callback failed:', e);
+        }
+      });
+    } catch (e) {
+      console.error('Picker local storage access failed:', e);
+    }
   }
 
   function cleanup() {

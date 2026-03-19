@@ -15,7 +15,9 @@ function parseFreeproxyworld(doc) {
   return rows
     .map((row) => {
       const cols = row.querySelectorAll('td');
-      if (cols.length < 6) {return null;}
+      if (cols.length < 6) {
+        return null;
+      }
 
       const ip = cols[0].textContent.trim();
       const port = cols[1].textContent.trim();
@@ -24,7 +26,13 @@ function parseFreeproxyworld(doc) {
       const speed = parseInt(speedText.replace(/[^0-9]/g, '')) || 9999;
 
       let scheme = 'PROXY';
-      if (typeText.includes('SOCKS5')) {scheme = 'SOCKS5';} else if (typeText.includes('SOCKS4')) {scheme = 'SOCKS4';} else if (typeText.includes('HTTPS')) {scheme = 'HTTPS';}
+      if (typeText.includes('SOCKS5')) {
+        scheme = 'SOCKS5';
+      } else if (typeText.includes('SOCKS4')) {
+        scheme = 'SOCKS4';
+      } else if (typeText.includes('HTTPS')) {
+        scheme = 'HTTPS';
+      }
 
       return { ip, port, scheme, speed };
     })
@@ -39,7 +47,9 @@ function parseDatabay(doc) {
   return rows
     .map((row) => {
       const cols = row.querySelectorAll('td');
-      if (cols.length < 4) {return null;}
+      if (cols.length < 4) {
+        return null;
+      }
 
       const ip = cols[0].textContent.trim();
       const port = cols[1].textContent.trim();
@@ -48,7 +58,13 @@ function parseDatabay(doc) {
       const speed = parseInt(speedText.replace(/[^0-9]/g, '')) || 9999;
 
       let scheme = 'PROXY';
-      if (typeText.includes('SOCKS5')) {scheme = 'SOCKS5';} else if (typeText.includes('SOCKS4')) {scheme = 'SOCKS4';} else if (typeText.includes('HTTPS')) {scheme = 'HTTPS';}
+      if (typeText.includes('SOCKS5')) {
+        scheme = 'SOCKS5';
+      } else if (typeText.includes('SOCKS4')) {
+        scheme = 'SOCKS4';
+      } else if (typeText.includes('HTTPS')) {
+        scheme = 'HTTPS';
+      }
 
       return { ip, port, scheme, speed };
     })
@@ -56,7 +72,7 @@ function parseDatabay(doc) {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === "FETCH_HTML") {
+  if (request.type === 'FETCH_HTML') {
     console.log(`[OFFSCREEN] Fetching ${request.url}...`);
     fetch(request.url, {
       method: 'GET',
@@ -64,24 +80,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       credentials: 'omit',
       cache: 'no-cache',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': request.url
+        Referer: request.url
       }
     })
-
-    .then(r => {
-      if (!r.ok) {
-        throw new Error(`HTTP ${r.status}: ${r.statusText}`);
-      }
-      return r.text();
-    })
-    .then(html => sendResponse({ html }))
-    .catch(e => {
-      console.error(`[OFFSCREEN] Fetch error for ${request.url}:`, e);
-      sendResponse({ error: e.toString() });
-    });
+      .then((r) => {
+        if (!r.ok) {
+          throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+        }
+        return r.text();
+      })
+      .then((html) => sendResponse({ html }))
+      .catch((e) => {
+        console.error(`[OFFSCREEN] Fetch error for ${request.url}:`, e);
+        sendResponse({ error: e.toString() });
+      });
     return true;
   }
 
