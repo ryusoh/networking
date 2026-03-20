@@ -33,14 +33,12 @@ setup() {
 }
 
 build() {
-    echo "[*] Launching Turbo eBPF Build..."
-    # If we are using the RAM disk, we'd sync files here. 
-    # For now, we prioritize C-cache which is the safest 10x boost.
+    echo "[*] Launching Turbo Build (eBPF + C-Tools)..."
     sudo docker run --rm \
         -v "$PROJECT_ROOT":/app \
         -v "$CCACHE_PATH":/root/.ccache \
         -e CCACHE_DIR=/root/.ccache \
-        ebpf-builder make -C kernel_proxy all
+        ebpf-builder /bin/bash -c "make -C kernel_proxy all && make build-nas-tools"
 }
 
 scrub() {

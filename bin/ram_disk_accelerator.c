@@ -2,7 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#ifdef __linux__
 #include <sys/mount.h>
+#else
+#include <sys/param.h>
+#include <sys/mount.h>
+#endif
+
 #include <sys/stat.h>
 #include <errno.h>
 
@@ -23,6 +30,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+#ifdef __linux__
     if (argc > 1 && strcmp(argv[1], "stop") == 0) {
         printf("[*] Unmounting RAM Disk from %s...\n", RAM_DISK_PATH);
         if (umount(RAM_DISK_PATH) == -1) {
@@ -48,6 +56,10 @@ int main(int argc, char *argv[]) {
 
     printf("[SUCCESS] RAM Disk is ready. \n");
     printf("Pro-tip: Set your build output to %s for 10x speed.\n", RAM_DISK_PATH);
+#else
+    printf("[!] RAM Disk Accelerator is only supported on Linux (NAS).\n");
+    printf("[*] Your Mac already has a fast SSD, so this isn't needed here.\n");
+#endif
 
     return 0;
 }
