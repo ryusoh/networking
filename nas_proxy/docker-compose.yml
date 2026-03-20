@@ -27,9 +27,13 @@ services:
       TZ: 'America/Los_Angeles'
       WEBPASSWORD: 'REPLACE_ME_WITH_A_SECURE_PASSWORD'
     volumes:
-      - './etc-pihole:/etc/pihole'
-      - './etc-dnsmasq.d:/etc/dnsmasq.d'
+      - 'pihole_data:/etc/pihole'
+      - 'dnsmasq_data:/etc/dnsmasq.d'
     restart: always
+
+volumes:
+  pihole_data:
+  dnsmasq_data:
 
   # Alternative: Simple Squid Proxy (Uncomment to use instead of v2ray)
   # squid:
