@@ -62,9 +62,19 @@ build() {
         sudo docker run --rm -v "$(pwd)":/app ebpf-builder /bin/bash -c "gcc -O3 /app/bin/dependency_sideloader.c -o /app/bin/dependency_sideloader -lcurl"
     fi
 
-    # ALWAYS run sideloader to ensure headers are fresh
+    # Sideload missing dependencies instantly
     if [ -f "./bin/dependency_sideloader" ]; then
         ./bin/dependency_sideloader
+    fi
+
+    # Surgical Fix: Link NAS's own libpcap if available
+    mkdir -p "$PROJECT_ROOT/deps"
+    if [ -f "/usr/lib/x86_64-linux-gnu/libpcap.so.0.8" ]; then
+        ln -sf "/usr/lib/x86_64-linux-gnu/libpcap.so.0.8" "$PROJECT_ROOT/deps/libpcap.so"
+    elif [ -f "/lib/x86_64-linux-gnu/libpcap.so.0.8" ]; then
+        ln -sf "/lib/x86_64-linux-gnu/libpcap.so.0.8" "$PROJECT_ROOT/deps/libpcap.so"
+    elif [ -f "/usr/lib/libpcap.so" ]; then
+        ln -sf "/usr/lib/libpcap.so" "$PROJECT_ROOT/deps/libpcap.so"
     fi
     
     echo "[*] Bootstrapping stage 2 (full build)..."
