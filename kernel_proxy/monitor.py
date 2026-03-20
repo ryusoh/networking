@@ -69,9 +69,28 @@ def add_to_blocklist(ip):
     except Exception as e:
         print(f"Error adding IP: {e}")
 
+def block_domain(domain):
+    """Resolves a domain to its IPs and blocks each one in the kernel."""
+    import socket
+    print(f"[*] Resolving {domain}...")
+    try:
+        # Get all unique IP addresses for the domain (IPv4 only for now)
+        info = socket.getaddrinfo(domain, None, socket.AF_INET)
+        ips = {item[4][0] for item in info}
+        
+        if not ips:
+            print(f"[-] No IPs found for {domain}")
+            return
+
+        for ip in ips:
+            add_to_blocklist(ip)
+            
+    except Exception as e:
+        print(f"[-] Resolution failed for {domain}: {e}")
+
 def main():
     if len(sys.argv) < 2:
-        print("Usage: ./monitor.py [status|dns|block <ip>]")
+        print("Usage: ./monitor.py [status|dns|block <ip>|block-domain <domain>]")
         return
 
     cmd = sys.argv[1]
@@ -82,6 +101,8 @@ def main():
         show_dns_hits()
     elif cmd == "block" and len(sys.argv) == 3:
         add_to_blocklist(sys.argv[2])
+    elif cmd == "block-domain" and len(sys.argv) == 3:
+        block_domain(sys.argv[2])
     else:
         print("Unknown command.")
 

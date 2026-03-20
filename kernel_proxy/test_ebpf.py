@@ -22,9 +22,14 @@ class TestEBPFPrograms(unittest.TestCase):
         """Verify that all programs compiled without errors."""
         self.assertEqual(self.make_result.returncode, 0, f"Compilation failed:\n{self.make_result.stderr}")
         
-        expected_files = ["hello.bpf.o", "adblock.bpf.o", "redirect.bpf.o", "reputation.bpf.o", "dns_filter.bpf.o"]
+        expected_files = ["hello.bpf.o", "adblock.bpf.o", "redirect.bpf.o", "reputation.bpf.o", "dns_filter.bpf.o", "sni_filter.bpf.o"]
         for f in expected_files:
             self.assertTrue(os.path.exists(f), f"Expected binary {f} was not generated.")
+
+    def test_sni_filter_maps(self):
+        """Verify that the SNI filter has its blacklist map."""
+        output = subprocess.check_output("bpftool btf dump file sni_filter.bpf.o", shell=True).decode()
+        self.assertIn("sni_blacklist", output, "Map 'sni_blacklist' missing from sni_filter.bpf.o BTF")
 
     def test_adblock_maps(self):
         """Verify that the adblock program has its blocklist map."""
