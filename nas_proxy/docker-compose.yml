@@ -14,6 +14,23 @@ services:
       - ./config:/etc/v2ray
     command: run -c /etc/v2ray/config.json
 
+  # Tianditu Map Tile Accelerator
+  # Caches Chinese map tiles locally on the NAS to bypass slow exit nodes
+  tile_cache:
+    build:
+      context: .
+      dockerfile: Dockerfile.tile_cache
+    container_name: tile_cache
+    restart: always
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./tiles:/app/tiles
+    environment:
+      PROXY_URL: "http://nas_proxy:8080"
+    depends_on:
+      - nas_proxy
+
   # Network-wide ad blocking
   pihole:
     container_name: pihole
