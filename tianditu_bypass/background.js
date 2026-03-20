@@ -29,6 +29,8 @@ const ROTATION_INTERVAL_MINS = 15;
 
 let proxyList = [];
 let currentProxyIndex = 0;
+let nasFailureCount = 0;
+const MAX_NAS_FAILURES = 3;
 
 /**
  * Updates the PAC script.
@@ -74,6 +76,14 @@ async function notifyNAS(proxies) {
 chrome.proxy.onProxyError.addListener((details) => {
   if (details.fatal) {
     console.warn('[Tianditu] Proxy error, rotating...');
+    
+    // Check if the current proxy is the NAS
+    const currentProxy = proxyList[currentProxyIndex];
+    if (currentProxy && (currentProxy.ip === NAS_IP || currentProxy.name === 'Home NAS')) {
+      nasFailureCount++;
+      console.warn(`[Tianditu] NAS Failure Count: ${nasFailureCount}`);
+    }
+    
     tryNextProxy();
   }
 });
@@ -82,6 +92,13 @@ function tryNextProxy() {
   currentProxyIndex++;
   if (currentProxyIndex < proxyList.length) {
     const p = proxyList[currentProxyIndex];
+    
+    // Skip NAS if it has failed too many times
+    if ((p.ip === NAS_IP || p.name === 'Home NAS') && nasFailureCount >= MAX_NAS_FAILURES) {
+      console.warn('[Tianditu] NAS threshold reached, skipping NAS for this session.');
+      return tryNextProxy(); // Skip and try next
+    }
+    
     updateProxySettings(`${p.scheme} ${p.ip}:${p.port}`);
   } else {
     refreshProxy();
@@ -150,6 +167,7 @@ async function fetchFromSource(source) {
 
 async function refreshProxy() {
   console.log('[Tianditu] Refreshing proxy list...');
+  nasFailureCount = 0; // Reset count on full refresh
   try {
     await ensureOffscreenDocument();
     const results = await Promise.all(
@@ -162,7 +180,8 @@ async function refreshProxy() {
       port: '8080',
       scheme: 'PROXY',
       speed: 10,
-      name: 'Home NAS'
+      name: 'Home NAS',
+      type: 'nas'
     };
 
     if (fetchedProxies.length > 0) {
