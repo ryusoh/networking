@@ -3,3 +3,4 @@ node_modules/
 _metadata/
 nas_proxy/tiles/
 .env
+*.o
