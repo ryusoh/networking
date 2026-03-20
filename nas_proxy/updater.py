@@ -9,11 +9,11 @@ NAS Proxy Auto-Updater
 Parses proxies.html and injects them into V2Ray config.json.
 Ensures your NAS always uses the fastest working Chinese proxies.
 """
-
-CONFIG_PATH = "./config/config.json"
-PROXY_FILE = "proxies.html"
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config", "config.json")
+PROXY_FILE = os.path.join(os.path.dirname(__file__), "proxies.html")
 
 def update_v2ray_config():
+
     if not os.path.exists(PROXY_FILE):
         print(f"[-] {PROXY_FILE} not found. Run scraper first.")
         return
