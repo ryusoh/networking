@@ -5,11 +5,7 @@
     "loglevel": "info"
   },
   "dns": {
-    "servers": [
-      "223.5.5.5",
-      "119.29.29.29",
-      "8.8.8.8"
-    ]
+    "servers": ["223.5.5.5", "119.29.29.29", "8.8.8.8"]
   },
   "inbounds": [
     {
@@ -57,10 +53,7 @@
       {
         "type": "field",
         "outboundTag": "china-proxy",
-        "domain": [
-          "domain:tianditu.gov.cn",
-          "domain:tianditu.cn"
-        ]
+        "domain": ["domain:tianditu.gov.cn", "domain:tianditu.cn"]
       },
       {
         "type": "field",

@@ -8,8 +8,8 @@ services:
     container_name: nas_proxy
     restart: always
     ports:
-      - "1080:1080" # SOCKS5 Port
-      - "8080:8080" # HTTP Proxy Port
+      - '1080:1080' # SOCKS5 Port
+      - '8080:8080' # HTTP Proxy Port
     volumes:
       - ./config:/etc/v2ray
       - ./logs:/var/log/v2ray
@@ -24,11 +24,11 @@ services:
     container_name: tile_cache
     restart: always
     ports:
-      - "8082:8082"
+      - '8082:8082'
     volumes:
       - ./tiles:/app/tiles
     environment:
-      PROXY_URL: "http://nas_proxy:8080"
+      PROXY_URL: 'http://nas_proxy:8080'
     depends_on:
       - nas_proxy
 
@@ -36,25 +36,28 @@ services:
   pihole:
     container_name: pihole
     image: pihole/pihole:2024.07.0
+    env_file:
+      - .env
     ports:
-      - "53:53/tcp"
-      - "53:53/udp"
-      - "67:67/udp" # DHCP (Optional)
-      - "8000:80"   # Admin UI
+      - '53:53/tcp'
+      - '53:53/udp'
+      - '67:67/udp' # DHCP (Optional)
+      - '8000:80' # Admin UI
     environment:
       TZ: 'America/Los_Angeles'
-      WEBPASSWORD: 'REPLACE_ME_WITH_A_SECURE_PASSWORD'
+      WEBPASSWORD: ${PIHOLE_PASSWORD:-REPLACE_ME_WITH_A_SECURE_PASSWORD}
       FTLCONF_LOCAL_IPV4: '10.0.0.169'
       DNSMASQ_USER: 'root'
       INTERFACE: 'eth0'
-      PIHOLE_DNS_: '8.8.8.8;1.1.1.1'
+      PIHOLE_DNS_: '8.8.4.4;1.1.1.1' # Adding Google Secondary and Cloudflare
     volumes:
-      - 'pihole_data:/etc/pihole'
-      - 'dnsmasq_data:/etc/dnsmasq.d'
+      - './pihole/etc-pihole:/etc/pihole'
+      - './pihole/etc-dnsmasq.d:/etc/dnsmasq.d'
     cap_add:
       - NET_ADMIN
     restart: always
 
 volumes:
+  # Using named volumes for local stability, but mapped to folders for easier NAS management
   pihole_data:
   dnsmasq_data:
