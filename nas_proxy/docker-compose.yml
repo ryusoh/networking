@@ -17,16 +17,19 @@ services:
   # Network-wide ad blocking
   pihole:
     container_name: pihole
-    image: pihole/pihole:latest
+    image: pihole/pihole:2024.07.0
     ports:
       - "53:53/tcp"
       - "53:53/udp"
       - "67:67/udp" # DHCP (Optional)
-      - "8000:80"   # Admin UI (Access via NAS_IP:8000/admin)
+      - "8000:80"   # Admin UI
     environment:
       TZ: 'America/Los_Angeles'
       WEBPASSWORD: 'REPLACE_ME_WITH_A_SECURE_PASSWORD'
       FTLCONF_LOCAL_IPV4: '10.0.0.169'
+      DNSMASQ_USER: 'root'
+      INTERFACE: 'eth0'
+      PIHOLE_DNS_: '8.8.8.8;1.1.1.1'
     volumes:
       - 'pihole_data:/etc/pihole'
       - 'dnsmasq_data:/etc/dnsmasq.d'
