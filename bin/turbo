@@ -34,6 +34,9 @@ setup() {
 
 build() {
     echo "[*] Launching Turbo Build (eBPF + C-Tools)..."
+    # Auto-create cache dir if it's missing
+    mkdir -p "$CCACHE_PATH"
+    
     sudo docker run --rm \
         -v "$PROJECT_ROOT":/app \
         -v "$CCACHE_PATH":/root/.ccache \
