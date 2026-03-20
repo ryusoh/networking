@@ -90,9 +90,9 @@ int fetch_proxy_list(const char *url) {
 int main() {
     curl_global_init(CURL_GLOBAL_ALL);
     
-    printf("[*] Running NAS Proxy Scraper (Reliability Focus)...\n");
-    // Using a more reliable, frequently updated Chinese proxy source
-    fetch_proxy_list("https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt");
+    printf("[*] Running NAS Proxy Scraper (SOCKS5 for TLS tunneling)...\n");
+    // SOCKS5 proxies tunnel TLS end-to-end without MITM (unlike HTTP proxies)
+    fetch_proxy_list("https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt");
     
     curl_global_cleanup();
     return 0;

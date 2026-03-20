@@ -36,11 +36,11 @@ def update_v2ray_config():
         print("[-] No valid proxies found in file.")
         return
 
-    # 2. Create small outbound config
+    # 2. Create SOCKS5 outbound config (SOCKS5 tunnels TLS properly, no MITM)
     proxies_config = {
         "outbounds": [
             {
-                "protocol": "http",
+                "protocol": "socks",
                 "settings": {"servers": proxies[:10]},
                 "tag": "china-proxy"
             }
