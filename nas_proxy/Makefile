@@ -1,6 +1,6 @@
 CC = gcc
-CFLAGS = -O3 -Wall -fPIC -I../deps
-LDFLAGS = -L../deps -lcurl
+CFLAGS = -O3 -Wall -fPIC
+LDFLAGS = -lcurl
 TARGET = tile_storage
 TUNNEL_TARGET = stealth_tunnel
 SHM_TARGET = shared_memory
@@ -20,10 +20,10 @@ $(SCRAPER_TARGET): proxy_scraper.c
 	$(CC) $(CFLAGS) -o $(SCRAPER_TARGET) proxy_scraper.c $(LDFLAGS)
 
 $(BLOCKER_TARGET): userspace_blocker.c
-	$(CC) $(CFLAGS) -o $(BLOCKER_TARGET) userspace_blocker.c -lpcap
+	$(CC) $(CFLAGS) -o $(BLOCKER_TARGET) userspace_blocker.c
 
-$(TEST_TARGET): tests.c tile_storage.c tile_fetcher.c stealth_tunnel.c connectivity_spoofer.c shared_memory.c neon_adblock.c
-	$(CC) $(CFLAGS) -DTEST_MAIN -o $(TEST_TARGET) tests.c tile_storage.c tile_fetcher.c stealth_tunnel.c connectivity_spoofer.c shared_memory.c neon_adblock.c $(LDFLAGS) -lpcap
+$(TEST_TARGET): tests.c tile_storage.c tile_fetcher.c stealth_tunnel.c connectivity_spoofer.c shared_memory.c neon_adblock.c userspace_blocker.c
+	$(CC) $(CFLAGS) -DTEST_MAIN -o $(TEST_TARGET) tests.c tile_storage.c tile_fetcher.c stealth_tunnel.c connectivity_spoofer.c shared_memory.c neon_adblock.c userspace_blocker.c $(LDFLAGS)
 
 test: $(TEST_TARGET)
 	@./$(TEST_TARGET)

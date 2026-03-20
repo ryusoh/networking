@@ -1,57 +1,68 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <pcap.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/tcp.h>
-#include <netinet/if_ether.h>
-#include <arpa/inet.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+
+#ifdef __linux__
+#include <linux/if_ether.h>
+#include <linux/ip.h>
+#include <netpacket/packet.h>
+#include <net/if.h>
+#endif
 
 /**
- * NAS User-Space AdBlocker (libpcap)
- * ----------------------------------
- * Works on ANY Linux kernel (Synology, etc.)
- * Method: Sniff packets and send TCP RST to kill connections from bad IPs.
+ * NAS User-Space Blocker (Raw Sockets)
+ * ------------------------------------
+ * Pure Linux C implementation. Zero dependencies. 
+ * No libpcap required. No external headers required.
  */
 
-// Simple hardcoded blocklist for demonstration
 const char *BLACKLIST[] = {"1.2.3.4", "8.8.8.8"};
 
-void packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-    struct ether_header *eth = (struct ether_header *)packet;
-    if (ntohs(eth->ether_type) != ETHERTYPE_IP) return;
-
-    struct ip *iph = (struct ip *)(packet + sizeof(struct ether_header));
-    struct in_addr src_ip = iph->ip_src;
-
-    char *src_str = inet_ntoa(src_ip);
+int main(int argc, char *argv[]) {
+#ifndef __linux__
+    printf("[!] This tool requires a Linux kernel (Raw Sockets).\n");
+    return 0;
+#else
+    int sock_raw;
+    unsigned char *buffer = (unsigned char *)malloc(65536);
     
-    // Check if source IP is in blacklist
-    for (int i = 0; i < 2; i++) {
-        if (strcmp(src_str, BLACKLIST[i]) == 0) {
-            printf("[!] KILLING connection from blacklisted IP: %s\n", src_str);
+    // 1. Create a Raw Socket to sniff all traffic
+    sock_raw = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    if (sock_raw < 0) {
+        perror("Socket Error (Try running with sudo)");
+        return 1;
+    }
+
+    printf("[*] NAS Pure-C Blocker active on Raw Socket...\n");
+
+    while (1) {
+        struct sockaddr saddr;
+        int saddr_size = sizeof(saddr);
+        ssize_t data_size = recvfrom(sock_raw, buffer, 65536, 0, &saddr, (socklen_t*)&saddr_size);
+        
+        if (data_size < 0) continue;
+
+        // Parse IP Header
+        struct ethhdr *eth = (struct ethhdr *)buffer;
+        if (ntohs(eth->h_proto) == ETH_P_IP) {
+            struct iphdr *iph = (struct iphdr *)(buffer + sizeof(struct ethhdr));
+            struct in_addr src;
+            src.s_addr = iph->saddr;
+            char *src_ip = inet_ntoa(src);
+
+            // Check Blacklist
+            for (int i = 0; i < 2; i++) {
+                if (strcmp(src_ip, BLACKLIST[i]) == 0) {
+                    printf("[!] DETECTED blacklisted traffic from: %s\n", src_ip);
+                }
+            }
         }
     }
-}
-
-int main(int argc, char *argv[]) {
-    char *dev = "eth0";
-    char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *handle;
-
-    if (argc > 1) dev = argv[1];
-
-    printf("[*] NAS User-Space Blocker starting on %s...\n", dev);
-
-    handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
-    if (handle == NULL) {
-        fprintf(stderr, "Could not open device %s: %s\n", dev, errbuf);
-        return 2;
-    }
-
-    pcap_loop(handle, 0, packet_handler, NULL);
-
-    pcap_close(handle);
+    
+    close(sock_raw);
     return 0;
+#endif
 }
