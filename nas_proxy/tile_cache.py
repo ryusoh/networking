@@ -26,13 +26,17 @@ class TileCacheHandler(BaseHTTPRequestHandler):
 
         # Create a unique filename based on the URL
         url_hash = hashlib.md5(target_url.encode()).hexdigest()
-        cache_path = os.path.join(CACHE_DIR, f"{url_hash}.png")
+        
+        # Determine file extension (defaulting to png for tiles)
+        ext = "json" if target_url.endswith(".json") or ".json" in target_url else "png"
+        content_type = "application/json" if ext == "json" else "image/png"
+        cache_path = os.path.join(CACHE_DIR, f"{url_hash}.{ext}")
 
         if os.path.exists(cache_path):
             # Serve from cache
             # print(f"[Cache] Hit: {target_url}")
             self.send_response(200)
-            self.send_header('Content-Type', 'image/png')
+            self.send_header('Content-Type', content_type)
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             with open(cache_path, 'rb') as f:
@@ -42,7 +46,7 @@ class TileCacheHandler(BaseHTTPRequestHandler):
             # print(f"[Cache] Miss: {target_url}")
             try:
                 proxies = {"http": PROXY_URL, "https": PROXY_URL}
-                response = requests.get(target_url, proxies=proxies, timeout=5)
+                response = requests.get(target_url, proxies=proxies, timeout=10)
                 
                 if response.status_code == 200:
                     # Save to cache
@@ -51,7 +55,7 @@ class TileCacheHandler(BaseHTTPRequestHandler):
                     
                     # Serve to client
                     self.send_response(200)
-                    self.send_header('Content-Type', 'image/png')
+                    self.send_header('Content-Type', content_type)
                     self.send_header('Access-Control-Allow-Origin', '*')
                     self.end_headers()
                     self.wfile.write(response.content)

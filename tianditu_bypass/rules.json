@@ -10,12 +10,7 @@
           "host": "10.0.0.169",
           "port": "8082",
           "queryTransform": {
-            "addOrReplaceParams": [
-              {
-                "key": "url",
-                "value": "==url=="
-              }
-            ]
+            "addOrReplaceParams": [{ "key": "url", "value": "==url==" }]
           }
         }
       }
@@ -36,12 +31,7 @@
           "host": "10.0.0.169",
           "port": "8082",
           "queryTransform": {
-            "addOrReplaceParams": [
-              {
-                "key": "url",
-                "value": "==url=="
-              }
-            ]
+            "addOrReplaceParams": [{ "key": "url", "value": "==url==" }]
           }
         }
       }
@@ -49,6 +39,27 @@
     "condition": {
       "urlFilter": "|http*://*.tianditu.cn/*/tile*",
       "resourceTypes": ["image"]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 2,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "transform": {
+          "scheme": "http",
+          "host": "10.0.0.169",
+          "port": "8082",
+          "queryTransform": {
+            "addOrReplaceParams": [{ "key": "url", "value": "==url==" }]
+          }
+        }
+      }
+    },
+    "condition": {
+      "urlFilter": "|http*://*.tianditu.gov.cn/*.json*",
+      "resourceTypes": ["xmlhttprequest", "other"]
     }
   }
 ]
