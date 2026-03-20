@@ -74,18 +74,24 @@ function parseDatabay(doc) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'FETCH_HTML') {
     console.log(`[OFFSCREEN] Fetching ${request.url}...`);
+    
+    // Use a fresh User-Agent for every fetch to avoid 403
+    const uas = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    ];
+    const ua = uas[Math.floor(Math.random() * uas.length)];
+
     fetch(request.url, {
       method: 'GET',
       mode: 'cors',
-      credentials: 'omit',
       cache: 'no-cache',
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept:
-          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        Referer: request.url
+        'User-Agent': ua,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Upgrade-Insecure-Requests': '1'
       }
     })
       .then((r) => {
