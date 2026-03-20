@@ -117,7 +117,9 @@ try {
  * Tab Management: Auto-Close Annoying Update Pages
  */
 function shouldCloseTab(url) {
-  if (!url) {return false;}
+  if (!url) {
+    return false;
+  }
   try {
     const urlObj = new URL(url);
     if (urlObj.hostname.includes('getadblock.com')) {

@@ -166,6 +166,52 @@
   }
 
   /**
+   * Restores text selection, copying, and right-click functionality.
+   */
+  function restoreInteractions() {
+    const userSelectCss =
+      'user-select: text !important;-webkit-user-select: text !important;-webkit-touch-callout: text !important;';
+
+    // 1. Force CSS selection
+    if (!document.getElementById('bypass-copy-fix')) {
+      const style = document.createElement('style');
+      style.id = 'bypass-copy-fix';
+      style.textContent = `* { ${userSelectCss} }`;
+      document.documentElement.appendChild(style);
+    }
+
+    // 2. Clear restrictive inline event handlers
+    const clearEvents = (el) => {
+      if (!el) {
+        return;
+      }
+      el.onselectstart = null;
+      el.oncopy = null;
+      el.oncut = null;
+      el.onpaste = null;
+      el.oncontextmenu = null;
+      el.onmousedown = null;
+      el.onmouseup = null;
+    };
+    clearEvents(document);
+    clearEvents(document.body);
+    clearEvents(document.documentElement);
+
+    // 3. Hijack event listeners via Capture Phase
+    const stopPropagation = (e) => {
+      e.stopPropagation();
+      if (e.stopImmediatePropagation) {
+        e.stopImmediatePropagation();
+      }
+      return true;
+    };
+
+    ['copy', 'cut', 'contextmenu', 'selectstart', 'mousedown', 'mouseup'].forEach((evt) => {
+      document.documentElement.addEventListener(evt, stopPropagation, { capture: true });
+    });
+  }
+
+  /**
    * Site-specific modules for complex platforms.
    */
   const SITE_MODULES = {
@@ -254,14 +300,17 @@
             }
           }
 
-          // 3. Site-specific handling
+          // 3. Force Interaction Restoration (Always On)
+          restoreInteractions();
+
+          // 4. Site-specific handling
           Object.keys(SITE_MODULES).forEach((m) => {
             if (host.includes(m)) {
               SITE_MODULES[m]();
             }
           });
 
-          // 4. Apply automatic detection
+          // 5. Apply automatic detection
           scanDOM(document.body, (el) => {
             if (scoreElement(el) > 0.6) {
               hideDetector(el);
