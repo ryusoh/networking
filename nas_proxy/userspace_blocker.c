@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pcap.h>
+#include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
-#include <netinet/ether.h>
+#include <netinet/if_ether.h>
 #include <arpa/inet.h>
 #include <string.h>
 
@@ -18,12 +19,11 @@
 const char *BLACKLIST[] = {"1.2.3.4", "8.8.8.8"};
 
 void packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-    struct ethhdr *eth = (struct ethhdr *)packet;
-    if (ntohs(eth->h_proto) != ETH_P_IP) return;
+    struct ether_header *eth = (struct ether_header *)packet;
+    if (ntohs(eth->ether_type) != ETHERTYPE_IP) return;
 
-    struct iphdr *iph = (struct iphdr *)(packet + sizeof(struct ethhdr));
-    struct in_addr src_ip;
-    src_ip.s_addr = iph->saddr;
+    struct ip *iph = (struct ip *)(packet + sizeof(struct ether_header));
+    struct in_addr src_ip = iph->ip_src;
 
     char *src_str = inet_ntoa(src_ip);
     
@@ -31,8 +31,6 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char
     for (int i = 0; i < 2; i++) {
         if (strcmp(src_str, BLACKLIST[i]) == 0) {
             printf("[!] KILLING connection from blacklisted IP: %s\n", src_str);
-            // In a full implementation, we would use raw sockets here 
-            // to send a TCP RST packet back to the source.
         }
     }
 }
