@@ -4,3 +4,4 @@ _metadata/
 nas_proxy/tiles/
 .env
 *.o
+*.bin
