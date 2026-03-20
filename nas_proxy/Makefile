@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -O3 -Wall -fPIC -I../deps
-LDFLAGS = -lcurl
+LDFLAGS = -L../deps -lcurl
 TARGET = tile_storage
 TUNNEL_TARGET = stealth_tunnel
 SHM_TARGET = shared_memory
