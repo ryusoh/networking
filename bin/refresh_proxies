@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# NAS Proxy Refresher
+# --------------------
+# Builds and runs the C-based scraper to ensure 
+# your extension always has fresh Chinese proxies.
+
+PROJECT_ROOT="/volume1/docker/networking"
+SCRAPER_BIN="$PROJECT_ROOT/nas_proxy/proxy_scraper"
+
+echo "[*] Refreshing Chinese Proxy List..."
+
+# 1. Ensure binary is built (using our Turbo Build)
+if [ ! -f "$SCRAPER_BIN" ]; then
+    echo "[!] Scraper binary missing. Building..."
+    $PROJECT_ROOT/bin/turbo build
+fi
+
+# 2. Run the Scraper
+cd "$PROJECT_ROOT/nas_proxy"
+./proxy_scraper
+
+if [ $? -eq 0 ]; then
+    echo "[SUCCESS] proxies.html updated at $(date)"
+else
+    echo "[ERROR] Scraper failed at $(date)"
+fi

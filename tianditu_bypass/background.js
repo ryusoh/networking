@@ -14,7 +14,7 @@ const SOURCES = [
   }
 ];
 
-const ROTATION_INTERVAL_MINS = 15;
+const ROTATION_INTERVAL_MINS = 5; // Refresh more often to keep proxies fresh
 
 let proxyList = [];
 let currentProxyIndex = 0;
