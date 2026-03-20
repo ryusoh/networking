@@ -1,7 +1,7 @@
 # Makefile for compiling eBPF programs
 CLANG ?= clang
 LLVM_STRIP ?= llvm-strip
-BPF_OBJ = hello.bpf.o adblock.bpf.o redirect.bpf.o reputation.bpf.o dns_filter.bpf.o sni_filter.bpf.o bloom_filter.bpf.o
+BPF_OBJ = hello.bpf.o adblock.bpf.o redirect.bpf.o reputation.bpf.o dns_filter.bpf.o sni_filter.bpf.o bloom_filter.bpf.o xdp_forwarder.bpf.o
 
 # Search paths for headers
 INCLUDES := -I/usr/include -I/usr/include/x86_64-linux-gnu -I/usr/include/$(shell uname -m)-linux-gnu

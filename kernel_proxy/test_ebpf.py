@@ -22,9 +22,14 @@ class TestEBPFPrograms(unittest.TestCase):
         """Verify that all programs compiled without errors."""
         self.assertEqual(self.make_result.returncode, 0, f"Compilation failed:\n{self.make_result.stderr}")
         
-        expected_files = ["hello.bpf.o", "adblock.bpf.o", "redirect.bpf.o", "reputation.bpf.o", "dns_filter.bpf.o", "sni_filter.bpf.o", "bloom_filter.bpf.o"]
+        expected_files = ["hello.bpf.o", "adblock.bpf.o", "redirect.bpf.o", "reputation.bpf.o", "dns_filter.bpf.o", "sni_filter.bpf.o", "bloom_filter.bpf.o", "xdp_forwarder.bpf.o"]
         for f in expected_files:
             self.assertTrue(os.path.exists(f), f"Expected binary {f} was not generated.")
+
+    def test_xdp_forwarder_maps(self):
+        """Verify that the XDP forwarder has its redirect map."""
+        output = subprocess.check_output("bpftool btf dump file xdp_forwarder.bpf.o", shell=True).decode()
+        self.assertIn("forward_map", output, "Map 'forward_map' missing from xdp_forwarder.bpf.o BTF")
 
     def test_bloom_filter_maps(self):
         """Verify that the Bloom filter has its specialized map."""
@@ -59,7 +64,7 @@ class TestEBPFPrograms(unittest.TestCase):
         Runs a 'dry-run' verification using bpftool. 
         Note: This requires a Linux environment with BTF support.
         """
-        expected_files = ["hello.bpf.o", "adblock.bpf.o", "redirect.bpf.o", "reputation.bpf.o", "dns_filter.bpf.o", "sni_filter.bpf.o", "bloom_filter.bpf.o"]
+        expected_files = ["hello.bpf.o", "adblock.bpf.o", "redirect.bpf.o", "reputation.bpf.o", "dns_filter.bpf.o", "sni_filter.bpf.o", "bloom_filter.bpf.o", "xdp_forwarder.bpf.o"]
         # We try to dump the BTF (kernel type info) - if this works, the ELF is valid.
         for f in expected_files:
             res = subprocess.run(["bpftool", "btf", "dump", "file", f], capture_output=True)
