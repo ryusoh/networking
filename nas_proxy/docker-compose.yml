@@ -72,6 +72,19 @@ services:
     depends_on:
       - pihole
 
+  # Automated Proxy Refresher
+  # Runs the C-based scraper every hour automatically
+  refresher:
+    container_name: nas_refresher
+    image: ebpf-builder
+    volumes:
+      - '..:/app'
+    working_dir: /app
+    command: /bin/bash -c "while true; do ./bin/refresh_proxies; sleep 3600; done"
+    restart: always
+    depends_on:
+      - nas_proxy
+
 volumes:
   # Using named volumes for NAS stability
   pihole_etc:
