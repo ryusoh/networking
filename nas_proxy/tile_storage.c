@@ -127,7 +127,7 @@ int init_tile_storage() {
     return init_storage();
 }
 
-#ifdef TEST_MAIN
+#ifdef BUILD_TILE_STORAGE_TEST
 int main() {
     if (init_storage() != 0) return 1;
     printf("[*] Tile Storage Initialized. Count: %u\n", header->count);

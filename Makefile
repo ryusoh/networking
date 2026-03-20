@@ -10,9 +10,9 @@ pull:
 install-dev:
 	@npm install
 
-precommit: fmt-check lint test test-ebpf
+precommit: fmt-check lint test test-ebpf test-nas
 
-precommit-fix: fmt lint-fix test test-ebpf
+precommit-fix: fmt lint-fix test test-ebpf test-nas
 
 fmt:
 	@npm run fmt
@@ -32,6 +32,10 @@ test:
 test-ebpf:
 	@echo "Running eBPF Kernel Tests (via Docker)..."
 	@docker run --rm -v $(shell pwd):/app ebpf-builder make -C kernel_proxy test
+
+test-nas:
+	@echo "Running C-based NAS Tool Tests..."
+	@make -C nas_proxy test
 
 build-nas-tools:
 	@echo "Building C-based NAS tools..."

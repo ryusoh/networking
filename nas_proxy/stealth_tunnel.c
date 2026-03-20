@@ -24,6 +24,7 @@ void obfuscate(uint8_t *data, size_t len) {
     }
 }
 
+#ifndef TEST_MAIN
 int main() {
     int server_fd, client_fd;
     struct sockaddr_in address;
@@ -77,3 +78,4 @@ int main() {
 
     return 0;
 }
+#endif

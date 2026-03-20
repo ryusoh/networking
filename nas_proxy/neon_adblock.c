@@ -35,6 +35,7 @@ void process_ips_neon(uint32_t *ips, uint32_t *results, int count) {
 #endif
 }
 
+#ifndef TEST_MAIN
 int main() {
     uint32_t ips[4] = {0x01010101, 0x02020202, 0x03030303, 0x04040404};
     uint32_t results[4];
@@ -47,3 +48,4 @@ int main() {
 
     return 0;
 }
+#endif

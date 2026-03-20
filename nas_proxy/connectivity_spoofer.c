@@ -36,6 +36,7 @@ void handle_client(int client_fd) {
     close(client_fd);
 }
 
+#ifndef TEST_MAIN
 int main() {
     int server_fd, client_fd;
     struct sockaddr_in address;
@@ -63,3 +64,4 @@ int main() {
     }
     return 0;
 }
+#endif

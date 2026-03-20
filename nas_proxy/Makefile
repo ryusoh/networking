@@ -6,12 +6,19 @@ TUNNEL_TARGET = stealth_tunnel
 SHM_TARGET = shared_memory
 NEON_TARGET = neon_adblock
 SPOOFER_TARGET = connectivity_spoofer
+TEST_TARGET = tests
 LIB_TARGET = libtilestorage.so
 
 all: $(TARGET) $(LIB_TARGET) $(TUNNEL_TARGET) $(SHM_TARGET) $(NEON_TARGET) $(SPOOFER_TARGET)
 
 $(TARGET): tile_storage.c tile_fetcher.c
-	$(CC) $(CFLAGS) -DTEST_MAIN -o $(TARGET) tile_storage.c tile_fetcher.c $(LDFLAGS)
+	$(CC) $(CFLAGS) -DBUILD_TILE_STORAGE_TEST -o $(TARGET) tile_storage.c tile_fetcher.c $(LDFLAGS)
+
+$(TEST_TARGET): tests.c tile_storage.c tile_fetcher.c stealth_tunnel.c connectivity_spoofer.c shared_memory.c neon_adblock.c
+	$(CC) $(CFLAGS) -DTEST_MAIN -o $(TEST_TARGET) tests.c tile_storage.c tile_fetcher.c stealth_tunnel.c connectivity_spoofer.c shared_memory.c neon_adblock.c $(LDFLAGS)
+
+test: $(TEST_TARGET)
+	@./$(TEST_TARGET)
 
 $(SPOOFER_TARGET): connectivity_spoofer.c
 	$(CC) $(CFLAGS) -o $(SPOOFER_TARGET) connectivity_spoofer.c

@@ -16,3 +16,4 @@ ctx_cleaner
 ram_disk_accelerator
 parallel_pkg_pull
 ccache_manager
+tests

@@ -26,6 +26,7 @@ typedef struct {
     uint32_t active_connections;
 } NetworkStats;
 
+#ifndef TEST_MAIN
 int main(int argc, char *argv[]) {
     int shm_fd;
     NetworkStats *stats;
@@ -74,3 +75,4 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+#endif
