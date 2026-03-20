@@ -21,7 +21,9 @@ cd "$PROJECT_ROOT/nas_proxy"
 ./proxy_scraper
 
 if [ $? -eq 0 ]; then
-    echo "[SUCCESS] proxies.html updated at $(date)"
+    echo "[*] Injecting fresh proxies into V2Ray config..."
+    python3 ./updater.py
+    echo "[SUCCESS] System updated at $(date)"
 else
     echo "[ERROR] Scraper failed at $(date)"
 fi
