@@ -22,9 +22,18 @@ class TestEBPFPrograms(unittest.TestCase):
         """Verify that all programs compiled without errors."""
         self.assertEqual(self.make_result.returncode, 0, f"Compilation failed:\n{self.make_result.stderr}")
         
-        expected_files = ["hello.bpf.o", "adblock.bpf.o", "redirect.bpf.o", "reputation.bpf.o", "dns_filter.bpf.o", "sni_filter.bpf.o", "bloom_filter.bpf.o", "xdp_forwarder.bpf.o"]
+        expected_files = [
+            "hello.bpf.o", "adblock.bpf.o", "redirect.bpf.o", "reputation.bpf.o", 
+            "dns_filter.bpf.o", "sni_filter.bpf.o", "bloom_filter.bpf.o", 
+            "xdp_forwarder.bpf.o", "ebpf_snat.bpf.o", "container_pcap.bpf.o", "ptr_resolver.bpf.o"
+        ]
         for f in expected_files:
             self.assertTrue(os.path.exists(f), f"Expected binary {f} was not generated.")
+
+    def test_snat_maps(self):
+        """Verify that the SNAT filter has its map."""
+        output = subprocess.check_output("bpftool btf dump file ebpf_snat.bpf.o", shell=True).decode()
+        self.assertIn("snat_map", output, "Map 'snat_map' missing from ebpf_snat.bpf.o BTF")
 
     def test_xdp_forwarder_maps(self):
         """Verify that the XDP forwarder has its redirect map."""
@@ -64,7 +73,11 @@ class TestEBPFPrograms(unittest.TestCase):
         Runs a 'dry-run' verification using bpftool. 
         Note: This requires a Linux environment with BTF support.
         """
-        expected_files = ["hello.bpf.o", "adblock.bpf.o", "redirect.bpf.o", "reputation.bpf.o", "dns_filter.bpf.o", "sni_filter.bpf.o", "bloom_filter.bpf.o", "xdp_forwarder.bpf.o"]
+        expected_files = [
+            "hello.bpf.o", "adblock.bpf.o", "redirect.bpf.o", "reputation.bpf.o", 
+            "dns_filter.bpf.o", "sni_filter.bpf.o", "bloom_filter.bpf.o", 
+            "xdp_forwarder.bpf.o", "ebpf_snat.bpf.o", "container_pcap.bpf.o", "ptr_resolver.bpf.o"
+        ]
         # We try to dump the BTF (kernel type info) - if this works, the ELF is valid.
         for f in expected_files:
             res = subprocess.run(["bpftool", "btf", "dump", "file", f], capture_output=True)
