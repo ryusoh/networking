@@ -72,17 +72,17 @@ function parseDatabay(doc) {
 }
 
 function parseRawText(text) {
-  // Parses "IP:Port" format from a raw text file
+  // Parses "IP:Port" format - these are NAS-verified SOCKS5 Chinese-exit proxies
   return text
     .split('\n')
     .map((line) => {
       const parts = line.trim().split(':');
-      if (parts.length === 2) {
+      if (parts.length === 2 && parts[0].includes('.')) {
         return {
           ip: parts[0],
           port: parts[1],
-          scheme: 'PROXY',
-          speed: 100
+          scheme: 'SOCKS5',
+          speed: 10
         };
       }
       return null;

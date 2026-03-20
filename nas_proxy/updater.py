@@ -143,7 +143,18 @@ def update_v2ray_config():
     for p in working:
         print(f"    {p['address']}:{p['port']}")
 
-    # 4. Create outbound config
+    # 4. Write verified proxies to proxies.html for the browser extension
+    #    (pihole serves this file on port 8000, extension fetches it directly)
+    #    Extension will use SOCKS5 scheme in PAC script -> bypasses V2Ray entirely
+    try:
+        with open(PROXY_FILE, 'w') as f:
+            for p in working:
+                f.write(f"{p['address']}:{p['port']}\n")
+        print(f"[+] Wrote {len(working)} verified proxies to proxies.html (served by pihole)")
+    except Exception as e:
+        print(f"[-] Error writing proxies.html: {e}")
+
+    # 5. Also update V2Ray config (for tile_cache and other NAS services)
     proxies_config = {
         "outbounds": [
             {
@@ -158,12 +169,10 @@ def update_v2ray_config():
         os.makedirs(os.path.dirname(PROXIES_CONFIG_PATH), exist_ok=True)
         with open(PROXIES_CONFIG_PATH, 'w') as f:
             json.dump(proxies_config, f, indent=2)
-        print(f"[+] Deployed {len(working)} verified proxies to proxies.json")
+        print(f"[+] Also deployed to V2Ray proxies.json (for tile_cache)")
     except Exception as e:
         print(f"[-] Error writing config: {e}")
-        return
 
-    # 5. Reload V2Ray
     print("[*] Restarting nas_proxy container...")
     subprocess.run(["sudo", "docker", "restart", "nas_proxy"])
     print("[+] Done! Reload Chrome extension and try map.tianditu.gov.cn")
