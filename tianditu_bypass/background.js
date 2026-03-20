@@ -6,6 +6,11 @@
 
 const SOURCES = [
   {
+    name: 'Home NAS Proxy',
+    url: 'http://10.0.0.169:8080', // We'll assume the HTTP relay is working or we'll use a hardcoded entry
+    type: 'nas'
+  },
+  {
     name: 'freeproxy.world',
     url: 'https://www.freeproxy.world/?type=&anonymity=&country=CN&speed=1500',
     type: 'freeproxyworld'
@@ -233,19 +238,32 @@ async function refreshProxy() {
   console.log('[Tianditu] Refreshing proxy list...');
   try {
     await ensureOffscreenDocument();
-    const results = await Promise.all(SOURCES.map((s) => fetchFromSource(s)));
-    const allProxies = results.flat();
+    const results = await Promise.all(
+      SOURCES.filter((s) => s.type !== 'nas').map((s) => fetchFromSource(s))
+    );
+    const fetchedProxies = results.flat();
 
-    if (allProxies.length > 0) {
-      proxyList = allProxies.sort((a, b) => a.speed - b.speed);
-      currentProxyIndex = 0;
-      updateProxySettings(`${proxyList[0].scheme} ${proxyList[0].ip}:${proxyList[0].port}`);
+    // Always prepend the Home NAS Proxy as the fastest option
+    const nasProxy = {
+      ip: '10.0.0.169',
+      port: '8080',
+      scheme: 'PROXY',
+      speed: 10,
+      name: 'Home NAS'
+    };
+
+    if (fetchedProxies.length > 0) {
+      proxyList = [nasProxy, ...fetchedProxies.sort((a, b) => a.speed - b.speed)];
+    } else {
+      proxyList = [nasProxy];
     }
+
+    currentProxyIndex = 0;
+    updateProxySettings(`${proxyList[0].scheme} ${proxyList[0].ip}:${proxyList[0].port}`);
   } catch (e) {
     console.error('[Tianditu] Failed to refresh proxies:', e);
   }
 }
-
 chrome.alarms.create('refreshProxy', { periodInMinutes: ROTATION_INTERVAL_MINS });
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === 'refreshProxy') {
