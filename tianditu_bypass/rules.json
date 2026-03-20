@@ -1,1 +1,54 @@
-[]
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "transform": {
+          "scheme": "http",
+          "host": "10.0.0.169",
+          "port": "8082",
+          "queryTransform": {
+            "addOrReplaceParams": [
+              {
+                "key": "url",
+                "value": "==url=="
+              }
+            ]
+          }
+        }
+      }
+    },
+    "condition": {
+      "urlFilter": "|http*://*.tianditu.gov.cn/*/tile*",
+      "resourceTypes": ["image"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "transform": {
+          "scheme": "http",
+          "host": "10.0.0.169",
+          "port": "8082",
+          "queryTransform": {
+            "addOrReplaceParams": [
+              {
+                "key": "url",
+                "value": "==url=="
+              }
+            ]
+          }
+        }
+      }
+    },
+    "condition": {
+      "urlFilter": "|http*://*.tianditu.cn/*/tile*",
+      "resourceTypes": ["image"]
+    }
+  }
+]

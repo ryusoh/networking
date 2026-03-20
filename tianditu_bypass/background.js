@@ -4,6 +4,9 @@
  * Routes all tianditu traffic through the designated proxy server.
  */
 
+const NAS_IP = '10.0.0.169';
+const NAS_TILE_CACHE_URL = `http://${NAS_IP}:8082`;
+
 const SOURCES = [
   {
     name: 'Home NAS Proxy',
