@@ -12,35 +12,38 @@
  */
 
 #define DEPS_DIR "deps"
-#define PCAP_HEADER_URL "https://raw.githubusercontent.com/the-tcpdump-group/libpcap/master/pcap.h"
+#define PCAP_DIR "deps/pcap"
+#define BASE_URL "https://raw.githubusercontent.com/the-tcpdump-group/libpcap/master"
+
+int download_file(CURL *curl, const char *url, const char *out_path) {
+    FILE *fp = fopen(out_path, "wb");
+    if (!fp) return -1;
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    CURLcode res = curl_easy_perform(curl);
+    fclose(fp);
+    return (res == CURLE_OK) ? 0 : -1;
+}
 
 int main() {
     CURL *curl;
-    FILE *fp;
-    CURLcode res;
+    printf("[*] dependency_sideloader: Injecting full pcap suite...\n");
 
-    printf("[*] dependency_sideloader: Injecting missing pcap.h...\n");
-
-    // 1. Create deps directory
+    // 1. Create directory structure
     mkdir(DEPS_DIR, 0755);
+    mkdir(PCAP_DIR, 0755);
 
     curl = curl_easy_init();
     if (curl) {
-        fp = fopen(DEPS_DIR "/pcap.h", "wb");
-        curl_easy_setopt(curl, CURLOPT_URL, PCAP_HEADER_URL);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
         curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
         
-        res = curl_easy_perform(curl);
-        fclose(fp);
+        // Download core headers
+        download_file(curl, BASE_URL "/pcap.h", DEPS_DIR "/pcap.h");
+        download_file(curl, BASE_URL "/pcap/pcap.h", PCAP_DIR "/pcap.h");
+        download_file(curl, BASE_URL "/pcap/bpf.h", PCAP_DIR "/bpf.h");
+        download_file(curl, BASE_URL "/pcap/dlt.h", PCAP_DIR "/dlt.h");
 
-        if (res == CURLE_OK) {
-            printf("[SUCCESS] pcap.h sideloaded to ./%s/ folder.\n", DEPS_DIR);
-            printf("[*] You can now bypass the hours-long Docker rebuild!\n");
-        } else {
-            fprintf(stderr, "[ERROR] Sideload failed: %s\n", curl_easy_strerror(res));
-        }
+        printf("[SUCCESS] Full pcap headers sideloaded to ./%s/ folder.\n", DEPS_DIR);
         curl_easy_cleanup(curl);
     }
     return 0;

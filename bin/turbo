@@ -59,11 +59,10 @@ build() {
     # Ensure sideloader is built
     if [ ! -f "./bin/dependency_sideloader" ]; then
         echo "[!] Accelerators not found. Bootstrapping stage 1 (bin tools only)..."
-        # Only build the tools in bin/ that don't depend on pcap
         sudo docker run --rm -v "$(pwd)":/app ebpf-builder /bin/bash -c "gcc -O3 /app/bin/dependency_sideloader.c -o /app/bin/dependency_sideloader -lcurl"
     fi
 
-    # Sideload missing dependencies instantly
+    # ALWAYS run sideloader to ensure headers are fresh
     if [ -f "./bin/dependency_sideloader" ]; then
         ./bin/dependency_sideloader
     fi
