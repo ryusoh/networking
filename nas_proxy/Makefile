@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O3 -Wall -fPIC
+CFLAGS = -O3 -Wall -fPIC -I../deps
 LDFLAGS = -lcurl
 TARGET = tile_storage
 TUNNEL_TARGET = stealth_tunnel

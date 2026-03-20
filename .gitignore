@@ -20,5 +20,6 @@ tests
 proxy_scraper
 userspace_blocker
 pkg_warrior
+dependency_sideloader
 fs_overdrive
 dist_build_client
