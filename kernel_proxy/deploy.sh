@@ -22,14 +22,20 @@ load_prog() {
     local p=$1
     local i=$2
     echo "[+] Loading $p onto $i..."
-    # Attach XDP program in 'skb' mode for maximum compatibility with NAS drivers
-    ip link set dev "$i" xdp obj "$p" sec xdp || \
-    ip link set dev "$i" xdp generic obj "$p" sec xdp
+    # 1. Try modern syntax
+    ip link set dev "$i" xdp obj "$p" sec xdp 2>/dev/null || \
+    # 2. Try generic mode syntax
+    ip link set dev "$i" xdp generic obj "$p" sec xdp 2>/dev/null || \
+    # 3. Try alternative syntax (no dev keyword)
+    ip link set "$i" xdp obj "$p" 2>/dev/null || \
+    # 4. Final attempt with verbose error
+    ip link set dev "$i" xdp object "$p" section xdp
     
     if [ $? -eq 0 ]; then
         echo "[SUCCESS] $p is now active on $i."
     else
-        echo "[ERROR] Failed to load $p. Check 'dmesg' for kernel logs."
+        echo "[ERROR] Failed to load $p. Your NAS 'ip' command might not support XDP."
+        echo "Try checking if 'bpftool' can load it instead."
     fi
 }
 
