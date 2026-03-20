@@ -8,3 +8,6 @@ nas_proxy/tiles/
 *.so
 *.dylib
 tile_storage
+stealth_tunnel
+shared_memory
+neon_adblock
