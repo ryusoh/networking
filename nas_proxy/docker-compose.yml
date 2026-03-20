@@ -12,6 +12,7 @@ services:
       - "8080:8080" # HTTP Proxy Port
     volumes:
       - ./config:/etc/v2ray
+      - ./logs:/var/log/v2ray
     command: run -c /etc/v2ray/config.json
 
   # Tianditu Map Tile Accelerator
