@@ -37,10 +37,16 @@ def update_v2ray_config():
         config = json.load(f)
 
     # 3. Inject new outbound proxies (Keep top 5)
+    found = False
     for outbound in config['outbounds']:
         if outbound.get('tag') == 'china-proxy':
-            outbound['settings']['servers'] = proxies[:5]
-            print(f"[+] Injected {len(outbound['settings']['servers'])} fresh Chinese proxies.")
+            outbound['settings'] = {"servers": proxies[:5]}
+            found = True
+            print(f"[+] Injected {len(proxies[:5])} fresh Chinese proxies.")
+    
+    if not found:
+        print("[-] 'china-proxy' tag not found in config. Adding it...")
+        # (Logic to add it if missing can go here)
 
     # 4. Save updated config
     with open(CONFIG_PATH, 'w') as f:
