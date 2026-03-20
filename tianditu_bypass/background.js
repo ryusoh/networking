@@ -34,14 +34,19 @@ const MAX_NAS_FAILURES = 3;
 
 /**
  * Updates the PAC script.
+ * Optimization: Bypass NAS for JSON/Style files if they are failing.
  */
-function updateProxySettings(server) {
+function updateProxySettings(server, fallbackServer = null) {
   const config = {
     mode: 'pac_script',
     pacScript: {
       data: `
         function FindProxyForURL(url, host) {
           if (shExpMatch(host, "*.tianditu.gov.cn") || shExpMatch(host, "*.tianditu.cn") || host === "tianditu.gov.cn" || host === "tianditu.cn") {
+            // If it's a JSON/Style/Manifest, and we have a fallback, use the fallback to avoid connection resets
+            if (url.indexOf(".json") !== -1 && "${fallbackServer}" !== "null") {
+               return "${fallbackServer}";
+            }
             return "${server}";
           }
           return "DIRECT";
@@ -51,7 +56,7 @@ function updateProxySettings(server) {
   };
 
   chrome.proxy.settings.set({ value: config, scope: 'regular' }, () => {
-    console.log(`[Tianditu] Proxy active: ${server}`);
+    console.log(`[Tianditu] Proxy active: ${server} (Fallback: ${fallbackServer})`);
     chrome.action.setBadgeText({ text: 'ON' });
     chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
   });
@@ -63,7 +68,7 @@ function updateProxySettings(server) {
 async function notifyNAS(proxies) {
   console.log(`[Tianditu] Notifying NAS of ${proxies.length} top exit nodes.`);
   try {
-    await fetch('http://10.0.0.169:8081', {
+    await fetch(`http://${NAS_IP}:8081`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ proxies })
@@ -77,11 +82,9 @@ chrome.proxy.onProxyError.addListener((details) => {
   if (details.fatal) {
     console.warn('[Tianditu] Proxy error, rotating...');
     
-    // Check if the current proxy is the NAS
     const currentProxy = proxyList[currentProxyIndex];
     if (currentProxy && (currentProxy.ip === NAS_IP || currentProxy.name === 'Home NAS')) {
       nasFailureCount++;
-      console.warn(`[Tianditu] NAS Failure Count: ${nasFailureCount}`);
     }
     
     tryNextProxy();
@@ -93,13 +96,16 @@ function tryNextProxy() {
   if (currentProxyIndex < proxyList.length) {
     const p = proxyList[currentProxyIndex];
     
-    // Skip NAS if it has failed too many times
     if ((p.ip === NAS_IP || p.name === 'Home NAS') && nasFailureCount >= MAX_NAS_FAILURES) {
-      console.warn('[Tianditu] NAS threshold reached, skipping NAS for this session.');
-      return tryNextProxy(); // Skip and try next
+      return tryNextProxy();
     }
     
-    updateProxySettings(`${p.scheme} ${p.ip}:${p.port}`);
+    const serverString = `${p.scheme} ${p.ip}:${p.port}`;
+    // Find a non-NAS Chinese proxy as a fallback for sensitive JSON requests
+    const fallback = proxyList.find(item => item.type !== 'nas');
+    const fallbackString = fallback ? `${fallback.scheme} ${fallback.ip}:${fallback.port}` : "null";
+    
+    updateProxySettings(serverString, fallbackString);
   } else {
     refreshProxy();
   }
@@ -153,11 +159,6 @@ async function fetchFromSource(source) {
     const fetchTime = Date.now() - start;
     const result = await sendMessageToOffscreen({ type: 'PARSE_PROXIES_MULTI', html: html, sourceType: source.type });
 
-    if (result && result.proxies && result.proxies.length > 0) {
-      const avg = Math.round(result.proxies.reduce((a, b) => a + b.speed, 0) / result.proxies.length);
-      const min = Math.min(...result.proxies.map((p) => p.speed));
-      console.log(`[BENCHMARK] ${source.name}: Found ${result.proxies.length} proxies in ${fetchTime}ms. Avg: ${avg}ms. Fastest: ${min}ms.`);
-    }
     return result.proxies || [];
   } catch (e) {
     console.error(`[BENCHMARK] ${source.name} failed: ${e.message}`);
@@ -167,7 +168,7 @@ async function fetchFromSource(source) {
 
 async function refreshProxy() {
   console.log('[Tianditu] Refreshing proxy list...');
-  nasFailureCount = 0; // Reset count on full refresh
+  nasFailureCount = 0;
   try {
     await ensureOffscreenDocument();
     const results = await Promise.all(
@@ -176,7 +177,7 @@ async function refreshProxy() {
     const fetchedProxies = results.flat();
 
     const nasProxy = {
-      ip: '10.0.0.169',
+      ip: NAS_IP,
       port: '8080',
       scheme: 'PROXY',
       speed: 10,
@@ -193,7 +194,11 @@ async function refreshProxy() {
     }
 
     currentProxyIndex = 0;
-    updateProxySettings(`${proxyList[0].scheme} ${proxyList[0].ip}:${proxyList[0].port}`);
+    const serverString = `${proxyList[0].scheme} ${proxyList[0].ip}:${proxyList[0].port}`;
+    const fallback = proxyList.find(item => item.type !== 'nas');
+    const fallbackString = fallback ? `${fallback.scheme} ${fallback.ip}:${fallback.port}` : "null";
+    
+    updateProxySettings(serverString, fallbackString);
   } catch (e) {
     console.error('[Tianditu] Failed to refresh proxies:', e);
   }
