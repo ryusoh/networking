@@ -37,19 +37,34 @@ load_prog() {
     
     if bpftool prog load "$p" "$prog_path" type xdp 2>/dev/null; then
         if bpftool net attach xdp pinned "$prog_path" dev "$i" 2>/dev/null; then
-            echo "[SUCCESS] $p active on $i (via bpftool)."
+            echo "[SUCCESS] $p active on $i (via bpftool xdp)."
             return 0
         fi
     fi
 
-    echo "[ERROR] All load methods failed. Your NAS might have XDP disabled in the kernel."
-    echo "Check 'zcat /proc/config.gz | grep XDP' if possible."
+    # 3. Universal Fallback: Use TC (Traffic Control)
+    # TC works on almost every Linux kernel, even when XDP is disabled.
+    echo "[!] bpftool XDP failed. Attempting TC fallback (more compatible)..."
+    
+    # Ensure clsact qdisc exists
+    tc qdisc add dev "$i" clsact 2>/dev/null
+    
+    # Attach to ingress hook
+    if tc filter add dev "$i" ingress bpf obj "$p" sec xdp direct-action 2>/dev/null || \
+       tc filter add dev "$i" ingress bpf obj "$p" sec classifier direct-action 2>/dev/null; then
+        echo "[SUCCESS] $p active on $i (via TC ingress)."
+        return 0
+    fi
+
+    echo "[ERROR] All load methods (XDP & TC) failed."
+    echo "This usually means your NAS kernel is too old or lacks BPF support."
 }
 
 unload_prog() {
     local i=$1
     echo "[-] Unloading eBPF from $i..."
-    ip link set dev "$i" xdp off
+    ip link set dev "$i" xdp off 2>/dev/null
+    tc qdisc del dev "$i" clsact 2>/dev/null
     echo "[DONE] Interface $i is now clean."
 }
 
