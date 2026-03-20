@@ -10,14 +10,8 @@ const SOURCES = [
   {
     name: 'NAS Scraped Proxies',
     url: `http://${NAS_IP}:8000/proxies.html`,
-    type: 'freeproxyworld'
-  },
-  {
-    name: 'freeproxy.world',
-    url: 'https://www.freeproxy.world/?type=&anonymity=&country=CN&speed=1500',
-    type: 'freeproxyworld'
-  },
-  { name: 'databay.com', url: 'https://databay.com/free-proxy-list/china', type: 'databay' }
+    type: 'raw_text'
+  }
 ];
 
 const ROTATION_INTERVAL_MINS = 15;

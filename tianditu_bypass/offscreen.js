@@ -71,6 +71,25 @@ function parseDatabay(doc) {
     .filter((p) => p && p.ip && p.port && p.ip.includes('.') && !isNaN(parseInt(p.port)));
 }
 
+function parseRawText(text) {
+  // Parses "IP:Port" format from a raw text file
+  return text
+    .split('\n')
+    .map((line) => {
+      const parts = line.trim().split(':');
+      if (parts.length === 2) {
+        return {
+          ip: parts[0],
+          port: parts[1],
+          scheme: 'PROXY',
+          speed: 100
+        };
+      }
+      return null;
+    })
+    .filter((p) => p && p.ip && p.port);
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'FETCH_HTML') {
     console.log(`[OFFSCREEN] Fetching ${request.url}...`);
@@ -119,6 +138,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         proxies = parseFreeproxyworld(doc);
       } else if (request.sourceType === 'databay') {
         proxies = parseDatabay(doc);
+      } else if (request.sourceType === 'raw_text') {
+        proxies = parseRawText(request.html);
       }
 
       sendResponse({ proxies: proxies });

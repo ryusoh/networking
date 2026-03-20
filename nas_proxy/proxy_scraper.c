@@ -90,8 +90,9 @@ int fetch_proxy_list(const char *url) {
 int main() {
     curl_global_init(CURL_GLOBAL_ALL);
     
-    printf("[*] Running NAS Proxy Scraper...\n");
-    fetch_proxy_list("https://www.freeproxy.world/?type=&anonymity=&country=CN&speed=1500");
+    printf("[*] Running NAS Proxy Scraper (China Focus)...\n");
+    // Using a specialized China proxy list from a Cloudflare-free source
+    fetch_proxy_list("https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/countries/CN/data.txt");
     
     curl_global_cleanup();
     return 0;
