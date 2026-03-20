@@ -1,58 +1,81 @@
 #!/usr/bin/env bash
 
-# tm-repair: Automatically repair a corrupted Time Machine sparsebundle on a NAS.
-# This script should be run on your Mac.
+# tm-repair: Forcefully unlock and repair the MacBook Air Time Machine backup.
+# Run this on your Mac.
 
-# 1. Locate Sparsebundles on mounted network shares
-SEARCH_DIR="/Volumes"
-BUNDLES=($(find "$SEARCH_DIR" -name "*.sparsebundle" -maxdepth 2 2>/dev/null))
+# 0. Force Cleanup of stuck processes
+echo "🧹 Cleaning up stuck Mac processes..."
+sudo killall -9 hdiutil diskimagesiod chflags mds mds_stores 2>/dev/null
 
-if [ ${#BUNDLES[@]} -eq 0 ]; then
-    echo "❌ No .sparsebundle found in $SEARCH_DIR. Please ensure your NAS share is mounted."
-    exit 1
-fi
+# 1. Force Unmount of deadlocked shares
+echo "🔌 Forcefully unmounting Time Machine volumes to clear locks..."
+for vol in "/Volumes/MacBook Air Time Machine" "/Volumes/Mac Time Machine" "/Volumes/SSBNのバックアップ"*; do
+    if [ -d "$vol" ]; then
+        echo "   -> Unmounting $vol"
+        sudo umount -f "$vol" 2>/dev/null || diskutil unmount force "$vol" 2>/dev/null
+    fi
+done
 
-# If multiple found, pick the first or let user choose (simplified for one-command use)
-BUNDLE="${BUNDLES[0]}"
-echo "🔍 Found backup: $BUNDLE"
+echo "✅ Mac-side locks cleared."
 
-# 2. Make it editable (Clear immutable flag if set)
-echo "🔓 Removing immutable flags..."
-chflags -R nouchg "$BUNDLE" 2>/dev/null
+# 2. Re-mount the NAS Share
+# Based on your tmutil destinationinfo
+SMB_URL="smb://zhuangliulz@SnapHub._smb._tcp.local/MacBook%20Air%20Time%20Machine"
+echo "🌐 Attempting to re-mount: $SMB_URL"
+open "$SMB_URL"
 
-# 3. Modify VerificationState in the .plist
-# VerificationState 2 = Corrupted, 0 = Healthy (ready for check)
+echo "⏳ Waiting for volume to mount (please click 'Connect' if prompted on your Mac)..."
+# Wait up to 30 seconds for the mount to appear
+for i in {1..30}; do
+    if [ -d "/Volumes/MacBook Air Time Machine" ]; then
+        echo "✅ Volume mounted!"
+        break
+    fi
+    sleep 1
+    if [ $i -eq 30 ]; then
+        echo "❌ Volume failed to mount. Please ensure you are connected to the network and try again."
+        exit 1
+    fi
+done
+
+# 3. Locate Bundle
+BUNDLE="/Volumes/MacBook Air Time Machine/SSBN.sparsebundle"
+echo "✅ Found backup: $BUNDLE"
+
+# 4. Quick Unlock
+echo "🔓 Removing immutable flags from main bundle..."
+chflags nouchg "$BUNDLE" 2>/dev/null
+chflags nouchg "$BUNDLE/com.apple.TimeMachine.MachineID.plist" 2>/dev/null
+
+# 5. Reset VerificationState
 PLIST="$BUNDLE/com.apple.TimeMachine.MachineID.plist"
 if [ -f "$PLIST" ]; then
     echo "📝 Resetting VerificationState in $PLIST..."
-    # Backup the plist
-    cp "$PLIST" "$PLIST.bak"
-    # Use plutil to change the value (native macOS tool)
     plutil -replace VerificationState -integer 0 "$PLIST"
-else
-    echo "⚠️ Warning: MachineID.plist not found. Proceeding anyway..."
+    echo "✅ VerificationState reset to 0."
 fi
 
-# 4. Attach the sparsebundle (without mounting partitions)
-echo "🔌 Attaching image (this may take a minute)..."
-ATTACH_OUTPUT=$(hdiutil attach -nomount -noverify -noautofsck "$BUNDLE")
-DISK_ID=$(echo "$ATTACH_OUTPUT" | grep -o "/dev/disk[0-9]*" | head -n 1)
+# 6. Attach and Repair (Live Output)
+echo "🔌 Attaching image (Live Output)..."
+echo "---------------------------------------------------"
+TMP_ATTACH="/tmp/tm_attach_log"
+hdiutil attach -nomount -noverify -noautofsck -verbose "$BUNDLE" 2>&1 | tee "$TMP_ATTACH"
+DISK_ID=$(grep -o "/dev/disk[0-9]*" "$TMP_ATTACH" | head -n 1)
 
 if [ -z "$DISK_ID" ]; then
-    echo "❌ Failed to attach image."
+    echo "---------------------------------------------------"
+    echo "❌ Failed to attach image (Error 35 usually means a lock)."
+    echo "💡 Final Tip: Run this ON YOUR NAS (via SSH) to force unlock:"
+    echo "   sudo synoservicectl --restart samba"
     exit 1
 fi
-echo "✅ Attached as $DISK_ID"
 
-# 5. Determine if it's APFS or HFS+ and run repair
-# Look for the Apple_APFS or Apple_HFS slice
+echo "---------------------------------------------------"
+echo "✅ Attached as $DISK_ID"
+echo "🛠 Starting repair (Live Output)..."
 SLICE=$(diskutil list "$DISK_ID" | grep -E "Apple_APFS|Apple_HFS" | awk '{print $NF}' | head -n 1)
 
-if [ -z "$SLICE" ]; then
-    echo "⚠️ Could not identify partition type. Running generic fsck on $DISK_ID..."
-    fsck_hfs -fy "$DISK_ID"
-else
-    echo "🛠 Running repair on $SLICE..."
+if [ -n "$SLICE" ]; then
     if diskutil list "$DISK_ID" | grep -q "Apple_APFS"; then
         sudo fsck_apfs -y "/dev/$SLICE"
     else
@@ -60,8 +83,8 @@ else
     fi
 fi
 
-# 6. Eject
+echo "---------------------------------------------------"
 echo "⏹ Ejecting $DISK_ID..."
 hdiutil detach "$DISK_ID"
-
-echo "🎉 Repair complete! Try running Time Machine again."
+echo "🎉 ALL DONE! Try running Time Machine now."
+rm "$TMP_ATTACH"
