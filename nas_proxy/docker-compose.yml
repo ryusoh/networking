@@ -26,9 +26,12 @@ services:
     environment:
       TZ: 'America/Los_Angeles'
       WEBPASSWORD: 'REPLACE_ME_WITH_A_SECURE_PASSWORD'
+      FTLCONF_LOCAL_IPV4: '10.0.0.169'
     volumes:
       - 'pihole_data:/etc/pihole'
       - 'dnsmasq_data:/etc/dnsmasq.d'
+    cap_add:
+      - NET_ADMIN
     restart: always
 
 volumes:
