@@ -22,6 +22,8 @@
 #include <linux/if_ether.h>
 #endif
 
+#include "devices.h"
+
 /**
  * LAN Scanner
  * -----------
@@ -442,12 +444,17 @@ static int ip_cmp(const void *a, const void *b) {
 
 /* --- Output --- */
 
+static Device g_devs[MAX_DEVICES];
+static int g_dev_count = 0;
+
 static void print_table(void) {
     qsort(g_hosts, g_host_count, sizeof(Host), ip_cmp);
 
-    printf("\n%-16s %-18s %-16s %8s  %s\n", "IP", "MAC", "Vendor", "RTT(ms)", "Hostname");
-    printf("%-16s %-18s %-16s %8s  %s\n",
-           "──────────────", "─────────────────", "──────────────", "───────", "────────────────");
+    printf("\n%-10s %-16s %-18s %-14s %8s  %s\n",
+           "Name", "IP", "MAC", "Vendor", "RTT(ms)", "Hostname");
+    printf("%-10s %-16s %-18s %-14s %8s  %s\n",
+           "────────", "──────────────", "─────────────────",
+           "────────────", "───────", "────────────────");
 
     int shown = 0;
     for (int i = 0; i < g_host_count; i++) {
@@ -457,11 +464,16 @@ static void print_table(void) {
         /* Only show hosts with a real MAC, or the scanner itself */
         if (!h->mac[0] && !is_self) continue;
 
+        /* Look up saved name */
+        const Device *d = devices_find(g_devs, g_dev_count, h->ip);
+        const char *name = d ? d->name : "";
+
         const char *label = "";
         if (is_self) label = "(this device)";
         else if (h->hostname[0]) label = h->hostname;
 
-        printf("%-16s %-18s %-16s %7.1f  %s\n",
+        printf("%-10s %-16s %-18s %-14s %7.1f  %s\n",
+               name,
                h->ip,
                h->mac[0] ? h->mac : "--",
                h->vendor[0] ? h->vendor : "",
@@ -470,6 +482,22 @@ static void print_table(void) {
         shown++;
     }
     printf("\n[scanner] %d devices found (%d responded to ping)\n", shown, g_host_count);
+}
+
+/* Save scan results to device list (preserving existing names) */
+static void save_devices(void) {
+    for (int i = 0; i < g_host_count; i++) {
+        Host *h = &g_hosts[i];
+        if (!h->mac[0] && !(g_self_ip[0] && strcmp(h->ip, g_self_ip) == 0))
+            continue;
+
+        const Device *existing = devices_find(g_devs, g_dev_count, h->ip);
+        const char *name = existing ? existing->name : h->ip;
+        const char *mac = h->mac[0] ? h->mac : "--";
+
+        g_dev_count = devices_set(g_devs, g_dev_count, name, h->ip, mac);
+    }
+    devices_save(g_devs, g_dev_count);
 }
 
 static void print_json(void) {
@@ -508,6 +536,8 @@ int main(int argc, char *argv[]) {
     int json_mode = 0;
     int watch_interval = 0;
     const char *iface = NULL;
+    const char *name_ip = NULL;
+    const char *name_label = NULL;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-j") == 0 || strcmp(argv[i], "--json") == 0) {
@@ -517,13 +547,42 @@ int main(int argc, char *argv[]) {
             else watch_interval = 60;
         } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--interface") == 0) {
             if (i + 1 < argc) iface = argv[++i];
+        } else if (strcmp(argv[i], "-n") == 0 || strcmp(argv[i], "--name") == 0) {
+            if (i + 2 < argc) { name_ip = argv[++i]; name_label = argv[++i]; }
+        } else if (strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--list") == 0) {
+            Device devs[MAX_DEVICES];
+            int count = devices_load(devs, MAX_DEVICES);
+            if (count == 0) {
+                printf("No saved devices. Run a scan first.\n");
+                return 0;
+            }
+            printf("\n%-12s %-16s %s\n", "Name", "IP", "MAC");
+            printf("%-12s %-16s %s\n", "──────────", "──────────────", "─────────────────");
+            for (int d = 0; d < count; d++)
+                printf("%-12s %-16s %s\n", devs[d].name, devs[d].ip, devs[d].mac);
+            printf("\n");
+            return 0;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-            printf("Usage: %s [-j] [-w seconds] [-i interface]\n", argv[0]);
-            printf("  -j, --json         JSON output\n");
-            printf("  -w, --watch N      Rescan every N seconds\n");
-            printf("  -i, --interface X  Use specific network interface\n");
+            printf("Usage: %s [options]\n", argv[0]);
+            printf("  -j, --json           JSON output\n");
+            printf("  -w, --watch N        Rescan every N seconds\n");
+            printf("  -i, --interface X    Use specific network interface\n");
+            printf("  -n, --name IP LABEL  Name a device (e.g. --name 10.0.0.1 router)\n");
+            printf("  -l, --list           Show saved device names\n");
             return 0;
         }
+    }
+
+    /* Handle --name: label a device without scanning */
+    if (name_ip && name_label) {
+        Device devs[MAX_DEVICES];
+        int count = devices_load(devs, MAX_DEVICES);
+        const Device *existing = devices_find(devs, count, name_ip);
+        const char *mac = (existing && strcmp(existing->mac, "--") != 0) ? existing->mac : "--";
+        count = devices_set(devs, count, name_label, name_ip, mac);
+        devices_save(devs, count);
+        printf("[scanner] Saved: %s -> %s\n", name_label, name_ip);
+        return 0;
     }
 
     char base_ip[16];
@@ -531,6 +590,9 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "[scanner] Could not detect subnet. Use -i to specify interface.\n");
         return 1;
     }
+
+    /* Load saved device names */
+    g_dev_count = devices_load(g_devs, MAX_DEVICES);
 
     /* Track previous scan for change detection */
     Host prev_hosts[MAX_HOSTS];
@@ -544,6 +606,9 @@ int main(int argc, char *argv[]) {
 
         gettimeofday(&t1, NULL);
         double elapsed = (t1.tv_sec - t0.tv_sec) + (t1.tv_usec - t0.tv_usec) / 1000000.0;
+
+        /* Save discovered devices */
+        save_devices();
 
         if (json_mode) {
             print_json();
