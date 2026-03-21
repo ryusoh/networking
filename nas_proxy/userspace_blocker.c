@@ -17,6 +17,10 @@
  * ------------------------------------
  * Pure Linux C implementation. Zero dependencies.
  * No libpcap required. No external headers required.
+ *
+ * Note: This tool operates at the IP layer (Layer 3).
+ * It can only block by IP address, not domain names or DOM elements.
+ * For domain-level blocking, use DNS-level or HTTP proxy solutions.
  */
 
 const char *BLACKLIST[] = {"1.2.3.4", "8.8.8.8"};

@@ -36,7 +36,14 @@
     '.cookie-notification',
     '.cookie-policy-banner',
     '[aria-label*="cookie"]',
-    '[aria-label*="consent"]'
+    '[aria-label*="consent"]',
+
+    // Push notification prompts (OneSignal)
+    '#onesignal-slidedown-dialog',
+    '.onesignal-slidedown-dialog',
+    '#onesignal-popover-container',
+    '.onesignal-customlink-container',
+    '#onesignal-container'
   ];
 
   // Button selectors for auto-dismiss
