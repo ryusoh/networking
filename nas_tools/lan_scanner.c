@@ -235,7 +235,8 @@ static void *scan_worker(void *arg) {
             pthread_mutex_lock(&g_lock);
             if (g_host_count < MAX_HOSTS) {
                 Host *h = &g_hosts[g_host_count++];
-                snprintf(h->ip, sizeof(h->ip), "%s", ip);
+                memcpy(h->ip, ip, sizeof(h->ip));
+                h->ip[sizeof(h->ip) - 1] = '\0';
                 h->mac[0] = '\0';
                 h->hostname[0] = '\0';
                 h->alive = 1;
