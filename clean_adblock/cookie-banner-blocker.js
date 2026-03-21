@@ -43,7 +43,12 @@
     '.onesignal-slidedown-dialog',
     '#onesignal-popover-container',
     '.onesignal-customlink-container',
-    '#onesignal-container'
+    '#onesignal-container',
+
+    // 1point3acres.com specific elements
+    '.deal-card',
+    'iframe[src*="adrecover.com"]',
+    '#iframe-ad-container'
   ];
 
   // Button selectors for auto-dismiss

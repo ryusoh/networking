@@ -17,7 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     socialMedia: document.getElementById('feature-socialMedia'),
     youtube: document.getElementById('feature-youtube'),
     videoStream: document.getElementById('feature-videoStream'),
-    twitch: document.getElementById('feature-twitch')
+    twitch: document.getElementById('feature-twitch'),
+    forum: document.getElementById('feature-forum')
   };
 
   // Load current settings
@@ -39,13 +40,15 @@ document.addEventListener('DOMContentLoaded', () => {
         socialMediaBlocker: true,
         youtubeAdBlocker: true,
         videoStreamAdBlocker: true,
-        twitchAdBlocker: true
+        twitchAdBlocker: true,
+        forumAdBlocker: true
       };
       featureToggles.cookieBanner.checked = features.cookieBannerBlocker !== false;
       featureToggles.socialMedia.checked = features.socialMediaBlocker !== false;
       featureToggles.youtube.checked = features.youtubeAdBlocker !== false;
       featureToggles.videoStream.checked = features.videoStreamAdBlocker !== false;
       featureToggles.twitch.checked = features.twitchAdBlocker !== false;
+      featureToggles.forum.checked = features.forumAdBlocker !== false;
     });
   } catch (e) {
     console.error('Popup sync storage access failed:', e);
@@ -74,7 +77,8 @@ document.addEventListener('DOMContentLoaded', () => {
     socialMedia: 'socialMediaBlocker',
     youtube: 'youtubeAdBlocker',
     videoStream: 'videoStreamAdBlocker',
-    twitch: 'twitchAdBlocker'
+    twitch: 'twitchAdBlocker',
+    forum: 'forumAdBlocker'
   };
 
   Object.entries(featureToggles).forEach(([key, toggle]) => {
@@ -87,7 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
               socialMediaBlocker: true,
               youtubeAdBlocker: true,
               videoStreamAdBlocker: true,
-              twitchAdBlocker: true
+              twitchAdBlocker: true,
+              forumAdBlocker: true
             };
             features[featureKeys[key]] = toggle.checked;
             chrome.storage.sync.set({ features });

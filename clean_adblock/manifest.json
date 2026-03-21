@@ -53,6 +53,11 @@
       "run_at": "document_idle"
     },
     {
+      "matches": ["<all_urls>"],
+      "js": ["forum-ad-blocker.js"],
+      "run_at": "document_start"
+    },
+    {
       "matches": [
         "*://*.facebook.com/*",
         "*://*.linkedin.com/*",

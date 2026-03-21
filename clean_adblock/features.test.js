@@ -45,7 +45,8 @@ describe('Feature Toggles', () => {
       socialMediaBlocker: true,
       youtubeAdBlocker: true,
       videoStreamAdBlocker: true,
-      twitchAdBlocker: true
+      twitchAdBlocker: true,
+      forumAdBlocker: true
     });
   });
 });
@@ -100,6 +101,16 @@ describe('Twitch Ad Blocker', () => {
   });
 });
 
+describe('Forum Ad Blocker', () => {
+  test('forum-ad-blocker.js should exist and be valid JS', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const content = fs.readFileSync(path.join(__dirname, 'forum-ad-blocker.js'), 'utf8');
+    expect(content).toContain('ForumAdBlocker');
+    expect(content).toContain('FORUM_AD_SELECTORS');
+  });
+});
+
 describe('Manifest Configuration', () => {
   test('manifest.json should include all content scripts', () => {
     const fs = require('fs');
@@ -112,7 +123,8 @@ describe('Manifest Configuration', () => {
       'social-media-blocker.js',
       'youtube-ad-blocker.js',
       'video-stream-ad-blocker.js',
-      'twitch-ad-blocker.js'
+      'twitch-ad-blocker.js',
+      'forum-ad-blocker.js'
     ];
 
     const contentScriptFiles = manifest.content_scripts.flatMap((cs) => cs.js);

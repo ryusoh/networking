@@ -30,7 +30,9 @@
     'amazon-adsystem.com',
     'spotxchange.com',
     'free-wheel.tv',
-    'v.fwmrm.net'
+    'v.fwmrm.net',
+    'adrecover.com',
+    'delivery.adrecover.com'
   ];
 
   // VAST/VPAID XML patterns

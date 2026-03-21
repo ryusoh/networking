@@ -63,6 +63,43 @@ const updateBlockingRules = async (hostnames) => {
   }
 };
 
+// Ad network domains to block at the network level
+const AD_NETWORK_DOMAINS = [
+  'adrecover.com',
+  'adpushup.com',
+  'publift.com',
+  'vdo.ai',
+  'primis.tech',
+  'undrads.com',
+  'fundingchoicesmessages.google.com',
+  'adservice.google.com',
+];
+
+async function setupAdNetworkBlocking() {
+  try {
+    const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
+    // Use IDs 9000+ to avoid conflicts with jsBlocked rules
+    const adRuleIds = existingRules.filter((r) => r.id >= 9000).map((r) => r.id);
+
+    const addRules = AD_NETWORK_DOMAINS.map((domain, i) => ({
+      id: 9000 + i,
+      priority: 2,
+      action: { type: 'block' },
+      condition: {
+        urlFilter: `||${domain}`,
+        resourceTypes: ['script', 'sub_frame', 'xmlhttprequest', 'image', 'other']
+      }
+    }));
+
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: adRuleIds,
+      addRules
+    });
+  } catch (e) {
+    console.error('Ad network blocking setup failed:', e);
+  }
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     try {
@@ -78,13 +115,15 @@ chrome.runtime.onInstalled.addListener((details) => {
           socialMediaBlocker: true,
           youtubeAdBlocker: true,
           videoStreamAdBlocker: true,
-          twitchAdBlocker: true
+          twitchAdBlocker: true,
+          forumAdBlocker: true
         }
       });
     } catch (e) {
       console.error('Background onInstalled storage set failed:', e);
     }
   }
+  setupAdNetworkBlocking();
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -117,6 +156,7 @@ try {
       updateBlockingRules(prefs.jsBlocked);
     }
   });
+  setupAdNetworkBlocking();
 } catch (e) {
   console.error('Background startup storage access failed:', e);
 }
