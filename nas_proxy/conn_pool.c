@@ -13,6 +13,7 @@
 #include <sys/socket.h>
 #include <sys/epoll.h>
 #include <netdb.h>
+#include <sys/stat.h>
 
 /**
  * Connection Pooler for SOCKS5 Proxies
@@ -136,8 +137,7 @@ static int load_proxies(void) {
 
         if (strlen(host) < 7) continue; /* min "1.2.3.4" */
 
-        strncpy(tmp[count].host, host, sizeof(tmp[count].host) - 1);
-        tmp[count].host[sizeof(tmp[count].host) - 1] = '\0';
+        snprintf(tmp[count].host, sizeof(tmp[count].host), "%s", host);
         tmp[count].port = port;
         count++;
     }
@@ -428,9 +428,9 @@ static void *handle_client(void *arg) {
     if (colon) {
         *colon = '\0';
         dest_port = atoi(colon + 1);
-        strncpy(dest_host, hostport, sizeof(dest_host) - 1);
+        snprintf(dest_host, sizeof(dest_host), "%s", hostport);
     } else {
-        strncpy(dest_host, hostport, sizeof(dest_host) - 1);
+        snprintf(dest_host, sizeof(dest_host), "%s", hostport);
     }
 
     /* Acquire a pooled SOCKS5 connection */
