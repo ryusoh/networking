@@ -139,7 +139,7 @@ static void read_arp_table(void) {
     if (!fp) return;
 
     char line[512];
-    fgets(line, sizeof(line), fp); /* skip header */
+    if (!fgets(line, sizeof(line), fp)) { fclose(fp); return; }
 
     while (fgets(line, sizeof(line), fp)) {
         char ip[16], mac[18];
@@ -153,7 +153,7 @@ static void read_arp_table(void) {
             pthread_mutex_lock(&g_lock);
             for (int i = 0; i < g_host_count; i++) {
                 if (strcmp(g_hosts[i].ip, ip) == 0) {
-                    strncpy(g_hosts[i].mac, mac, sizeof(g_hosts[i].mac) - 1);
+                    snprintf(g_hosts[i].mac, sizeof(g_hosts[i].mac), "%s", mac);
                     break;
                 }
             }
@@ -175,7 +175,7 @@ static void resolve_hostname(Host *h) {
     char host[256];
     if (getnameinfo((struct sockaddr *)&sa, sizeof(sa),
                     host, sizeof(host), NULL, 0, NI_NAMEREQD) == 0) {
-        strncpy(h->hostname, host, sizeof(h->hostname) - 1);
+        snprintf(h->hostname, sizeof(h->hostname), "%s", host);
     }
 }
 
@@ -235,7 +235,7 @@ static void *scan_worker(void *arg) {
             pthread_mutex_lock(&g_lock);
             if (g_host_count < MAX_HOSTS) {
                 Host *h = &g_hosts[g_host_count++];
-                strncpy(h->ip, ip, sizeof(h->ip) - 1);
+                snprintf(h->ip, sizeof(h->ip), "%s", ip);
                 h->mac[0] = '\0';
                 h->hostname[0] = '\0';
                 h->alive = 1;
@@ -259,8 +259,7 @@ static void scan_subnet(const char *base_ip) {
 
     for (int t = 0; t < SCAN_THREADS; t++) {
         ScanRange *r = malloc(sizeof(ScanRange));
-        strncpy(r->base_ip, base_ip, sizeof(r->base_ip) - 1);
-        r->base_ip[sizeof(r->base_ip) - 1] = '\0';
+        snprintf(r->base_ip, sizeof(r->base_ip), "%s", base_ip);
         r->start = t * per_thread;
         r->end = (t == SCAN_THREADS - 1) ? 256 : (t + 1) * per_thread;
         pthread_create(&threads[t], NULL, scan_worker, r);
