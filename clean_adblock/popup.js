@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       enabledToggle.checked = prefs.enabled !== false;
-      modeSelect.value = prefs.mode || 'all';
+      modeSelect.value = prefs.mode || 'selective';
     });
   } catch (e) {
     console.error('Popup sync storage access failed:', e);

@@ -1,8 +1,8 @@
 const updateBadge = () => {
   if (typeof chrome !== 'undefined' && chrome.action && chrome.storage) {
-    chrome.storage.sync.get({ enabled: true, mode: 'all' }, (prefs) => {
+    chrome.storage.sync.get({ enabled: true, mode: 'selective' }, (prefs) => {
       const isEnabled = prefs.enabled !== false;
-      const mode = prefs.mode || 'all';
+      const mode = prefs.mode || 'selective';
       if (!isEnabled) {
         chrome.action.setBadgeText({ text: 'OFF' });
         chrome.action.setBadgeBackgroundColor({ color: '#F44336' });
@@ -68,7 +68,7 @@ chrome.runtime.onInstalled.addListener((details) => {
     try {
       chrome.storage.sync.set({
         enabled: true,
-        mode: 'all',
+        mode: 'selective',
         whitelist: [],
         blacklist: [],
         jsBlocked: ['bild.de']

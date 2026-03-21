@@ -8,6 +8,9 @@ global.chrome = {
     sync: {
       get: jest.fn(),
       set: jest.fn()
+    },
+    onChanged: {
+      addListener: jest.fn()
     }
   },
   action: {
@@ -20,10 +23,24 @@ global.chrome = {
   },
   runtime: {
     onInstalled: {
+      addListener: jest.fn((cb) => cb({ reason: 'install' }))
+    },
+    lastError: null
+  },
+  tabs: {
+    query: jest.fn(),
+    onUpdated: {
       addListener: jest.fn()
-    }
+    },
+    onCreated: {
+      addListener: jest.fn()
+    },
+    remove: jest.fn()
   }
 };
+
+// Import background.js to trigger onInstalled handler
+require('./background.js');
 
 const validateRules = (hostnames) => {
   const uniqueHosts = Array.from(new Set(hostnames || [])).filter((h) => h && h.trim());
@@ -77,5 +94,12 @@ describe('Background Logic Validation', () => {
   test('Null input should produce no rules', () => {
     const rules = validateRules(null);
     expect(rules.length).toBe(0);
+  });
+
+  test('Default mode should be selective (blacklist mode)', () => {
+    // Verify storage.set was called with correct defaults during onInstalled
+    const callArgs = chrome.storage.sync.set.mock.calls[0][0];
+    expect(callArgs.enabled).toBe(true);
+    expect(callArgs.mode).toBe('selective');
   });
 });
