@@ -91,6 +91,49 @@ static size_t write_cb(void *ptr, size_t size, size_t nmemb, void *userp) {
     return total;
 }
 
+/* --- User-Agent rotation --- */
+
+static const char *USER_AGENTS[] = {
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+};
+#define NUM_UAS (sizeof(USER_AGENTS) / sizeof(USER_AGENTS[0]))
+
+static const char *random_ua(void) {
+    return USER_AGENTS[rand() % NUM_UAS];
+}
+
+/* --- Retry with backoff helper --- */
+
+#define MAX_RETRIES 3
+
+static CURLcode fetch_with_retry(CURL *c, const char *label) {
+    CURLcode res;
+    for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        if (attempt > 0) {
+            int delay = attempt * 2 + (rand() % 3); /* 2-4s, 4-6s */
+            printf("[retry] %s: attempt %d/%d (waiting %ds)\n", label, attempt + 1, MAX_RETRIES, delay);
+            sleep(delay);
+            curl_easy_setopt(c, CURLOPT_USERAGENT, random_ua());
+        }
+        res = curl_easy_perform(c);
+        if (res == CURLE_OK) {
+            long code;
+            curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &code);
+            if (code == 200) return res;
+            if (code != 403 && code != 429 && code != 503) return res; /* non-retryable */
+            printf("[retry] %s: HTTP %ld, retrying...\n", label, code);
+        } else {
+            return res; /* network error, don't retry */
+        }
+    }
+    return res;
+}
+
 /* --- Phase 1: Scraping --- */
 
 static int scrape_plaintext(const char *url, const char *label) {
@@ -102,12 +145,12 @@ static int scrape_plaintext(const char *url, const char *label) {
     curl_easy_setopt(c, CURLOPT_URL, url);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, &buf);
-    curl_easy_setopt(c, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0");
+    curl_easy_setopt(c, CURLOPT_USERAGENT, random_ua());
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0L);
     curl_easy_setopt(c, CURLOPT_TIMEOUT, 20L);
 
-    CURLcode res = curl_easy_perform(c);
+    CURLcode res = fetch_with_retry(c, label);
     int added = 0;
 
     if (res == CURLE_OK) {
@@ -150,12 +193,12 @@ static int scrape_geonode(const char *url, const char *label) {
     curl_easy_setopt(c, CURLOPT_URL, url);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, &buf);
-    curl_easy_setopt(c, CURLOPT_USERAGENT, "Mozilla/5.0");
+    curl_easy_setopt(c, CURLOPT_USERAGENT, random_ua());
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0L);
     curl_easy_setopt(c, CURLOPT_TIMEOUT, 20L);
 
-    CURLcode res = curl_easy_perform(c);
+    CURLcode res = fetch_with_retry(c, label);
     int added = 0;
 
     if (res == CURLE_OK && buf.size > 10) {
@@ -200,6 +243,92 @@ static int scrape_geonode(const char *url, const char *label) {
     return added;
 }
 
+static int scrape_freeproxy_world(const char *url, const char *label) {
+    CURL *c = curl_easy_init();
+    if (!c) return 0;
+
+    struct MemBuf buf = { .data = malloc(1), .size = 0 };
+
+    curl_easy_setopt(c, CURLOPT_URL, url);
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_cb);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, &buf);
+    curl_easy_setopt(c, CURLOPT_USERAGENT, random_ua());
+    curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(c, CURLOPT_TIMEOUT, 25L);
+
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Accept: text/html,application/xhtml+xml,*/*;q=0.8");
+    headers = curl_slist_append(headers, "Accept-Language: en-US,en;q=0.9");
+    headers = curl_slist_append(headers, "Cache-Control: no-cache");
+    curl_easy_setopt(c, CURLOPT_HTTPHEADER, headers);
+
+    CURLcode res = fetch_with_retry(c, label);
+    int added = 0;
+
+    if (res == CURLE_OK && buf.size > 100) {
+        /*
+         * freeproxy.world HTML table format:
+         * <td class="show-ip-div">IP</td>
+         * <td><a href="...">PORT</a></td>
+         * We scan for IP patterns following "show-ip-div" class.
+         */
+        char *p = buf.data;
+        while ((p = strstr(p, "show-ip-div")) != NULL) {
+            /* Find the next '>' after the class attribute */
+            p = strchr(p, '>');
+            if (!p) break;
+            p++; /* skip '>' */
+
+            /* Extract IP address */
+            char ip[64] = {0};
+            int ip_len = 0;
+            while (*p && *p != '<' && ip_len < 63) {
+                if ((*p >= '0' && *p <= '9') || *p == '.') {
+                    ip[ip_len++] = *p;
+                } else if (*p != ' ' && *p != '\n' && *p != '\r' && *p != '\t') {
+                    break;
+                }
+                p++;
+            }
+            ip[ip_len] = '\0';
+
+            if (ip_len < 7) continue; /* not a valid IP */
+
+            /* Find port in the next <td> or <a> */
+            char *td = strstr(p, "<td");
+            if (!td) break;
+            /* Look for digits after '>' */
+            char *gt = strchr(td, '>');
+            if (!gt) break;
+            gt++;
+            /* Port might be inside an <a> tag */
+            if (*gt == '<') {
+                gt = strchr(gt, '>');
+                if (!gt) break;
+                gt++;
+            }
+
+            int port = atoi(gt);
+            if (port > 0 && port <= 65535 &&
+                strncmp(ip, "10.", 3) != 0 &&
+                strncmp(ip, "192.168.", 8) != 0 &&
+                strncmp(ip, "127.", 4) != 0) {
+                if (add_proxy(ip, port) == 1) added++;
+            }
+        }
+        printf("[scrape] %s: %d new proxies\n", label, added);
+    } else {
+        printf("[scrape] %s: FAILED (%s)\n", label,
+               res != CURLE_OK ? curl_easy_strerror(res) : "empty response");
+    }
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(c);
+    free(buf.data);
+    return added;
+}
+
 static void scrape_all(void) {
     printf("[*] Scraping Chinese exit proxies from live APIs...\n\n");
 
@@ -226,6 +355,21 @@ static void scrape_all(void) {
     scrape_geonode(
         "https://proxylist.geonode.com/api/proxy-list?limit=50&page=1&sort_by=lastChecked&sort_type=desc&country=CN&protocols=socks4",
         "Geonode SOCKS4/CN");
+
+    /* FreeProxy.World - HTML table, China-filtered, speed < 1000ms */
+    scrape_freeproxy_world(
+        "https://www.freeproxy.world/?type=&anonymity=&country=CN&speed=1000&port=",
+        "FreeProxy.World CN");
+
+    /* SpysOne - HTML with encoded proxy data, China SOCKS */
+    scrape_freeproxy_world(
+        "https://spys.one/free-proxy-list/CN/",
+        "SpysOne CN");
+
+    /* ProxyNova - HTML table, China */
+    scrape_freeproxy_world(
+        "https://www.proxynova.com/proxy-server-list/country-cn/",
+        "ProxyNova CN");
 
     printf("\n[*] Total unique proxies scraped: %d\n\n", g_proxy_count);
 }
@@ -358,7 +502,7 @@ static void write_results(void) {
 
     if (vcount == 0) {
         printf("\n[-] No working Chinese-exit proxies found.\n");
-        printf("[-] All proxies either timed out or returned non-200.\n");
+        printf("[-] Keeping previous %s unchanged.\n", OUTPUT_FILE);
         return;
     }
 
@@ -407,6 +551,7 @@ static void write_results(void) {
 /* --- Main --- */
 
 int main(void) {
+    srand(time(NULL) ^ getpid());
     curl_global_init(CURL_GLOBAL_ALL);
 
     scrape_all();
