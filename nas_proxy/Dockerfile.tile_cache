@@ -1,10 +1,15 @@
-FROM python:3.9-slim
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY tile_cache.py .
-RUN pip install requests
 
-# Port for the tile accelerator
+# Compile tile_storage.c into shared library
+COPY tile_storage.c .
+RUN gcc -shared -fPIC -O2 -o libtilestorage.so tile_storage.c
+
+COPY tile_cache.py .
+
 EXPOSE 8082
 
-CMD ["python", "tile_cache.py"]
+CMD ["python3", "tile_cache.py"]

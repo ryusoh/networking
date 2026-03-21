@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Tianditu Hybrid Accelerator",
-  "version": "2.0",
-  "description": "Proxy-based access to Tianditu maps with header spoofing and geo-bypass.",
+  "version": "3.1",
+  "description": "Tianditu geo-bypass with SOCKS5 proxying, header spoofing, and NAS tile caching.",
   "permissions": [
     "proxy",
     "storage",

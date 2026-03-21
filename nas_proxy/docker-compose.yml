@@ -27,10 +27,11 @@ services:
       - '8082:8082'
     volumes:
       - ./tiles:/app/tiles
+      - ./proxies.html:/app/proxies.html:ro
+      - ./tile_storage.bin:/app/tile_storage.bin
     environment:
-      PROXY_URL: 'http://nas_proxy:8080'
-    depends_on:
-      - nas_proxy
+      PROXY_FILE: '/app/proxies.html'
+      TILE_STORAGE_LIB: '/app/libtilestorage.so'
 
   # Network-wide ad blocking
   pihole:
