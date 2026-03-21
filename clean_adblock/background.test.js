@@ -36,6 +36,12 @@ global.chrome = {
       addListener: jest.fn()
     },
     remove: jest.fn()
+  },
+  alarms: {
+    create: jest.fn(),
+    onAlarm: {
+      addListener: jest.fn()
+    }
   }
 };
 

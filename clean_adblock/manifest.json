@@ -10,10 +10,13 @@
     "activeTab",
     "tabs",
     "scripting",
-    "webRequest"
+    "webRequest",
+    "cookies",
+    "alarms"
   ],
   "host_permissions": [
     "<all_urls>",
+    "*://*.1point3acres.com/*",
     "*://*.getadblock.com/*",
     "*://*.youtube.com/*",
     "*://*.twitch.tv/*",

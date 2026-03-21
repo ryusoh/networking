@@ -34,6 +34,10 @@ describe('Feature Toggles', () => {
       declarativeNetRequest: {
         getDynamicRules: jest.fn(() => Promise.resolve([])),
         updateDynamicRules: jest.fn(() => Promise.resolve())
+      },
+      alarms: {
+        create: jest.fn(),
+        onAlarm: { addListener: jest.fn() }
       }
     };
 

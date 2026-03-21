@@ -9,8 +9,10 @@
  * - Google Funding Choices (ad blocker detection)
  * - OneSignal push notification prompts
  * - Generic forum ad patterns
+ * @global
  */
 
+/* global HTMLScriptElement */
 (function () {
   'use strict';
 
@@ -127,7 +129,7 @@
     'googlesyndication.com/pagead',
     'securepubads.g.doubleclick.net',
     'adservice.google.com',
-    'pagead2.googlesyndication.com',
+    'pagead2.googlesyndication.com'
   ];
 
   // Block script injection via DOM
@@ -164,7 +166,9 @@
   };
 
   function shouldBlockScript(src) {
-    if (!src) return false;
+    if (!src) {
+      return false;
+    }
     const lower = src.toLowerCase();
     return BLOCKED_SCRIPT_PATTERNS.some((p) => lower.includes(p));
   }
@@ -179,7 +183,9 @@
         set: () => {},
         configurable: false
       });
-    } catch (e) { /* already defined */ }
+    } catch (e) {
+      /* already defined */
+    }
 
     // Kill AdPushup
     try {
@@ -188,7 +194,9 @@
         set: () => {},
         configurable: false
       });
-    } catch (e) { /* already defined */ }
+    } catch (e) {
+      /* already defined */
+    }
 
     // Kill Google Funding Choices
     try {
@@ -197,12 +205,14 @@
           callbackQueue: [],
           showRevocationMessage: () => {},
           getConsentStatus: () => 1,
-          getConsentedProviderIds: () => [],
+          getConsentedProviderIds: () => []
         }),
         set: () => {},
         configurable: false
       });
-    } catch (e) { /* already defined */ }
+    } catch (e) {
+      /* already defined */
+    }
   }
 
   neutralizeAdConfig();
@@ -255,13 +265,15 @@
     '[class*="banner-ad"]',
     '[id*="banner-ad"]',
     '[id*="sticky-ad"]',
-    '[class*="sticky-ad"]',
+    '[class*="sticky-ad"]'
   ];
 
   const processedElements = new WeakSet();
 
   function hideAd(element) {
-    if (processedElements.has(element)) return false;
+    if (processedElements.has(element)) {
+      return false;
+    }
     element.style.setProperty('display', 'none', 'important');
     element.setAttribute('data-blocked-by-clean-adblock', 'true');
     processedElements.add(element);
@@ -289,7 +301,9 @@
     for (const selector of FORUM_AD_SELECTORS) {
       try {
         document.querySelectorAll(selector).forEach((el) => hideAd(el));
-      } catch (e) { /* invalid selector */ }
+      } catch (e) {
+        /* invalid selector */
+      }
     }
     removeAdScripts();
     removeAdIframes();
@@ -313,7 +327,9 @@
     let needsFullScan = false;
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
-        if (node.nodeType !== 1) continue;
+        if (node.nodeType !== 1) {
+          continue;
+        }
 
         // Check if the added node itself is an ad
         for (const selector of FORUM_AD_SELECTORS) {
@@ -321,7 +337,9 @@
             if (node.matches && node.matches(selector)) {
               hideAd(node);
             }
-          } catch (e) { /* invalid selector */ }
+          } catch (e) {
+            /* invalid selector */
+          }
         }
 
         // Check if it's an ad script
@@ -356,7 +374,9 @@
   const periodicScan = setInterval(() => {
     blockForumAds();
     scanCount++;
-    if (scanCount >= 20) clearInterval(periodicScan);
+    if (scanCount >= 20) {
+      clearInterval(periodicScan);
+    }
   }, 500);
 
   // Export for testing
