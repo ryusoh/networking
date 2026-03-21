@@ -71,7 +71,15 @@ chrome.runtime.onInstalled.addListener((details) => {
         mode: 'selective',
         whitelist: [],
         blacklist: [],
-        jsBlocked: ['bild.de']
+        jsBlocked: ['bild.de'],
+        // Feature toggles for new integrated features
+        features: {
+          cookieBannerBlocker: true,
+          socialMediaBlocker: true,
+          youtubeAdBlocker: true,
+          videoStreamAdBlocker: true,
+          twitchAdBlocker: true
+        }
       });
     } catch (e) {
       console.error('Background onInstalled storage set failed:', e);

@@ -2,89 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <style>
-      body {
-        width: 300px;
-        font-family: sans-serif;
-        padding: 10px;
-        background: #f4f4f4;
-      }
-      .header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 15px;
-      }
-      .switch {
-        position: relative;
-        display: inline-block;
-        width: 40px;
-        height: 20px;
-      }
-      .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-      }
-      .slider {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: #ccc;
-        transition: 0.4s;
-        border-radius: 20px;
-      }
-      .slider:before {
-        position: absolute;
-        content: '';
-        height: 16px;
-        width: 16px;
-        left: 2px;
-        bottom: 2px;
-        background-color: white;
-        transition: 0.4s;
-        border-radius: 50%;
-      }
-      input:checked + .slider {
-        background-color: #4caf50;
-      }
-      input:checked + .slider:before {
-        transform: translateX(20px);
-      }
-
-      .section {
-        background: white;
-        padding: 10px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      }
-      .title {
-        font-weight: bold;
-        font-size: 14px;
-        margin-bottom: 5px;
-      }
-      .desc {
-        font-size: 12px;
-        color: #666;
-        margin-bottom: 10px;
-      }
-      button {
-        width: 100%;
-        padding: 8px;
-        border: none;
-        border-radius: 4px;
-        background: #2196f3;
-        color: white;
-        cursor: pointer;
-      }
-      button:hover {
-        background: #1976d2;
-      }
-    </style>
+    <link rel="stylesheet" href="css/popup.css" />
   </head>
   <body>
     <div class="header">
@@ -110,6 +28,45 @@
         <button id="addWhitelist" style="background: #4caf50; font-size: 11px">Whitelist</button>
         <button id="addBlacklist" style="background: #2196f3; font-size: 11px">Blacklist</button>
         <button id="addJsBlock" style="background: #ff9800; font-size: 11px">Block JS</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="title">Features</div>
+      <div class="feature-toggle">
+        <span class="feature-name">Cookie Banner Blocker</span>
+        <label class="mini-switch">
+          <input type="checkbox" id="feature-cookieBanner" />
+          <span class="mini-slider"></span>
+        </label>
+      </div>
+      <div class="feature-toggle">
+        <span class="feature-name">Social Media Blocker</span>
+        <label class="mini-switch">
+          <input type="checkbox" id="feature-socialMedia" />
+          <span class="mini-slider"></span>
+        </label>
+      </div>
+      <div class="feature-toggle">
+        <span class="feature-name">YouTube Ad Blocker</span>
+        <label class="mini-switch">
+          <input type="checkbox" id="feature-youtube" />
+          <span class="mini-slider"></span>
+        </label>
+      </div>
+      <div class="feature-toggle">
+        <span class="feature-name">Video Stream Ad Blocker</span>
+        <label class="mini-switch">
+          <input type="checkbox" id="feature-videoStream" />
+          <span class="mini-slider"></span>
+        </label>
+      </div>
+      <div class="feature-toggle">
+        <span class="feature-name">Twitch Ad Blocker</span>
+        <label class="mini-switch">
+          <input type="checkbox" id="feature-twitch" />
+          <span class="mini-slider"></span>
+        </label>
       </div>
     </div>
 

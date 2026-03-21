@@ -11,9 +11,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const scanBtn = document.getElementById('scan');
   const pickerBtn = document.getElementById('picker');
 
+  // Feature toggles
+  const featureToggles = {
+    cookieBanner: document.getElementById('feature-cookieBanner'),
+    socialMedia: document.getElementById('feature-socialMedia'),
+    youtube: document.getElementById('feature-youtube'),
+    videoStream: document.getElementById('feature-videoStream'),
+    twitch: document.getElementById('feature-twitch')
+  };
+
   // Load current settings
   try {
-    chrome.storage.sync.get(['enabled', 'mode'], (prefs) => {
+    chrome.storage.sync.get(['enabled', 'mode', 'features'], (prefs) => {
       if (
         typeof chrome === 'undefined' ||
         !chrome.storage ||
@@ -23,6 +32,20 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       enabledToggle.checked = prefs.enabled !== false;
       modeSelect.value = prefs.mode || 'selective';
+
+      // Load feature settings
+      const features = prefs.features || {
+        cookieBannerBlocker: true,
+        socialMediaBlocker: true,
+        youtubeAdBlocker: true,
+        videoStreamAdBlocker: true,
+        twitchAdBlocker: true
+      };
+      featureToggles.cookieBanner.checked = features.cookieBannerBlocker !== false;
+      featureToggles.socialMedia.checked = features.socialMediaBlocker !== false;
+      featureToggles.youtube.checked = features.youtubeAdBlocker !== false;
+      featureToggles.videoStream.checked = features.videoStreamAdBlocker !== false;
+      featureToggles.twitch.checked = features.twitchAdBlocker !== false;
     });
   } catch (e) {
     console.error('Popup sync storage access failed:', e);
@@ -42,6 +65,37 @@ document.addEventListener('DOMContentLoaded', () => {
       chrome.storage.sync.set({ mode: modeSelect.value });
     } catch (e) {
       console.error('Popup sync storage set failed:', e);
+    }
+  });
+
+  // Feature toggle handlers
+  const featureKeys = {
+    cookieBanner: 'cookieBannerBlocker',
+    socialMedia: 'socialMediaBlocker',
+    youtube: 'youtubeAdBlocker',
+    videoStream: 'videoStreamAdBlocker',
+    twitch: 'twitchAdBlocker'
+  };
+
+  Object.entries(featureToggles).forEach(([key, toggle]) => {
+    if (toggle) {
+      toggle.addEventListener('change', () => {
+        try {
+          chrome.storage.sync.get(['features'], (result) => {
+            const features = result.features || {
+              cookieBannerBlocker: true,
+              socialMediaBlocker: true,
+              youtubeAdBlocker: true,
+              videoStreamAdBlocker: true,
+              twitchAdBlocker: true
+            };
+            features[featureKeys[key]] = toggle.checked;
+            chrome.storage.sync.set({ features });
+          });
+        } catch (e) {
+          console.error('Popup feature toggle set failed:', e);
+        }
+      });
     }
   });
 
