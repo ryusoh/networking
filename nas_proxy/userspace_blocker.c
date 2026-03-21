@@ -34,14 +34,19 @@ int main(int argc, char *argv[]) {
     int sock_raw;
     unsigned char *buffer = (unsigned char *)malloc(65536);
 
+    // Daemonize: fork to background, detach from terminal
+    printf("[*] NAS Pure-C Blocker starting...\n");
+    if (daemon(0, 0) != 0) {
+        perror("Failed to daemonize");
+        return 1;
+    }
+
     // 1. Create a Raw Socket to sniff all traffic
     sock_raw = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (sock_raw < 0) {
         perror("Socket Error (Try running with sudo)");
         return 1;
     }
-
-    printf("[*] NAS Pure-C Blocker active on Raw Socket...\n");
 
     while (1) {
         struct sockaddr saddr;
