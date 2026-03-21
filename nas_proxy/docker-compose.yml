@@ -59,6 +59,21 @@ services:
       - NET_ADMIN
     restart: always
 
+  # SOCKS5 Connection Pooler
+  # Maintains persistent SOCKS5 connections, eliminates per-request handshakes
+  conn_pool:
+    container_name: conn_pool
+    image: ubuntu:24.04
+    restart: always
+    ports:
+      - '8083:8083'
+    volumes:
+      - '.:/app'
+    working_dir: /app
+    command: ./conn_pool
+    depends_on:
+      - nas_proxy
+
   # SOCKS5-to-HTTP Bridge
   # Browser connects via fast HTTP CONNECT, NAS handles SOCKS5 protocol
   # with auto-failover between verified Chinese proxies
@@ -74,16 +89,29 @@ services:
     working_dir: /app
     command: python3 cache_proxy.py
 
-  # Automated Proxy Refresher
-  # Runs the C-based scraper every hour automatically
+  # Automated Proxy Scraper + Verifier
+  # Scrapes, health-checks, and deploys proxies every hour (all in C)
   refresher:
     container_name: nas_refresher
-    image: ebpf-builder
+    image: ubuntu:24.04
     volumes:
-      - '..:/app'
+      - '.:/app'
     working_dir: /app
-    command: /bin/bash -c "while true; do ./bin/refresh_proxies; sleep 3600; done"
+    command: /bin/bash -c "while true; do ./proxy_scraper; sleep 3600; done"
     restart: always
+    depends_on:
+      - nas_proxy
+
+  # Proxy Health Monitor
+  # Continuously pings proxies every 30s, removes dead ones between scraper cycles
+  proxy_monitor:
+    container_name: proxy_monitor
+    image: ubuntu:24.04
+    restart: always
+    volumes:
+      - '.:/app'
+    working_dir: /app
+    command: ./proxy_monitor
     depends_on:
       - nas_proxy
 

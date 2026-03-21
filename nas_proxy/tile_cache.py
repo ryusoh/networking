@@ -23,6 +23,8 @@ import threading
 LISTEN_PORT = 8082
 PROXY_FILE = os.environ.get("PROXY_FILE", "/app/proxies.html")
 TILE_STORAGE_LIB = os.environ.get("TILE_STORAGE_LIB", "/app/libtilestorage.so")
+CONN_POOL_HOST = os.environ.get("CONN_POOL_HOST", "conn_pool")
+CONN_POOL_PORT = int(os.environ.get("CONN_POOL_PORT", "8083"))
 FALLBACK_CACHE_DIR = "/app/tiles"
 
 # --- Mmap Tile Storage via ctypes ---
@@ -167,8 +169,80 @@ def socks5_connect(proxy_host, proxy_port, dest_host, dest_port, timeout=12):
     return sock
 
 
+def fetch_via_pool(url, timeout=15):
+    """Fetch a URL through the C connection pooler (preferred path).
+    The pooler maintains persistent SOCKS5 connections, eliminating handshake overhead."""
+    parsed = urlparse(url)
+    host = parsed.hostname
+    port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+    path = parsed.path or '/'
+    if parsed.query:
+        path += '?' + parsed.query
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(timeout)
+    sock.connect((CONN_POOL_HOST, CONN_POOL_PORT))
+
+    # Send HTTP CONNECT to the pooler
+    connect_req = f"CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n"
+    sock.sendall(connect_req.encode())
+
+    # Read 200 Connection Established
+    resp = b''
+    while b'\r\n\r\n' not in resp:
+        chunk = sock.recv(4096)
+        if not chunk:
+            raise Exception("Pool connection closed during CONNECT")
+        resp += chunk
+
+    if b'200' not in resp.split(b'\r\n')[0]:
+        sock.close()
+        raise Exception(f"Pool CONNECT failed: {resp[:100]}")
+
+    # Now we have a tunnel — do TLS if needed
+    if parsed.scheme == 'https':
+        import ssl
+        ctx = ssl.create_default_context()
+        sock = ctx.wrap_socket(sock, server_hostname=host)
+
+    # Send HTTP GET
+    request = (
+        f"GET {path} HTTP/1.1\r\n"
+        f"Host: {host}\r\n"
+        f"Accept: */*\r\n"
+        f"Accept-Language: zh-CN,zh;q=0.9\r\n"
+        f"Connection: close\r\n"
+        f"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0\r\n"
+        f"\r\n"
+    )
+    sock.sendall(request.encode())
+
+    response = b''
+    while True:
+        chunk = sock.recv(65536)
+        if not chunk:
+            break
+        response += chunk
+    sock.close()
+
+    header_end = response.find(b'\r\n\r\n')
+    if header_end == -1:
+        raise Exception("No HTTP headers in response")
+
+    header_section = response[:header_end].decode('latin-1')
+    body = response[header_end + 4:]
+
+    status_line = header_section.split('\r\n')[0]
+    status_code = int(status_line.split(' ')[1])
+
+    if 'transfer-encoding: chunked' in header_section.lower():
+        body = _decode_chunked(body)
+
+    return status_code, body
+
+
 def fetch_via_socks5(url, timeout=12):
-    """Fetch a URL through SOCKS5 proxies with failover. Returns (status, headers_dict, body)."""
+    """Fallback: fetch through raw SOCKS5 proxies directly."""
     parsed = urlparse(url)
     host = parsed.hostname
     port = parsed.port or (443 if parsed.scheme == 'https' else 80)
@@ -208,7 +282,6 @@ def fetch_via_socks5(url, timeout=12):
                 response += chunk
             sock.close()
 
-            # Parse HTTP response
             header_end = response.find(b'\r\n\r\n')
             if header_end == -1:
                 continue
@@ -219,14 +292,13 @@ def fetch_via_socks5(url, timeout=12):
             status_line = header_section.split('\r\n')[0]
             status_code = int(status_line.split(' ')[1])
 
-            # Handle chunked transfer encoding
             headers_lower = header_section.lower()
             if 'transfer-encoding: chunked' in headers_lower:
                 body = _decode_chunked(body)
 
             return status_code, body
 
-        except Exception as e:
+        except Exception:
             continue
 
     raise Exception("All SOCKS5 proxies failed")
@@ -277,9 +349,12 @@ class TileCacheHandler(BaseHTTPRequestHandler):
             self.wfile.write(cached)
             return
 
-        # Cache miss - fetch through SOCKS5
+        # Cache miss - fetch through connection pool (fast) or raw SOCKS5 (fallback)
         try:
-            status_code, body = fetch_via_socks5(target_url)
+            try:
+                status_code, body = fetch_via_pool(target_url)
+            except Exception:
+                status_code, body = fetch_via_socks5(target_url)
 
             if status_code == 200 and body:
                 # Cache it

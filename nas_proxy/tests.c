@@ -7,34 +7,13 @@
 /**
  * C-based Unit Tests for NAS Tools
  * --------------------------------
- * Validates the core logic of our high-performance tools.
+ * Validates the core logic of production tools.
  */
 
-// Extern declarations
+// Extern declarations (tile_storage.c)
 extern int add_tile(uint64_t hash, const void *data, uint32_t len);
 extern void* get_tile(uint64_t hash, uint32_t *out_len);
 extern int init_storage();
-extern void obfuscate(uint8_t *data, size_t len);
-extern const char *MS_RESPONSE;
-
-void test_stealth_tunnel() {
-    printf("[*] Testing Stealth Tunnel (XOR)...\n");
-    uint8_t data[] = "secret_payload";
-    size_t len = strlen((char*)data);
-    uint8_t original[16];
-    memcpy(original, data, len);
-    obfuscate(data, len);
-    assert(memcmp(data, original, len) != 0);
-    obfuscate(data, len);
-    assert(memcmp(data, original, len) == 0);
-    printf("[PASS] Stealth Tunnel Test\n");
-}
-
-void test_connectivity_spoofer() {
-    printf("[*] Testing Connectivity Spoofer Responses...\n");
-    assert(strstr(MS_RESPONSE, "Microsoft Connect Test") != NULL);
-    printf("[PASS] Connectivity Spoofer Test\n");
-}
 
 void test_tile_storage() {
     printf("[*] Testing Tile Storage...\n");
@@ -49,8 +28,6 @@ void test_tile_storage() {
 
 int main() {
     printf("--- [ STARTING C-BASED UNIT TESTS ] ---\n");
-    test_stealth_tunnel();
-    test_connectivity_spoofer();
     test_tile_storage();
     printf("--- [ ALL C TESTS PASSED ] ---\n");
     return 0;
