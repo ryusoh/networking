@@ -59,20 +59,6 @@ services:
       - NET_ADMIN
     restart: always
 
-  # Real-time User-space AdBlocker
-  # Uses Raw Sockets to monitor and drop malicious traffic
-  blocker:
-    container_name: nas_blocker
-    image: ubuntu:24.04
-    network_mode: 'host' # Crucial for Raw Socket access
-    volumes:
-      - '.:/app'
-    working_dir: /app
-    command: ./userspace_blocker eth0
-    restart: always
-    depends_on:
-      - pihole
-
   # SOCKS5-to-HTTP Bridge
   # Browser connects via fast HTTP CONNECT, NAS handles SOCKS5 protocol
   # with auto-failover between verified Chinese proxies
