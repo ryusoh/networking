@@ -53,14 +53,13 @@ def fetch_geonode_proxies():
 
 
 def test_proxy(ip, port):
-    """Test if a proxy can reach tianditu without getting 418/000."""
-    # Try socks5h first (DNS through proxy), then socks5, then socks4
-    for scheme in ["socks5h", "socks5", "socks4"]:
+    """Test if a proxy can reach tianditu. Returns response time in seconds or None."""
+    for scheme in ["socks5h", "socks5"]:
         try:
             result = subprocess.run(
                 [
                     "curl", "-s", "-o", "/dev/null",
-                    "-w", "%{http_code}",
+                    "-w", "%{http_code} %{time_total}",
                     "--proxy", f"{scheme}://{ip}:{port}",
                     "--connect-timeout", str(CONNECT_TIMEOUT),
                     "--max-time", str(MAX_TIME),
@@ -69,13 +68,15 @@ def test_proxy(ip, port):
                 capture_output=True, text=True,
                 timeout=MAX_TIME + 5
             )
-            code = result.stdout.strip()
-            if code in ("200", "301", "302"):
-                print(f"  [OK] {ip}:{port} ({scheme}) -> HTTP {code}")
-                return scheme
-            elif code != "000":
-                print(f"  [--] {ip}:{port} ({scheme}) -> HTTP {code}")
-                return None  # Got a response but wrong code, don't retry other schemes
+            parts = result.stdout.strip().split()
+            if len(parts) == 2:
+                code, time_s = parts[0], float(parts[1])
+                if code in ("200", "301", "302"):
+                    print(f"  [OK] {ip}:{port} ({scheme}) -> HTTP {code} in {time_s:.1f}s")
+                    return time_s
+                elif code != "000":
+                    print(f"  [--] {ip}:{port} ({scheme}) -> HTTP {code} in {time_s:.1f}s")
+                    return None
         except Exception:
             pass
     return None
@@ -114,34 +115,34 @@ def update_v2ray_config():
 
     print(f"\n[*] Testing {len(all_proxies)} proxies against tianditu...")
 
-    # 3. Health-check in parallel
-    working = []
+    # 3. Health-check ALL proxies in parallel, then sort by speed
+    candidates = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_proxy = {
             executor.submit(test_proxy, p["address"], p["port"]): p
             for p in all_proxies
         }
         for future in as_completed(future_to_proxy):
-            if len(working) >= MAX_WORKING_PROXIES:
-                for f in future_to_proxy:
-                    f.cancel()
-                break
             proxy = future_to_proxy[future]
             try:
-                scheme = future.result()
-                if scheme:
-                    working.append(proxy)
+                time_s = future.result()
+                if time_s is not None:
+                    candidates.append((time_s, proxy))
             except Exception:
                 pass
 
-    if not working:
+    if not candidates:
         print("\n[-] No working Chinese-exit proxies found from any source.")
         print("[-] All proxies either timed out (000) or returned 418 (geo-blocked).")
         return
 
-    print(f"\n[+] Found {len(working)} VERIFIED Chinese-exit proxies!")
-    for p in working:
-        print(f"    {p['address']}:{p['port']}")
+    # Sort by speed (fastest first) and take top N
+    candidates.sort(key=lambda x: x[0])
+    working = [p for _, p in candidates[:MAX_WORKING_PROXIES]]
+
+    print(f"\n[+] Found {len(candidates)} working proxies, using top {len(working)} fastest:")
+    for time_s, p in candidates[:MAX_WORKING_PROXIES]:
+        print(f"    {p['address']}:{p['port']} ({time_s:.1f}s)")
 
     # 4. Write verified proxies to proxies.html for the browser extension
     #    (pihole serves this file on port 8000, extension fetches it directly)

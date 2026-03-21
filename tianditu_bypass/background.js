@@ -1,12 +1,13 @@
 /**
- * Tianditu Proxy Accelerator - V3.0
- * Direct SOCKS5 proxy from NAS-verified Chinese exit nodes.
- * No V2Ray middleman - browser connects to SOCKS5 proxies directly.
+ * Tianditu Proxy Accelerator - V3.1
+ * Uses NAS proxy bridge (HTTP CONNECT -> SOCKS5) for best performance.
+ * Bridge handles SOCKS5 protocol, failover, and connection management.
+ * Fallback: direct SOCKS5 from verified Chinese exit nodes.
  */
 
 const NAS_IP = '10.0.0.169';
+const BRIDGE_PORT = 3128;
 
-// proxies.html now contains ONLY verified Chinese-exit proxies (written by updater.py)
 const SOURCES = [
   {
     name: 'NAS Verified Proxies',
@@ -21,8 +22,9 @@ let proxyList = [];
 let currentProxyIndex = 0;
 
 /**
- * Updates the PAC script with SOCKS5 proxies.
- * Uses SOCKS5 so Chrome resolves DNS through the proxy (Chinese DNS).
+ * Updates the PAC script.
+ * Primary: NAS bridge proxy (HTTP CONNECT, handled efficiently by Chrome)
+ * Fallback: direct SOCKS5 to verified Chinese proxies
  */
 function updateProxySettings(proxyChain) {
   const config = {
@@ -71,12 +73,14 @@ function applyProxyList() {
     return;
   }
 
-  // Build a chain of all verified SOCKS5 proxies as failover
-  const chain = proxyList
+  // Primary: NAS bridge proxy (handles SOCKS5 internally, with failover)
+  // Fallback: direct SOCKS5 connections to verified Chinese proxies
+  const socks5Fallback = proxyList
     .slice(currentProxyIndex)
     .map((p) => `SOCKS5 ${p.ip}:${p.port}`)
     .join('; ');
 
+  const chain = `PROXY ${NAS_IP}:${BRIDGE_PORT}; ${socks5Fallback}`;
   updateProxySettings(chain);
 }
 

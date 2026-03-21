@@ -72,6 +72,21 @@ services:
     depends_on:
       - pihole
 
+  # SOCKS5-to-HTTP Bridge
+  # Browser connects via fast HTTP CONNECT, NAS handles SOCKS5 protocol
+  # with auto-failover between verified Chinese proxies
+  proxy_bridge:
+    container_name: proxy_bridge
+    image: python:3.12-slim
+    restart: always
+    ports:
+      - '3128:3128'
+    volumes:
+      - './cache_proxy.py:/app/cache_proxy.py:ro'
+      - './proxies.html:/app/proxies.html:ro'
+    working_dir: /app
+    command: python3 cache_proxy.py
+
   # Automated Proxy Refresher
   # Runs the C-based scraper every hour automatically
   refresher:
