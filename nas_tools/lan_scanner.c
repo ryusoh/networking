@@ -96,18 +96,18 @@ static double ping_host(const char *ip) {
     addr.sin_family = AF_INET;
     inet_pton(AF_INET, ip, &addr.sin_addr);
 
-    /* Build ICMP echo request */
+    /* Build ICMP echo request (portable across Linux/macOS) */
     struct {
-        struct icmphdr hdr;
+        struct icmp hdr;
         char data[32];
     } pkt;
     memset(&pkt, 0, sizeof(pkt));
-    pkt.hdr.type = ICMP_ECHO;
-    pkt.hdr.code = 0;
-    pkt.hdr.un.echo.id = htons(getpid() & 0xFFFF);
-    pkt.hdr.un.echo.sequence = htons(1);
+    pkt.hdr.icmp_type = ICMP_ECHO;
+    pkt.hdr.icmp_code = 0;
+    pkt.hdr.icmp_id = htons(getpid() & 0xFFFF);
+    pkt.hdr.icmp_seq = htons(1);
     memset(pkt.data, 0x42, sizeof(pkt.data));
-    pkt.hdr.checksum = icmp_checksum(&pkt, sizeof(pkt));
+    pkt.hdr.icmp_cksum = icmp_checksum(&pkt, sizeof(pkt));
 
     struct timeval t0, t1;
     gettimeofday(&t0, NULL);
@@ -185,6 +185,12 @@ static int detect_subnet(const char *iface, char *base_ip, int base_ip_size) {
     struct ifaddrs *ifaddr, *ifa;
     if (getifaddrs(&ifaddr) != 0) return -1;
 
+    /* When no interface specified, pick the best candidate:
+       skip loopback, link-local (169.254.x.x), and virtual/docker interfaces */
+    char best_ip[16] = {0};
+    char best_iface[32] = {0};
+    int best_score = -1;
+
     for (ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
         if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET) continue;
         if (ifa->ifa_flags & IFF_LOOPBACK) continue;
@@ -196,19 +202,59 @@ static int detect_subnet(const char *iface, char *base_ip, int base_ip_size) {
         char ip[16];
         inet_ntop(AF_INET, &sa->sin_addr, ip, sizeof(ip));
 
-        /* Extract base (first 3 octets) */
-        char *last_dot = strrchr(ip, '.');
-        if (!last_dot) continue;
+        unsigned int addr = ntohl(sa->sin_addr.s_addr);
+        unsigned char first = (addr >> 24) & 0xFF;
+        unsigned char second = (addr >> 16) & 0xFF;
 
-        size_t prefix_len = last_dot - ip;
-        if (prefix_len >= (size_t)base_ip_size) continue;
+        /* Skip link-local 169.254.x.x */
+        if (first == 169 && second == 254) continue;
 
-        memcpy(base_ip, ip, prefix_len);
-        base_ip[prefix_len] = '\0';
+        /* Score interfaces: prefer real LAN interfaces */
+        int score = 0;
 
-        freeifaddrs(ifaddr);
-        printf("[scanner] Detected subnet: %s.0/24 (%s)\n", base_ip, ifa->ifa_name);
-        return 0;
+        /* Private ranges (10.x, 192.168.x, 172.16-31.x) get high score */
+        if (first == 10) score = 100;
+        else if (first == 192 && second == 168) score = 100;
+        else if (first == 172 && second >= 16 && second <= 31) score = 100;
+        else score = 50; /* public IP, less likely on LAN */
+
+        /* Penalize virtual/docker interfaces */
+        const char *name = ifa->ifa_name;
+        if (strncmp(name, "docker", 6) == 0 ||
+            strncmp(name, "veth", 4) == 0 ||
+            strncmp(name, "br-", 3) == 0 ||
+            strncmp(name, "virbr", 5) == 0) {
+            score -= 80;
+        }
+
+        /* Prefer common physical names */
+        if (strncmp(name, "eth0", 4) == 0 ||
+            strncmp(name, "en", 2) == 0 ||
+            strncmp(name, "br0", 3) == 0 ||
+            strncmp(name, "bond", 4) == 0) {
+            score += 10;
+        }
+
+        if (iface || score > best_score) {
+            best_score = score;
+            snprintf(best_ip, sizeof(best_ip), "%s", ip);
+            snprintf(best_iface, sizeof(best_iface), "%s", name);
+            if (iface) break; /* exact match requested */
+        }
+    }
+
+    if (best_score >= 0) {
+        char *last_dot = strrchr(best_ip, '.');
+        if (last_dot) {
+            size_t prefix_len = last_dot - best_ip;
+            if (prefix_len < (size_t)base_ip_size) {
+                memcpy(base_ip, best_ip, prefix_len);
+                base_ip[prefix_len] = '\0';
+                freeifaddrs(ifaddr);
+                printf("[scanner] Detected subnet: %s.0/24 (%s)\n", base_ip, best_iface);
+                return 0;
+            }
+        }
     }
 
     freeifaddrs(ifaddr);
