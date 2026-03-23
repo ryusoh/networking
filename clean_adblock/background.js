@@ -35,7 +35,11 @@ const updateBlockingRules = async (hostnames) => {
           id: baseId,
           priority: 1,
           action: { type: 'block' },
-          condition: { urlFilter: `||${host}/*`, resourceTypes: ['script'] }
+          condition: {
+            urlFilter: `||${host}/*`,
+            resourceTypes: ['script'],
+            excludedInitiatorDomains: ['lyeutsaon.com']
+          }
         });
         addRules.push({
           id: baseId + 1,
@@ -50,7 +54,11 @@ const updateBlockingRules = async (hostnames) => {
               }
             ]
           },
-          condition: { urlFilter: `||${host}/*`, resourceTypes: ['main_frame', 'sub_frame'] }
+          condition: {
+            urlFilter: `||${host}/*`,
+            resourceTypes: ['main_frame', 'sub_frame'],
+            excludedInitiatorDomains: ['lyeutsaon.com']
+          }
         });
       });
     }
@@ -95,7 +103,8 @@ async function setupAdNetworkBlocking() {
       action: { type: 'block' },
       condition: {
         urlFilter: `||${domain}`,
-        resourceTypes: ['script', 'sub_frame', 'xmlhttprequest', 'image', 'other']
+        resourceTypes: ['script', 'sub_frame', 'xmlhttprequest', 'image', 'other'],
+        excludedInitiatorDomains: ['lyeutsaon.com']
       }
     }));
 

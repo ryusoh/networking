@@ -56,16 +56,19 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
+      "exclude_matches": ["*://*.lyeutsaon.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["<all_urls>"],
+      "exclude_matches": ["*://*.lyeutsaon.com/*"],
       "js": ["cookie-banner-blocker.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["<all_urls>"],
+      "exclude_matches": ["*://*.lyeutsaon.com/*"],
       "js": ["forum-ad-blocker.js"],
       "run_at": "document_start"
     },
@@ -101,6 +104,7 @@
     },
     {
       "matches": ["<all_urls>"],
+      "exclude_matches": ["*://*.lyeutsaon.com/*"],
       "js": ["video-stream-ad-blocker.js"],
       "run_at": "document_start"
     },
