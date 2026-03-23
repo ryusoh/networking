@@ -75,7 +75,12 @@ const AD_NETWORK_DOMAINS = [
   'adservice.google.com',
   'cdn.admiral-media.com',
   'v.admiral-media.com',
-  'admiral.mgr.consensu.org'
+  'admiral.mgr.consensu.org',
+  'cdn.taboola.com',
+  'trc.taboola.com',
+  'api.taboola.com',
+  'taboolasyndication.com',
+  'erebor.douban.com'
 ];
 
 async function setupAdNetworkBlocking() {

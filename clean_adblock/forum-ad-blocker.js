@@ -114,6 +114,27 @@
     div[style*="z-index: 2147483568"],
     div[style*="z-index: 2147483647"],
 
+    /* Taboola native ads */
+    [dataurl*="taboola"],
+    li:has(a[href*="taboola.com"]),
+    div:has(> a[href*="taboola.com"]),
+    .hot-banner:has(a[href*="taboola.com"]),
+    .hot-content:has(a[href*="taboola.com"]),
+    h3.adTitle,
+    img[src*="images.taboola.com"],
+
+    /* Douban native ads (erebor redirect + dale ad units) */
+    .customize-slot,
+    .article-card:has(a[href*="erebor.douban.com"]),
+    a[href*="erebor.douban.com/redirect"],
+    div[class*="dale_"],
+    img[src*="dale-online"],
+    img[src*="dale_ad"],
+
+    /* Douban ad units */
+    div[class*="dale_"],
+    div[id*="dale_"],
+
     /* Sticky/floating ads */
     [id*="sticky-ad"],
     [class*="sticky-ad"],
@@ -162,7 +183,11 @@
     'pagead2.googlesyndication.com',
     'admiral-media.com',
     'admiral.mgr.consensu.org',
-    'admiralcdn.com'
+    'admiralcdn.com',
+    'cdn.taboola.com',
+    'trc.taboola.com',
+    'api.taboola.com',
+    'taboolasyndication.com'
   ];
 
   // Block script injection via DOM
@@ -288,6 +313,14 @@
     'div[style*="z-index: 2147483568"]',
     'div[style*="z-index: 2147483647"]',
 
+    // Taboola
+    '[dataurl*="taboola"]',
+    'h3.adTitle',
+
+    // Douban native ads
+    '.customize-slot',
+    'a[href*="erebor.douban.com/redirect"]',
+
     // Generic
     '[class*="ad-container"]',
     '[class*="sponsor"]',
@@ -345,6 +378,33 @@
     }
     removeAdScripts();
     removeAdIframes();
+
+    // Hide Taboola ad containers (walk up from taboola links)
+    document.querySelectorAll('a[href*="taboola.com"]').forEach((link) => {
+      const container = link.closest('li, .hot-banner, .hot-content') || link.parentElement;
+      if (container) {
+        hideAd(container);
+      }
+    });
+
+    // Hide Admaru ad label and its parent container (text says "Admaru")
+    document.querySelectorAll('div').forEach((el) => {
+      const txt = el.textContent || '';
+      if (txt.includes('Admaru') && txt.length < 50) {
+        hideAd(el);
+        if (el.parentElement) {
+          hideAd(el.parentElement);
+        }
+      }
+    });
+
+    // Hide Douban erebor redirect ad containers
+    document.querySelectorAll('a[href*="erebor.douban.com"]').forEach((link) => {
+      const container = link.closest('.customize-slot, .article-card') || link.parentElement;
+      if (container) {
+        hideAd(container);
+      }
+    });
 
     // Restore scroll if ad overlay locked it
     if (document.body) {
