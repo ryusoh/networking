@@ -381,7 +381,10 @@
             return;
           }
 
-          // 2. Check Execution Mode
+          // 2. Force Interaction Restoration (Always On, regardless of mode)
+          restoreInteractions();
+
+          // 3. Check Execution Mode
           if (prefs?.mode === 'selective') {
             const inBlacklist = prefs?.blacklist && prefs.blacklist.some((s) => host.includes(s));
             if (!inBlacklist) {
@@ -389,9 +392,6 @@
               return;
             }
           }
-
-          // 3. Force Interaction Restoration (Always On)
-          restoreInteractions();
 
           // 4. Site-specific handling
           Object.keys(SITE_MODULES).forEach((m) => {
