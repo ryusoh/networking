@@ -41,16 +41,19 @@
         display: none !important;
       }
 
-      /* Hide floating Grok and Messages buttons */
+      /* Hide floating Grok and Messages buttons/drawers */
       div[data-testid="msg-drawer"],
       button[aria-label="Grok"],
       a[aria-label="Grok"],
-      [data-testid="GrokDrawerHeader"] {
+      [data-testid="GrokDrawerHeader"],
+      [data-testid="GrokDrawer"],
+      [data-testid="chat-drawer-root"] {
         display: none !important;
       }
 
       /* Hide Subscribe to Premium / Who to follow / Live on X sidebar cards */
       aside[aria-label="Subscribe to Premium"],
+      aside[aria-label="プレミアムにサブスクライブ"],
       aside[aria-label="Who to follow"],
       aside[aria-label="Live on X"] {
         display: none !important;
