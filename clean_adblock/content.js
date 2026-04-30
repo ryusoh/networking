@@ -418,7 +418,8 @@
             '[class*="anti-adblocker"]',
             '[id*="anti-adblocker"]',
             '.fc-consent-root',
-            '.fc-dialog-overlay'
+            '.fc-dialog-overlay',
+            '#__ABoverlay'
           ];
 
           for (const sel of ADBLOCK_POPUP_SELECTORS) {
