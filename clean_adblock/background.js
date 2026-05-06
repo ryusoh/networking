@@ -104,7 +104,7 @@ async function setupAdNetworkBlocking() {
       condition: {
         urlFilter: `||${domain}`,
         resourceTypes: ['script', 'sub_frame', 'xmlhttprequest', 'image', 'other'],
-        excludedInitiatorDomains: ['lyeutsaon.com']
+        excludedInitiatorDomains: ['lyeutsaon.com', 'x.com', 'twitter.com']
       }
     }));
 

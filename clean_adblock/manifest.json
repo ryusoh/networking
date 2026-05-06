@@ -10,7 +10,6 @@
     "activeTab",
     "tabs",
     "scripting",
-    "webRequest",
     "cookies",
     "alarms"
   ],
@@ -56,19 +55,19 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "exclude_matches": ["*://*.lyeutsaon.com/*"],
+      "exclude_matches": ["*://*.lyeutsaon.com/*", "*://*.x.com/*", "*://*.twitter.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["<all_urls>"],
-      "exclude_matches": ["*://*.lyeutsaon.com/*"],
+      "exclude_matches": ["*://*.lyeutsaon.com/*", "*://*.x.com/*", "*://*.twitter.com/*"],
       "js": ["cookie-banner-blocker.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["<all_urls>"],
-      "exclude_matches": ["*://*.lyeutsaon.com/*"],
+      "exclude_matches": ["*://*.lyeutsaon.com/*", "*://*.x.com/*", "*://*.twitter.com/*"],
       "js": ["forum-ad-blocker.js"],
       "run_at": "document_start"
     },
@@ -80,7 +79,7 @@
     {
       "matches": ["*://*.x.com/*", "*://*.twitter.com/*"],
       "js": ["x-twitter-bird.js"],
-      "run_at": "document_start"
+      "run_at": "document_idle"
     },
     {
       "matches": ["*://*.x.com/*", "*://*.twitter.com/*"],

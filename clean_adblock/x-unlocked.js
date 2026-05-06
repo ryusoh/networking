@@ -112,9 +112,14 @@
     // Try once immediately
     tryTabSwitch();
 
-    // Then watch for DOM changes (handles SPA navigation)
+    // Throttled observer to avoid excessive DOM queries on X's SPA
+    let throttleTimer = null;
     const observer = new MutationObserver(() => {
-      tryTabSwitch();
+      if (throttleTimer) return;
+      throttleTimer = setTimeout(() => {
+        throttleTimer = null;
+        tryTabSwitch();
+      }, 300);
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
