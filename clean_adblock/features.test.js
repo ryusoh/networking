@@ -149,7 +149,7 @@ describe('X (Twitter) Unlocked', () => {
     const path = require('path');
     const content = fs.readFileSync(path.join(__dirname, 'x-twitter-bird.js'), 'utf8');
     expect(content).toContain('replaceFavicon');
-    expect(content).toContain('replaceLogos');
+    expect(content).toContain('injectCSS');
   });
 });
 

@@ -115,7 +115,14 @@
     // Throttled observer to avoid excessive DOM queries on X's SPA
     let throttleTimer = null;
     const observer = new MutationObserver(() => {
-      if (throttleTimer) return;
+      const path = window.location.pathname;
+      if (path !== '/home' && path !== '/') {
+        return;
+      }
+
+      if (throttleTimer) {
+        return;
+      }
       throttleTimer = setTimeout(() => {
         throttleTimer = null;
         tryTabSwitch();

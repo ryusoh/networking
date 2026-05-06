@@ -12,7 +12,16 @@
   'use strict';
 
   // Sites with dedicated scripts or complex SPAs where broad selectors break layout
-  const HARDCODED_SKIP = ['x.com', 'twitter.com', 'linkedin.com', 'instagram.com', 'facebook.com', 'reddit.com', 'pinterest.com', 'youtube.com'];
+  const HARDCODED_SKIP = [
+    'x.com',
+    'twitter.com',
+    'linkedin.com',
+    'instagram.com',
+    'facebook.com',
+    'reddit.com',
+    'pinterest.com',
+    'youtube.com'
+  ];
   const host = window.location.hostname;
   if (HARDCODED_SKIP.some((d) => host === d || host.endsWith('.' + d))) {
     return;

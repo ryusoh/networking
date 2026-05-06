@@ -16,10 +16,7 @@
     },
     instagram: {
       domains: ['instagram.com', 'www.instagram.com'],
-      selectors: [
-        '[class*="sponsored"]',
-        '[data-testid="social_context"]'
-      ],
+      selectors: ['[class*="sponsored"]', '[data-testid="social_context"]'],
       textPatterns: [/sponsored/i]
     },
     reddit: {
@@ -88,7 +85,11 @@
             .filter((n) => n.nodeType === Node.TEXT_NODE)
             .map((n) => n.textContent.trim())
             .join(' ');
-          if (directText.length > 0 && directText.length < 200 && matchesPattern({ textContent: directText }, config.textPatterns)) {
+          if (
+            directText.length > 0 &&
+            directText.length < 200 &&
+            matchesPattern({ textContent: directText }, config.textPatterns)
+          ) {
             return NodeFilter.FILTER_ACCEPT;
           }
           return NodeFilter.FILTER_SKIP;
