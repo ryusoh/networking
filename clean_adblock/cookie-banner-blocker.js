@@ -21,7 +21,8 @@
     'reddit.com',
     'pinterest.com',
     'youtube.com',
-    'nasdaq.com'
+    'nasdaq.com',
+    'fintel.io'
   ];
   const host = window.location.hostname;
   if (HARDCODED_SKIP.some((d) => host === d || host.endsWith('.' + d))) {
