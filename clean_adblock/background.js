@@ -296,6 +296,17 @@ sessionKeepAlive();
 /**
  * Tab Management: Auto-Close Annoying Update Pages
  */
+// URL path patterns that indicate a cookie/privacy notice popup
+const COOKIE_NOTICE_PATH_PATTERNS = [
+  '/legal/cookie',
+  '/cookie-notice',
+  '/cookie-policy',
+  '/privacy-notice',
+  '/privacy-policy/cookie',
+  '/consent/cookie',
+  '/gdpr/cookie'
+];
+
 function shouldCloseTab(url) {
   if (!url) {
     return false;
@@ -306,6 +317,11 @@ function shouldCloseTab(url) {
       if (urlObj.pathname.includes('/update/') || urlObj.pathname.includes('/installed/')) {
         return true;
       }
+    }
+    // Close cookie notice popups opened as new tabs/windows
+    const pathLower = urlObj.pathname.toLowerCase();
+    if (COOKIE_NOTICE_PATH_PATTERNS.some((p) => pathLower.includes(p))) {
+      return true;
     }
   } catch {
     /* Invalid URL */

@@ -98,6 +98,42 @@
     '[data-action*="deny"]'
   ];
 
+  // Block window.open() calls that open cookie/privacy notice popups
+  const COOKIE_POPUP_PATTERNS = [
+    '/legal/cookie',
+    '/cookie-notice',
+    '/cookie-policy',
+    '/privacy-notice',
+    '/privacy-policy/cookie',
+    '/consent/cookie',
+    '/gdpr/cookie'
+  ];
+
+  function injectPopupBlocker() {
+    const script = document.createElement('script');
+    script.textContent = `(function() {
+      const _open = window.open;
+      const patterns = ${JSON.stringify(COOKIE_POPUP_PATTERNS)};
+      window.open = function(url) {
+        if (url && typeof url === 'string') {
+          const lower = url.toLowerCase();
+          if (patterns.some(function(p) { return lower.includes(p); })) {
+            return null;
+          }
+        }
+        return _open.apply(this, arguments);
+      };
+    })();`;
+    (document.documentElement || document.head || document.body).appendChild(script);
+    script.remove();
+  }
+
+  try {
+    injectPopupBlocker();
+  } catch {
+    // CSP may block inline scripts on some sites — background.js tab closing is the fallback
+  }
+
   const processedBanners = new Set();
 
   function findCookieBanner() {
