@@ -99,11 +99,13 @@
   ];
 
   // Block window.open() calls that open cookie/privacy notice popups
+  // Patterns without leading slash to match compound paths (e.g. /swatch-cookie-notice.html)
   const COOKIE_POPUP_PATTERNS = [
+    'cookie-notice',
+    'cookie-policy',
+    'cookie-consent',
+    'privacy-notice',
     '/legal/cookie',
-    '/cookie-notice',
-    '/cookie-policy',
-    '/privacy-notice',
     '/privacy-policy/cookie',
     '/consent/cookie',
     '/gdpr/cookie'

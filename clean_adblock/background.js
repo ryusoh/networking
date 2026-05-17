@@ -297,11 +297,13 @@ sessionKeepAlive();
  * Tab Management: Auto-Close Annoying Update Pages
  */
 // URL path patterns that indicate a cookie/privacy notice popup
+// Patterns without leading slash to match compound paths (e.g. /swatch-cookie-notice.html)
 const COOKIE_NOTICE_PATH_PATTERNS = [
+  'cookie-notice',
+  'cookie-policy',
+  'cookie-consent',
+  'privacy-notice',
   '/legal/cookie',
-  '/cookie-notice',
-  '/cookie-policy',
-  '/privacy-notice',
   '/privacy-policy/cookie',
   '/consent/cookie',
   '/gdpr/cookie'
