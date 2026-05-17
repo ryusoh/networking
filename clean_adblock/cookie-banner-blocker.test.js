@@ -27,10 +27,7 @@ describe('Cookie Banner Blocker - Popup Blocking', () => {
   });
 
   function loadScript() {
-    const code = fs.readFileSync(
-      path.resolve(__dirname, './cookie-banner-blocker.js'),
-      'utf8'
-    );
+    const code = fs.readFileSync(path.resolve(__dirname, './cookie-banner-blocker.js'), 'utf8');
     eval(code);
   }
 
@@ -73,6 +70,131 @@ describe('Cookie Banner Blocker - Popup Blocking', () => {
   });
 });
 
+describe('Cookie Banner Blocker - Direct CMP Auto-Dismiss', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    delete window.location;
+    window.location = { hostname: 'www.swatch.com' };
+    global.chrome = undefined;
+    window.open = jest.fn();
+  });
+
+  function loadScript() {
+    const code = fs.readFileSync(path.resolve(__dirname, './cookie-banner-blocker.js'), 'utf8');
+    eval(code);
+  }
+
+  test('should prefer reject over accept on OneTrust banner', () => {
+    document.body.innerHTML = `
+      <div id="onetrust-banner-sdk" class="otFlat bottom" role="region" aria-label="Cookie banner">
+        <div id="onetrust-button-group">
+          <button id="onetrust-reject-all-handler">Reject All Cookies</button>
+          <button id="onetrust-accept-btn-handler">Accept All Cookies</button>
+        </div>
+      </div>
+    `;
+    const rejectBtn = document.getElementById('onetrust-reject-all-handler');
+    const acceptBtn = document.getElementById('onetrust-accept-btn-handler');
+    const rejectSpy = jest.spyOn(rejectBtn, 'click');
+    const acceptSpy = jest.spyOn(acceptBtn, 'click');
+
+    loadScript();
+
+    // Should click reject (privacy-first), not accept
+    expect(rejectSpy).toHaveBeenCalled();
+    expect(acceptSpy).not.toHaveBeenCalled();
+  });
+
+  test('should click reject button on OneTrust if configured to reject', () => {
+    document.body.innerHTML = `
+      <div id="onetrust-banner-sdk" class="otFlat bottom" role="region">
+        <div id="onetrust-button-group">
+          <button id="onetrust-reject-all-handler">Reject All Cookies</button>
+          <button id="onetrust-accept-btn-handler">Accept All Cookies</button>
+        </div>
+      </div>
+    `;
+    const rejectBtn = document.getElementById('onetrust-reject-all-handler');
+    const clickSpy = jest.spyOn(rejectBtn, 'click');
+
+    loadScript();
+
+    // dismissKnownCMP should click reject on OneTrust
+    expect(clickSpy).toHaveBeenCalled();
+  });
+
+  test('should handle Didomi popup dismiss', () => {
+    document.body.innerHTML = `
+      <div id="didomi-popup" class="didomi-popup">
+        <button id="didomi-notice-agree-button">Accept</button>
+      </div>
+    `;
+    const agreeBtn = document.getElementById('didomi-notice-agree-button');
+    const clickSpy = jest.spyOn(agreeBtn, 'click');
+
+    loadScript();
+
+    expect(clickSpy).toHaveBeenCalled();
+  });
+
+  test('should handle Quantcast choice banner', () => {
+    document.body.innerHTML = `
+      <div class="quantcast-choice" id="qc-cmp2-container">
+        <button class="qc-cmp2-summary-buttons" mode="primary">AGREE</button>
+      </div>
+    `;
+    const agreeBtn = document.querySelector('.qc-cmp2-summary-buttons');
+    const clickSpy = jest.spyOn(agreeBtn, 'click');
+
+    loadScript();
+
+    expect(clickSpy).toHaveBeenCalled();
+  });
+
+  test('should handle Cookiebot banner', () => {
+    document.body.innerHTML = `
+      <div id="CybotCookiebotDialog" class="CybotCookiebotDialogActive">
+        <button id="CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll">Allow all</button>
+      </div>
+    `;
+    const allowBtn = document.getElementById(
+      'CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll'
+    );
+    const clickSpy = jest.spyOn(allowBtn, 'click');
+
+    loadScript();
+
+    expect(clickSpy).toHaveBeenCalled();
+  });
+
+  test('should hide OneTrust banner if no buttons found', () => {
+    document.body.innerHTML = `
+      <div id="onetrust-banner-sdk" class="otFlat bottom" role="region">
+        <div id="onetrust-policy-text">We use cookies</div>
+      </div>
+    `;
+
+    loadScript();
+
+    const banner = document.getElementById('onetrust-banner-sdk');
+    expect(banner.style.display).toBe('none');
+  });
+
+  test('should not interfere with non-cookie elements', () => {
+    document.body.innerHTML = `
+      <div id="main-content">
+        <p>Normal page content</p>
+        <button id="submit-btn">Submit</button>
+      </div>
+    `;
+
+    loadScript();
+
+    const content = document.getElementById('main-content');
+    expect(content.style.display).not.toBe('none');
+  });
+});
+
 describe('Cookie Banner Blocker - shouldCloseTab patterns (background.js)', () => {
   let shouldCloseTab;
 
@@ -91,7 +213,7 @@ describe('Cookie Banner Blocker - shouldCloseTab patterns (background.js)', () =
 
     // This is the current implementation - it will fail for swatch URLs
     shouldCloseTab = (url) => {
-      if (!url) return false;
+      if (!url) {return false;}
       try {
         const urlObj = new URL(url);
         const pathLower = urlObj.pathname.toLowerCase();
@@ -106,26 +228,18 @@ describe('Cookie Banner Blocker - shouldCloseTab patterns (background.js)', () =
   });
 
   test('should match /en-us/swatch-cookie-notice.html (compound path)', () => {
-    expect(
-      shouldCloseTab('https://www.swatch.com/en-us/swatch-cookie-notice.html')
-    ).toBe(true);
+    expect(shouldCloseTab('https://www.swatch.com/en-us/swatch-cookie-notice.html')).toBe(true);
   });
 
   test('should match URLs with cookie-notice embedded in filename', () => {
-    expect(
-      shouldCloseTab('https://example.com/pages/brand-cookie-notice-popup.html')
-    ).toBe(true);
+    expect(shouldCloseTab('https://example.com/pages/brand-cookie-notice-popup.html')).toBe(true);
   });
 
   test('should still match direct /cookie-notice path', () => {
-    expect(
-      shouldCloseTab('https://example.com/cookie-notice')
-    ).toBe(true);
+    expect(shouldCloseTab('https://example.com/cookie-notice')).toBe(true);
   });
 
   test('should not match unrelated URLs', () => {
-    expect(
-      shouldCloseTab('https://www.swatch.com/en-us/royal-pop.html')
-    ).toBe(false);
+    expect(shouldCloseTab('https://www.swatch.com/en-us/royal-pop.html')).toBe(false);
   });
 });

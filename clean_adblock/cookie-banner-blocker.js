@@ -136,7 +136,62 @@
     // CSP may block inline scripts on some sites — background.js tab closing is the fallback
   }
 
+  // Known CMP configurations: selector -> button selectors to click (in priority order)
+  const KNOWN_CMPS = [
+    {
+      banner: '#onetrust-banner-sdk',
+      buttons: ['#onetrust-reject-all-handler', '#onetrust-accept-btn-handler']
+    },
+    {
+      banner: '#didomi-popup, .didomi-popup',
+      buttons: [
+        '#didomi-notice-disagree-button',
+        '#didomi-notice-agree-button',
+        '[class*="didomi"] button:first-of-type'
+      ]
+    },
+    {
+      banner: '.quantcast-choice, #qc-cmp2-container',
+      buttons: ['.qc-cmp2-summary-buttons[mode="secondary"]', '.qc-cmp2-summary-buttons']
+    },
+    {
+      banner: '#CybotCookiebotDialog',
+      buttons: [
+        '#CybotCookiebotDialogBodyButtonDecline',
+        '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
+        '#CybotCookiebotDialogBodyButtonAccept'
+      ]
+    },
+    {
+      banner: '#usercentrics-root',
+      buttons: ['[data-testid="uc-deny-all-button"]', '[data-testid="uc-accept-all-button"]']
+    }
+  ];
+
   const processedBanners = new Set();
+
+  function dismissKnownCMP() {
+    for (const cmp of KNOWN_CMPS) {
+      const banner = document.querySelector(cmp.banner);
+      if (!banner) {continue;}
+      const bannerId = cmp.banner;
+      if (processedBanners.has(bannerId)) {continue;}
+
+      for (const btnSelector of cmp.buttons) {
+        const btn = banner.querySelector(btnSelector) || document.querySelector(btnSelector);
+        if (btn) {
+          btn.click();
+          processedBanners.add(bannerId);
+          return true;
+        }
+      }
+      // No button found — hide the banner
+      banner.style.display = 'none';
+      processedBanners.add(bannerId);
+      return true;
+    }
+    return false;
+  }
 
   function findCookieBanner() {
     for (const selector of COOKIE_BANNER_SELECTORS) {
@@ -231,6 +286,10 @@
   }
 
   function blockCookieBanner() {
+    // Try known CMPs first (no heuristic needed)
+    if (dismissKnownCMP()) {return;}
+
+    // Fall back to heuristic detection
     const banner = findCookieBanner();
     if (banner) {
       dismissBanner(banner);
@@ -281,6 +340,7 @@
     window.CookieBannerBlocker = {
       findCookieBanner,
       dismissBanner,
+      dismissKnownCMP,
       processedBanners
     };
   }
