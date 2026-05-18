@@ -165,6 +165,10 @@
     {
       banner: '#usercentrics-root',
       buttons: ['[data-testid="uc-deny-all-button"]', '[data-testid="uc-accept-all-button"]']
+    },
+    {
+      banner: '.gc-consent-popup, .gc-consent-popup__modal-content',
+      buttons: ['.gc-consent-popup__button', '.gc-consent-popup__button:last-child']
     }
   ];
 
@@ -188,6 +192,71 @@
       // No button found — hide the banner
       banner.style.display = 'none';
       processedBanners.add(bannerId);
+      return true;
+    }
+    return false;
+  }
+
+  // Text patterns for button matching (privacy-first: reject patterns first)
+  const REJECT_TEXT = [
+    'reject all',
+    'deny all',
+    'decline all',
+    'required only',
+    'only necessary',
+    'necessary only',
+    'essential only',
+    'only essential'
+  ];
+  const ACCEPT_TEXT = [
+    'accept all',
+    'allow all',
+    'agree',
+    'confirm my choices',
+    'got it',
+    'i understand'
+  ];
+  const CONSENT_KEYWORDS = ['cookie', 'consent', 'privacy', 'tracking', 'analytics', 'gdpr'];
+
+  function isConsentDialog(el) {
+    const text = el.textContent.toLowerCase();
+    return CONSENT_KEYWORDS.filter((k) => text.includes(k)).length >= 2;
+  }
+
+  function findButtonByText(container, textPatterns) {
+    const buttons = container.querySelectorAll('button, [role="button"], a.button, a.btn');
+    for (const pattern of textPatterns) {
+      for (const btn of buttons) {
+        if (btn.textContent.toLowerCase().trim().includes(pattern)) {
+          return btn;
+        }
+      }
+    }
+    return null;
+  }
+
+  function dismissConsentDialog() {
+    const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+    for (const dialog of dialogs) {
+      if (!isConsentDialog(dialog)) {continue;}
+      const dialogId = 'dialog:' + (dialog.className || 'unknown');
+      if (processedBanners.has(dialogId)) {continue;}
+
+      const rejectBtn = findButtonByText(dialog, REJECT_TEXT);
+      if (rejectBtn) {
+        rejectBtn.click();
+        processedBanners.add(dialogId);
+        return true;
+      }
+      const acceptBtn = findButtonByText(dialog, ACCEPT_TEXT);
+      if (acceptBtn) {
+        acceptBtn.click();
+        processedBanners.add(dialogId);
+        return true;
+      }
+      // No recognized button — hide it
+      dialog.style.display = 'none';
+      processedBanners.add(dialogId);
       return true;
     }
     return false;
@@ -288,6 +357,9 @@
   function blockCookieBanner() {
     // Try known CMPs first (no heuristic needed)
     if (dismissKnownCMP()) {return;}
+
+    // Try generic dialog-based consent detection (text matching)
+    if (dismissConsentDialog()) {return;}
 
     // Fall back to heuristic detection
     const banner = findCookieBanner();
