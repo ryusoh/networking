@@ -6,6 +6,25 @@
 (function () {
   'use strict';
 
+  // Sites whose security scripts detect environment tampering
+  const SKIP_HOSTS = [
+    'x.com',
+    'twitter.com',
+    'linkedin.com',
+    'instagram.com',
+    'facebook.com',
+    'reddit.com',
+    'pinterest.com',
+    'youtube.com',
+    'nasdaq.com',
+    'fintel.io',
+    'xueqiu.com'
+  ];
+  const host = window.location.hostname;
+  if (SKIP_HOSTS.some((d) => host === d || host.endsWith('.' + d))) {
+    return;
+  }
+
   const COOKIE_POPUP_PATTERNS = [
     'cookie-notice',
     'cookie-policy',

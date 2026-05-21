@@ -28,7 +28,8 @@
     'youtube.com',
     'twitch.tv',
     'nasdaq.com',
-    'fintel.io'
+    'fintel.io',
+    'xueqiu.com'
   ];
   const host = window.location.hostname;
   if (EXCLUDED_DOMAINS.some((d) => host === d || host.endsWith('.' + d))) {
