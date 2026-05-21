@@ -98,43 +98,8 @@
     '[data-action*="deny"]'
   ];
 
-  // Block window.open() calls that open cookie/privacy notice popups
-  // Patterns without leading slash to match compound paths (e.g. /swatch-cookie-notice.html)
-  const COOKIE_POPUP_PATTERNS = [
-    'cookie-notice',
-    'cookie-policy',
-    'cookie-consent',
-    'privacy-notice',
-    '/legal/cookie',
-    '/privacy-policy/cookie',
-    '/consent/cookie',
-    '/gdpr/cookie'
-  ];
-
-  function injectPopupBlocker() {
-    const script = document.createElement('script');
-    script.textContent = `(function() {
-      const _open = window.open;
-      const patterns = ${JSON.stringify(COOKIE_POPUP_PATTERNS)};
-      window.open = function(url) {
-        if (url && typeof url === 'string') {
-          const lower = url.toLowerCase();
-          if (patterns.some(function(p) { return lower.includes(p); })) {
-            return null;
-          }
-        }
-        return _open.apply(this, arguments);
-      };
-    })();`;
-    (document.documentElement || document.head || document.body).appendChild(script);
-    script.remove();
-  }
-
-  try {
-    injectPopupBlocker();
-  } catch {
-    // CSP may block inline scripts on some sites — background.js tab closing is the fallback
-  }
+  // window.open() popup blocking for cookie/privacy popups is handled by
+  // cookie-popup-blocker-main.js running in the MAIN world (bypasses CSP)
 
   // Known CMP configurations: selector -> button selectors to click (in priority order)
   const KNOWN_CMPS = [

@@ -68,6 +68,13 @@
     {
       "matches": ["<all_urls>"],
       "exclude_matches": ["*://*.lyeutsaon.com/*", "*://*.x.com/*", "*://*.twitter.com/*"],
+      "js": ["cookie-popup-blocker-main.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "exclude_matches": ["*://*.lyeutsaon.com/*", "*://*.x.com/*", "*://*.twitter.com/*"],
       "js": ["forum-ad-blocker.js"],
       "run_at": "document_start"
     },
