@@ -138,6 +138,10 @@
     div[class*="dale_"],
     div[id*="dale_"],
 
+    /* NYTimes registration wall / doorslam */
+    #gateway-content,
+    [data-testid="onsite-messaging-unit-gateway"],
+
     /* Sticky/floating ads */
     [id*="sticky-ad"],
     [class*="sticky-ad"],
@@ -408,6 +412,17 @@
         hideAd(container);
       }
     });
+
+    // NYTimes regiwall: remove inert attribute and gateway overlay
+    if (host.endsWith('nytimes.com')) {
+      document.querySelectorAll('[data-testid="vi-gateway-container"][inert]').forEach((el) => {
+        el.removeAttribute('inert');
+        el.removeAttribute('aria-hidden');
+      });
+      document.querySelectorAll('#gateway-content, [data-testid="onsite-messaging-unit-gateway"]').forEach((el) => {
+        hideAd(el);
+      });
+    }
 
     // Restore scroll if ad overlay locked it
     if (document.body) {

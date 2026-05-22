@@ -104,6 +104,12 @@
       "run_at": "document_idle"
     },
     {
+      "matches": ["*://*.nytimes.com/*"],
+      "js": ["nytimes-unlocked.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
       "matches": ["*://*.youtube.com/*"],
       "js": ["youtube-ad-blocker.js"],
       "run_at": "document_start"
@@ -136,7 +142,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["picker.js", "assets/*.png", "css/*.css"],
+      "resources": ["picker.js", "nytimes-unlocked.js", "assets/*.png", "css/*.css"],
       "matches": ["<all_urls>"]
     }
   ],
