@@ -6,6 +6,15 @@
 (function () {
   'use strict';
 
+  // Skip search engines — broad keyword/element scanning causes false positives on results pages
+  const _host = window.location.hostname;
+  if (_host.endsWith('google.com') || _host.endsWith('google.co.uk') || _host.endsWith('google.ca') ||
+      _host.endsWith('google.com.au') || _host.endsWith('google.de') || _host.endsWith('google.fr') ||
+      _host.endsWith('google.co.jp') || _host.endsWith('google.co.in') ||
+      _host.endsWith('bing.com') || _host.endsWith('duckduckgo.com') || _host.endsWith('baidu.com')) {
+    return;
+  }
+
   const DEBUG = true;
   const log = (...args) => DEBUG && console.log('[Bypass: AdBlock]', ...args);
 
@@ -391,7 +400,8 @@
             'x.com',
             'twitter.com',
             'linkedin.com',
-            'twitch.tv'
+            'twitch.tv',
+            'google.com'
           ];
           if (!SKIP_INTERACTIONS.some((d) => host === d || host.endsWith('.' + d))) {
             restoreInteractions();

@@ -23,7 +23,15 @@
     'youtube.com',
     'nasdaq.com',
     'fintel.io',
-    'xueqiu.com'
+    'xueqiu.com',
+    'google.com',
+    'google.co.uk',
+    'google.ca',
+    'google.com.au',
+    'google.de',
+    'google.fr',
+    'google.co.jp',
+    'google.co.in'
   ];
   const host = window.location.hostname;
   if (HARDCODED_SKIP.some((d) => host === d || host.endsWith('.' + d))) {

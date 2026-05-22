@@ -29,7 +29,15 @@
     'twitch.tv',
     'nasdaq.com',
     'fintel.io',
-    'xueqiu.com'
+    'xueqiu.com',
+    'google.com',
+    'google.co.uk',
+    'google.ca',
+    'google.com.au',
+    'google.de',
+    'google.fr',
+    'google.co.jp',
+    'google.co.in'
   ];
   const host = window.location.hostname;
   if (EXCLUDED_DOMAINS.some((d) => host === d || host.endsWith('.' + d))) {
