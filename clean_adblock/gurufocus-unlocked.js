@@ -7,12 +7,71 @@
 
   if (!window.location.hostname.endsWith('gurufocus.com')) return;
 
-  // --- Paywall removal (same approach as gurupirate) ---
-  function removePaywall() {
-    document.body.style.overflow = 'visible';
-    var els = document.querySelectorAll('.paywall-shadow, .paywall-node, .el-dialog__wrapper.gf, .v-modal');
-    for (var i = 0; i < els.length; i++) els[i].remove();
+  // --- Anti-blur CSS ---
+  var antiBlurInjected = false;
+  function injectAntiBlur() {
+    if (antiBlurInjected) return;
+    var style = document.createElement('style');
+    style.textContent = '.blur { filter: none !important; pointer-events: auto !important; user-select: auto !important; } [style*="blur"] { filter: none !important; pointer-events: auto !important; } .subscribe-card, .subscribe-card-small { display: none !important; } img[src*="blur"] { display: none !important; }';
+    (document.head || document.documentElement).appendChild(style);
+    antiBlurInjected = true;
   }
+
+  // --- Paywall removal ---
+  function removePaywall() {
+    injectAntiBlur();
+    document.body.style.overflow = 'visible';
+    var els = document.querySelectorAll('.paywall-shadow, .paywall-node, .el-dialog__wrapper.gf, .v-modal, .subscribe-card, .subscribe-card-small');
+    for (var i = 0; i < els.length; i++) els[i].remove();
+    // Remove blur overlay images
+    document.querySelectorAll('img[src*="blur"]').forEach(function (img) { img.remove(); });
+    // Remove .blur class and inline blur styles from elements
+    document.querySelectorAll('.blur, [style*="blur"]').forEach(unblur);
+  }
+
+  function unblur(el) {
+    if (el.classList.contains('blur')) el.classList.remove('blur');
+    if (el.style.filter && el.style.filter.indexOf('blur') !== -1) {
+      el.style.filter = 'none';
+    }
+    if (el.style.pointerEvents === 'none') {
+      el.style.pointerEvents = '';
+    }
+    if (el.style.userSelect === 'none') {
+      el.style.userSelect = '';
+    }
+  }
+
+  // --- MutationObserver: catch Vue reactivity re-applying blur ---
+  var observer = new MutationObserver(function (mutations) {
+    for (var i = 0; i < mutations.length; i++) {
+      var m = mutations[i];
+      if (m.type === 'attributes') {
+        var el = m.target;
+        if (el.classList && el.classList.contains('blur')) unblur(el);
+        if (el.style && el.style.filter && el.style.filter.indexOf('blur') !== -1) unblur(el);
+      }
+      if (m.type === 'childList') {
+        for (var j = 0; j < m.addedNodes.length; j++) {
+          var node = m.addedNodes[j];
+          if (node.nodeType !== 1) continue;
+          // Remove blur overlay images
+          if (node.tagName === 'IMG' && node.src && node.src.indexOf('blur') !== -1) {
+            node.remove(); continue;
+          }
+          if (node.classList.contains('blur') || (node.style && node.style.filter && node.style.filter.indexOf('blur') !== -1)) {
+            unblur(node);
+          }
+          var blurred = node.querySelectorAll ? node.querySelectorAll('.blur, [style*="blur"]') : [];
+          for (var k = 0; k < blurred.length; k++) unblur(blurred[k]);
+          // Remove blur images inside added subtrees
+          var blurImgs = node.querySelectorAll ? node.querySelectorAll('img[src*="blur"]') : [];
+          for (var l = 0; l < blurImgs.length; l++) blurImgs[l].remove();
+        }
+      }
+    }
+  });
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'], childList: true, subtree: true });
 
   // --- Financial data rendering from __NUXT__ ---
   var CSS = '<style>' +
