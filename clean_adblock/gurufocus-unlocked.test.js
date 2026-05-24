@@ -273,6 +273,164 @@ describe('GuruFocus Unlocked - paywall overlay removal', () => {
   });
 });
 
+describe('GuruFocus Unlocked - forecast data from Vue components', () => {
+  beforeEach(() => {
+    document.head.innerHTML = '';
+    document.body.innerHTML = '';
+    delete window.__NUXT__;
+    setupLocation();
+  });
+
+  function createVueElement(estimateData, priceData, opts = {}) {
+    const el = document.createElement('div');
+    el.setAttribute('data-v-5ccaf75f', '');
+    el.__vue__ = {
+      loading: opts.loading || false,
+      noData: opts.noData || false,
+      estimateData: estimateData,
+      priceData: priceData,
+    };
+    return el;
+  }
+
+  test('renders forecast card with estimateData and priceData', async () => {
+    const estimateData = {
+      stockid: 'US01WD',
+      high: 400,
+      low: 215,
+      med: 310,
+      mean: 308.44,
+      num: 39,
+      entry_date: '2026-05-22',
+    };
+    const priceData = [
+      ['2026-05-20', 250],
+      ['2026-05-21', 255.5],
+    ];
+    const container = document.createElement('div');
+    container.className = 'el-main';
+    const vueEl = createVueElement(estimateData, priceData);
+    container.appendChild(vueEl);
+    document.body.appendChild(container);
+
+    loadScript();
+    await wait(600);
+
+    const card = document.querySelector('.gf-u-forecast');
+    expect(card).not.toBeNull();
+    expect(card.textContent).toContain('308.44');
+    expect(card.textContent).toContain('400.00');
+    expect(card.textContent).toContain('215.00');
+    expect(card.textContent).toContain('310.00');
+    expect(card.textContent).toContain('39');
+    expect(card.textContent).toContain('255.50');
+    expect(card.textContent).toContain('2026-05-22');
+  });
+
+  test('computes upside percentage correctly', async () => {
+    const estimateData = { high: 300, low: 100, med: 200, mean: 200, num: 10, entry_date: '2026-01-01' };
+    const priceData = [['2026-01-01', 100]]; // mean=200, price=100 → +100% upside
+    const container = document.createElement('div');
+    container.className = 'el-main';
+    container.appendChild(createVueElement(estimateData, priceData));
+    document.body.appendChild(container);
+
+    loadScript();
+    await wait(600);
+
+    const card = document.querySelector('.gf-u-forecast');
+    expect(card).not.toBeNull();
+    expect(card.textContent).toContain('+100.00%');
+  });
+
+  test('shows negative upside for overvalued stock', async () => {
+    const estimateData = { high: 150, low: 50, med: 100, mean: 100, num: 5, entry_date: '2026-01-01' };
+    const priceData = [['2026-01-01', 200]]; // mean=100, price=200 → -50% upside
+    const container = document.createElement('div');
+    container.className = 'el-main';
+    container.appendChild(createVueElement(estimateData, priceData));
+    document.body.appendChild(container);
+
+    loadScript();
+    await wait(600);
+
+    const card = document.querySelector('.gf-u-forecast');
+    expect(card.textContent).toContain('-50.00%');
+  });
+
+  test('does not render forecast when loading is true', async () => {
+    const estimateData = { high: 300, low: 100, med: 200, mean: 200, num: 10 };
+    const container = document.createElement('div');
+    container.className = 'el-main';
+    container.appendChild(createVueElement(estimateData, [], { loading: true }));
+    document.body.appendChild(container);
+
+    loadScript();
+    await wait(600);
+
+    expect(document.querySelector('.gf-u-forecast')).toBeNull();
+  });
+
+  test('does not render forecast when noData is true', async () => {
+    const estimateData = { high: 300, low: 100, med: 200, mean: 200, num: 10 };
+    const container = document.createElement('div');
+    container.className = 'el-main';
+    container.appendChild(createVueElement(estimateData, [], { noData: true }));
+    document.body.appendChild(container);
+
+    loadScript();
+    await wait(600);
+
+    expect(document.querySelector('.gf-u-forecast')).toBeNull();
+  });
+
+  test('does not render forecast on non-forecast pages', async () => {
+    window.location.pathname = '/stock/AAPL/summary';
+    const estimateData = { high: 300, low: 100, med: 200, mean: 200, num: 10 };
+    const container = document.createElement('div');
+    container.className = 'el-main';
+    container.appendChild(createVueElement(estimateData, [['2026-01-01', 100]]));
+    document.body.appendChild(container);
+
+    loadScript();
+    await wait(600);
+
+    expect(document.querySelector('.gf-u-forecast')).toBeNull();
+  });
+
+  test('does not duplicate forecast card on repeated calls', async () => {
+    const estimateData = { high: 300, low: 100, med: 200, mean: 200, num: 10 };
+    const container = document.createElement('div');
+    container.className = 'el-main';
+    container.appendChild(createVueElement(estimateData, [['2026-01-01', 100]]));
+    document.body.appendChild(container);
+
+    loadScript();
+    await wait(600);
+
+    // Wait more to ensure periodic re-runs don't duplicate
+    await wait(3000);
+    expect(document.querySelectorAll('.gf-u-forecast').length).toBe(1);
+  });
+
+  test('renders without priceData (no current price / upside)', async () => {
+    const estimateData = { high: 300, low: 100, med: 200, mean: 200, num: 10 };
+    const container = document.createElement('div');
+    container.className = 'el-main';
+    container.appendChild(createVueElement(estimateData, null));
+    document.body.appendChild(container);
+
+    loadScript();
+    await wait(600);
+
+    const card = document.querySelector('.gf-u-forecast');
+    expect(card).not.toBeNull();
+    expect(card.textContent).toContain('200.00');
+    expect(card.textContent).not.toContain('Current Price');
+    expect(card.textContent).not.toContain('Upside');
+  });
+});
+
 describe('GuruFocus Unlocked - full forecast page simulation', () => {
   beforeEach(() => {
     document.head.innerHTML = '';

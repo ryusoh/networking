@@ -73,7 +73,68 @@
   });
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'], childList: true, subtree: true });
 
-  // --- Financial data rendering from __NUXT__ ---
+  // --- Forecast data rendering from Vue components ---
+  function injectForecast() {
+    if (document.querySelector('.gf-u-forecast')) return true;
+    if (!/\/forecast/.test(window.location.pathname)) return false;
+
+    var vueEl = document.querySelector('[data-v-5ccaf75f]');
+    if (!vueEl || !vueEl.__vue__) return false;
+    var vm = vueEl.__vue__;
+    if (vm.loading || vm.noData) return false;
+
+    var est = vm.estimateData;
+    var priceData = vm.priceData;
+    if (!est) return false;
+
+    var currentPrice = priceData && priceData.length ? parseFloat(priceData[priceData.length - 1][1]) : null;
+    var upside = currentPrice ? (((est.mean - currentPrice) / currentPrice) * 100).toFixed(2) : null;
+    var upsideColor = upside >= 0 ? '#67c23a' : '#f56c6c';
+
+    var html = '<div class="gf-u-forecast" style="padding:16px;margin:12px 0;background:#fff;border:1px solid #eee;border-radius:8px;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">' +
+      '<h3 style="margin:0 0 12px;font-size:16px;color:#333;">Analyst Price Target</h3>' +
+      '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;">' +
+        '<div style="text-align:center;padding-right:24px;border-right:1px solid #eee;">' +
+          '<div style="font-size:13px;color:#666;">Average Target</div>' +
+          '<div style="font-size:28px;font-weight:700;color:' + upsideColor + ';">$' + est.mean.toFixed(2) + '</div>' +
+          (upside !== null ? '<div style="font-size:14px;color:' + upsideColor + ';">(' + (upside >= 0 ? '+' : '') + upside + '% Upside)</div>' : '') +
+        '</div>' +
+        '<div style="display:flex;gap:20px;">' +
+          '<div style="text-align:center;"><div style="font-size:12px;color:#999;">High</div><div style="font-size:18px;font-weight:600;color:#67c23a;">$' + est.high.toFixed(2) + '</div></div>' +
+          '<div style="text-align:center;"><div style="font-size:12px;color:#999;">Median</div><div style="font-size:18px;font-weight:600;color:#333;">$' + est.med.toFixed(2) + '</div></div>' +
+          '<div style="text-align:center;"><div style="font-size:12px;color:#999;">Low</div><div style="font-size:18px;font-weight:600;color:#f56c6c;">$' + est.low.toFixed(2) + '</div></div>' +
+          '<div style="text-align:center;"><div style="font-size:12px;color:#999;">Analysts</div><div style="font-size:18px;font-weight:600;color:#333;">' + est.num + '</div></div>' +
+        '</div>' +
+      '</div>' +
+      (currentPrice !== null ? '<div style="margin-top:8px;font-size:13px;color:#666;">Current Price: <strong>$' + currentPrice.toFixed(2) + '</strong> | Updated: ' + (est.entry_date || '') + '</div>' : '') +
+    '</div>';
+
+    // Replace blur image containers or insert after subscribe card removal points
+    var inserted = false;
+    var blurImgParents = document.querySelectorAll('[data-v-5ccaf75f]');
+    for (var i = 0; i < blurImgParents.length; i++) {
+      var parent = blurImgParents[i];
+      if (parent.__vue__ && parent.__vue__.estimateData && !inserted) {
+        var wrap = document.createElement('div');
+        wrap.innerHTML = html;
+        parent.parentElement.insertBefore(wrap.firstChild, parent);
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) {
+      var main = document.querySelector('.el-main');
+      if (main) {
+        var wrap = document.createElement('div');
+        wrap.innerHTML = html;
+        main.insertBefore(wrap.firstChild, main.firstChild);
+        inserted = true;
+      }
+    }
+    return inserted;
+  }
+
+  // --- Shared Utilities ---
   var CSS = '<style>' +
     '.gf-u-wrap{padding:15px;overflow-x:auto;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}' +
     '.gf-u-tabs{display:flex;gap:4px;margin-bottom:12px}' +
@@ -99,6 +160,97 @@
     if (Math.abs(n) >= 1e3 && n % 1 === 0) return (n / 1e3).toFixed(1) + 'K';
     if (Math.abs(n) < 0.01 && n !== 0) return n.toFixed(4);
     return n.toFixed(2);
+  }
+
+  var LABEL_TO_METRIC = {
+    'revenue': 'revenue_estimate',
+    'eps without nri': 'eps_nri_estimate',
+    'eps': 'per_share_eps_estimate',
+    'dividends per share': 'dividend_estimate',
+    'ebit': 'ebit_estimate',
+    'ebitda': 'ebitda_estimate',
+    'pretax income': 'pretax_income_estimate',
+    'net income': 'net_income_estimate',
+    'book value per share': 'book_value_per_share_estimate',
+    'operating cash flow per share': 'operating_cash_flow_per_share_estimate',
+    'gross margin': 'gross_margin_estimate',
+    'roa': 'roa_estimate',
+    'roe': 'roe_estimate'
+  };
+
+  function fillOriginalForecastTables() {
+    // Find parent component with estimate.estimate_current
+    var el = document.querySelector('.m-t-md.border.p-md');
+    if (!el || !el.__vue__) return false;
+    var vm = el.__vue__;
+    while (vm && !(vm.estimate && vm.estimate.estimate_current)) vm = vm.$parent;
+    if (!vm) return false;
+
+    var est = vm.estimate.estimate_current;
+    var sections = document.querySelectorAll('.m-t-md.border.p-md');
+    var filledAny = false;
+    var totalEmptyExpected = 0;
+
+    for (var i = 0; i < sections.length; i++) {
+      var table = sections[i].querySelector('table');
+      if (!table) continue;
+
+      var dateRow = null;
+      var trs = table.querySelectorAll('tr');
+      for (var j = 0; j < trs.length; j++) {
+        if (trs[j].innerText.match(/\d{4}-\d{2}/)) {
+          dateRow = trs[j]; // get the lowest row containing dates
+        }
+      }
+      if (!dateRow) continue;
+
+      var ths = dateRow.querySelectorAll('th, td');
+      var colMap = {};
+      for (var c = 0; c < ths.length; c++) {
+        var match = ths[c].innerText.trim().match(/^(\d{4})-(\d{2})/);
+        if (match) colMap[c] = match[1] + match[2];
+      }
+
+      for (var r = 0; r < trs.length; r++) {
+        var tds = trs[r].querySelectorAll('td');
+        if (!tds.length) continue;
+        
+        var labelNode = tds[0].querySelector('.el-tooltip') || tds[0];
+        var label = labelNode.innerText.trim().toLowerCase();
+        
+        var mKey = LABEL_TO_METRIC[label];
+        if (!mKey) continue;
+
+        var offset = tds.length - ths.length;
+        for (var colIdx in colMap) {
+          var tdIndex = parseInt(colIdx) + offset;
+          if (tdIndex > 0 && tdIndex < tds.length) {
+            var cell = tds[tdIndex];
+            var innerText = cell.innerText.trim();
+            if (!innerText || innerText === '-') {
+              totalEmptyExpected++;
+              var ek = colMap[colIdx];
+              var val = null;
+              if (est.annual && est.annual[mKey] && est.annual[mKey][ek] && est.annual[mKey][ek].mean != null) {
+                val = est.annual[mKey][ek].mean;
+              } else if (est.quarterly && est.quarterly[mKey] && est.quarterly[mKey][ek] && est.quarterly[mKey][ek].mean != null) {
+                val = est.quarterly[mKey][ek].mean;
+              }
+              
+              if (val != null) {
+                cell.innerText = fmt(val);
+                cell.style.color = '#409eff';
+                cell.style.fontWeight = 'bold';
+                filledAny = true;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Return true if we found and filled at least one cell, OR if we didn't expect to fill any
+    return filledAny || totalEmptyExpected === 0;
   }
 
   function buildTable(entries) {
@@ -194,7 +346,10 @@
   var attempts = 0;
   function run() {
     removePaywall();
-    if (injectFinancials()) return;
+    var forecastDone = injectForecast();
+    var forecastTablesDone = fillOriginalForecastTables();
+    var financialsDone = injectFinancials();
+    if (forecastDone && forecastTablesDone && financialsDone) return;
     if (++attempts < 40) setTimeout(run, 500);
   }
 
@@ -212,8 +367,12 @@
       lastPath = window.location.pathname;
       var old = document.querySelector('.gf-u-wrap');
       if (old) old.remove();
+      var oldForecast = document.querySelector('.gf-u-forecast');
+      if (oldForecast) oldForecast.remove();
       attempts = 0;
       setTimeout(run, 1000);
     }
+    // Also periodically re-fill tables just in case Vue re-rendered them
+    fillOriginalForecastTables();
   }, 2000);
 })();
