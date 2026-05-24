@@ -211,6 +211,7 @@
         if (match) colMap[c] = match[1] + match[2];
       }
 
+      var lastMKey = null;
       for (var r = 0; r < trs.length; r++) {
         var tds = trs[r].querySelectorAll('td');
         if (!tds.length) continue;
@@ -219,7 +220,23 @@
         var label = labelNode.innerText.trim().toLowerCase();
         
         var mKey = LABEL_TO_METRIC[label];
-        if (!mKey) continue;
+        var statKey = null;
+
+        if (mKey) {
+          lastMKey = mKey;
+          statKey = 'mean';
+        } else if (lastMKey) {
+          if (label.indexOf('no. of analysts') !== -1) statKey = 'num';
+          else if (label.indexOf('high estimate') !== -1) statKey = 'high';
+          else if (label.indexOf('low estimate') !== -1) statKey = 'low';
+          else if (label.indexOf('median estimate') !== -1) statKey = 'med';
+          else if (label.indexOf('standard deviation') !== -1) statKey = 'std';
+          else if (label.indexOf('smart estimate') !== -1) statKey = 'smart';
+          else { lastMKey = null; continue; }
+          mKey = lastMKey;
+        } else {
+          continue;
+        }
 
         var offset = tds.length - ths.length;
         for (var colIdx in colMap) {
@@ -231,16 +248,20 @@
               totalEmptyExpected++;
               var ek = colMap[colIdx];
               var val = null;
-              if (est.annual && est.annual[mKey] && est.annual[mKey][ek] && est.annual[mKey][ek].mean != null) {
-                val = est.annual[mKey][ek].mean;
-              } else if (est.quarterly && est.quarterly[mKey] && est.quarterly[mKey][ek] && est.quarterly[mKey][ek].mean != null) {
-                val = est.quarterly[mKey][ek].mean;
+              if (est.annual && est.annual[mKey] && est.annual[mKey][ek] && est.annual[mKey][ek][statKey] != null) {
+                val = est.annual[mKey][ek][statKey];
+              } else if (est.quarterly && est.quarterly[mKey] && est.quarterly[mKey][ek] && est.quarterly[mKey][ek][statKey] != null) {
+                val = est.quarterly[mKey][ek][statKey];
               }
               
               if (val != null) {
-                cell.innerText = fmt(val);
+                if (statKey === 'num') {
+                  cell.innerText = val;
+                } else {
+                  cell.innerText = fmt(val);
+                }
                 cell.style.color = '#409eff';
-                cell.style.fontWeight = 'bold';
+                if (statKey === 'mean') cell.style.fontWeight = 'bold';
                 filledAny = true;
               }
             }
