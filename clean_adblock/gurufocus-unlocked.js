@@ -1,198 +1,160 @@
 /**
  * GuruFocus Unlocked (MAIN world)
- * Renders summary financial data directly from __NUXT__ state,
- * bypassing Vue subscription checks.
+ * Removes paywall overlay elements and renders financial data from __NUXT__ state.
  */
 (function () {
   'use strict';
 
   if (!window.location.hostname.endsWith('gurufocus.com')) return;
 
-  // Only run on stock summary pages
-  var path = window.location.pathname;
-  if (!/\/stock\/[^/]+\/summary/.test(path) && !/\/stock\/[^/]+\/?$/.test(path)) return;
-
-  // Intercept __NUXT__ to modify subscription state before hydration
-  var nuxtData = undefined;
-  var originalNuxtSet = false;
-  try {
-    var desc = Object.getOwnPropertyDescriptor(window, '__NUXT__');
-    if (!desc || desc.configurable) {
-      Object.defineProperty(window, '__NUXT__', {
-        get: function () { return nuxtData; },
-        set: function (val) {
-          if (val && val.state) {
-            val.state.subscription = {
-              recheck: false, isPremium: true, plan: 'premium',
-              premium: true, type: 'premium', level: 'premium', status: 'active'
-            };
-            if (val.state.user) val.state.user.pid = 1;
-          }
-          nuxtData = val;
-          originalNuxtSet = true;
-        },
-        configurable: true
-      });
-    }
-  } catch (e) {}
-
-  function getFinancialData() {
-    var nuxt = window.__NUXT__;
-    if (!nuxt || !nuxt.state) return null;
-    var ssf = nuxt.state.stock_summary_financial;
-    if (!ssf) return null;
-    return ssf.financials || ssf;
+  // --- Paywall removal (same approach as gurupirate) ---
+  function removePaywall() {
+    document.body.style.overflow = 'visible';
+    var els = document.querySelectorAll('.paywall-shadow, .paywall-node, .el-dialog__wrapper.gf, .v-modal');
+    for (var i = 0; i < els.length; i++) els[i].remove();
   }
 
-  function formatNumber(val) {
-    if (val === null || val === undefined || val === '') return '-';
-    var n = parseFloat(val);
-    if (isNaN(n)) return String(val);
+  // --- Financial data rendering from __NUXT__ ---
+  var CSS = '<style>' +
+    '.gf-u-wrap{padding:15px;overflow-x:auto;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}' +
+    '.gf-u-tabs{display:flex;gap:4px;margin-bottom:12px}' +
+    '.gf-u-tab{padding:6px 16px;border:1px solid #ddd;background:#f5f7fa;border-radius:4px 4px 0 0;cursor:pointer;font-size:13px}' +
+    '.gf-u-tab.active{background:#fff;border-bottom-color:#fff;font-weight:600;color:#409eff}' +
+    '.gf-u-table{border-collapse:collapse;width:100%;font-size:13px}' +
+    '.gf-u-table th{padding:6px 10px;text-align:right;border-bottom:2px solid #ddd;background:#f5f7fa;white-space:nowrap}' +
+    '.gf-u-table th:first-child{text-align:left}' +
+    '.gf-u-table td{padding:5px 10px;text-align:right;border-bottom:1px solid #eee}' +
+    '.gf-u-table td:first-child{text-align:left;white-space:nowrap}' +
+    '.gf-u-table tr:nth-child(even){background:#f9f9f9}' +
+    '.gf-u-table tr:hover{background:#eef5ff}' +
+    '</style>';
+
+  var SKIP = {'':1,date:1,fiscal_year:1,year:1,id:1,stock_id:1,company_id:1,exchange_id:1,currency:1,currency_id:1,preliminary:1,restated_date:1};
+
+  function fmt(v) {
+    if (v === null || v === undefined || v === '') return '-';
+    var n = parseFloat(v);
+    if (isNaN(n)) return String(v);
     if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(2) + 'B';
     if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(2) + 'M';
-    if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(2) + 'K';
+    if (Math.abs(n) >= 1e3 && n % 1 === 0) return (n / 1e3).toFixed(1) + 'K';
+    if (Math.abs(n) < 0.01 && n !== 0) return n.toFixed(4);
     return n.toFixed(2);
   }
 
-  function buildTable(data) {
-    if (!data) return null;
-
-    // data can be: { annual: [...], quarterly: [...] } or an array directly
-    var annual = Array.isArray(data) ? data : (data.annual || data.annuals || []);
-    if (!annual || !annual.length) {
-      // Try to find any array property
-      for (var key in data) {
-        if (Array.isArray(data[key]) && data[key].length > 0) {
-          annual = data[key];
-          break;
-        }
-      }
+  function buildTable(entries) {
+    if (!entries || !entries.length) return '';
+    var best = entries[0];
+    for (var i = 1; i < entries.length; i++) {
+      if (Object.keys(entries[i]).length > Object.keys(best).length) best = entries[i];
     }
-    if (!annual || !annual.length) return null;
-
-    // Find the richest entry to discover metric keys (some entries are sparse)
-    var sample = annual[0];
-    for (var si = 1; si < annual.length; si++) {
-      if (Object.keys(annual[si]).length > Object.keys(sample).length) {
-        sample = annual[si];
-      }
+    var metrics = [];
+    for (var k in best) {
+      if (!SKIP[k] && best[k] !== null && best[k] !== undefined) metrics.push(k);
     }
-    var metricKeys = [];
-    var skipKeys = new Set(['fiscal_year', 'year', 'date', 'Fiscal_Year', 'restated_date', 'preliminary', 'currency', 'currency_id', 'id', 'exchange_id', 'stock_id', 'company_id', '']);
-    for (var k in sample) {
-      if (!skipKeys.has(k) && sample[k] !== null && sample[k] !== undefined) {
-        metricKeys.push(k);
-      }
+    if (!metrics.length) return '';
+    var sorted = entries.slice().sort(function (a, b) {
+      return String(b.date || '').localeCompare(String(a.date || ''));
+    }).slice(0, 10);
+
+    var h = '<table class="gf-u-table"><tr><th>Metric</th>';
+    for (var s = 0; s < sorted.length; s++) h += '<th>' + (sorted[s].date || '?') + '</th>';
+    h += '</tr>';
+    for (var m = 0; m < metrics.length; m++) {
+      var label = metrics[m].replace(/_/g, ' ').replace(/\b[a-z]/g, function(c) { return c.toUpperCase(); });
+      h += '<tr><td>' + label + '</td>';
+      for (var c = 0; c < sorted.length; c++) h += '<td>' + fmt(sorted[c][metrics[m]]) + '</td>';
+      h += '</tr>';
     }
-
-    // Sort by date/year descending
-    var sorted = annual.slice().sort(function (a, b) {
-      var da = a.fiscal_year || a.year || a.date || a.Fiscal_Year || '';
-      var db = b.fiscal_year || b.year || b.date || b.Fiscal_Year || '';
-      return String(db).localeCompare(String(da));
-    });
-
-    // Limit to last 10 years
-    sorted = sorted.slice(0, 10);
-
-    var html = '<table style="width:100%;border-collapse:collapse;font-size:13px;margin:10px 0;">';
-    // Header row
-    html += '<tr style="background:#f5f7fa;"><th style="padding:6px 10px;text-align:left;border-bottom:2px solid #ddd;">Metric</th>';
-    sorted.forEach(function (entry) {
-      var label = entry.fiscal_year || entry.year || entry.date || entry.Fiscal_Year || '?';
-      html += '<th style="padding:6px 10px;text-align:right;border-bottom:2px solid #ddd;">' + label + '</th>';
-    });
-    html += '</tr>';
-
-    // Data rows
-    metricKeys.forEach(function (key, idx) {
-      var bg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
-      var label = key.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
-      html += '<tr style="background:' + bg + ';"><td style="padding:5px 10px;border-bottom:1px solid #eee;white-space:nowrap;">' + label + '</td>';
-      sorted.forEach(function (entry) {
-        html += '<td style="padding:5px 10px;text-align:right;border-bottom:1px solid #eee;">' + formatNumber(entry[key]) + '</td>';
-      });
-      html += '</tr>';
-    });
-
-    html += '</table>';
-    return html;
+    return h + '</table>';
   }
 
-  function injectSummary() {
-    var data = getFinancialData();
-    if (!data) return false;
+  function injectFinancials() {
+    if (document.querySelector('.gf-u-wrap')) return true;
 
-    var tableHtml = buildTable(data);
-    if (!tableHtml) return false;
+    var nuxt = window.__NUXT__;
+    if (!nuxt || !nuxt.state || !nuxt.state.stock_summary_financial) return false;
+    var fin = nuxt.state.stock_summary_financial.financials;
+    if (!fin) return false;
 
-    // Find the summary container
-    var container = document.querySelector('.built-in-stock-summary')
-      || document.querySelector('.stock-summary-container')
-      || document.querySelector('[class*="summary"]');
+    var annual = fin.annual || [];
+    var quarter = fin.quarter || [];
+    var ttm = fin.ttm || [];
+    if (!annual.length && !quarter.length && !ttm.length) return false;
 
-    if (!container) {
-      // Try the main content area
-      container = document.querySelector('.page-container .el-main')
-        || document.querySelector('#stock .el-main')
-        || document.querySelector('.stock-page');
+    var tabs = [], panels = [];
+    if (annual.length) { tabs.push('Annual'); panels.push({id:'annual', html:buildTable(annual)}); }
+    if (quarter.length) { tabs.push('Quarterly'); panels.push({id:'quarter', html:buildTable(quarter)}); }
+    if (ttm.length) { tabs.push('TTM'); panels.push({id:'ttm', html:buildTable(ttm)}); }
+
+    var tabHtml = '<div class="gf-u-tabs">';
+    for (var t = 0; t < tabs.length; t++) {
+      tabHtml += '<div class="gf-u-tab' + (t === 0 ? ' active' : '') + '" data-gfu="' + panels[t].id + '">' + tabs[t] + '</div>';
+    }
+    tabHtml += '</div>';
+
+    var panelHtml = '';
+    for (var p = 0; p < panels.length; p++) {
+      panelHtml += '<div class="gf-u-panel" data-gfu="' + panels[p].id + '" style="display:' + (p === 0 ? 'block' : 'none') + ';">' + panels[p].html + '</div>';
     }
 
-    if (!container) return false;
+    var wrap = document.createElement('div');
+    wrap.className = 'gf-u-wrap';
+    wrap.innerHTML = CSS + '<h3 style="margin:0 0 10px;font-size:16px;color:#333;">Financial Summary</h3>' + tabHtml + panelHtml;
 
-    // Check if we already injected
-    if (container.querySelector('.gf-unlocked-summary')) return true;
+    wrap.addEventListener('click', function (e) {
+      var tab = e.target;
+      if (!tab.classList.contains('gf-u-tab')) return;
+      var id = tab.getAttribute('data-gfu');
+      var allTabs = wrap.querySelectorAll('.gf-u-tab');
+      var allPanels = wrap.querySelectorAll('.gf-u-panel');
+      for (var i = 0; i < allTabs.length; i++) allTabs[i].classList.remove('active');
+      for (var j = 0; j < allPanels.length; j++) allPanels[j].style.display = 'none';
+      tab.classList.add('active');
+      var target = wrap.querySelector('.gf-u-panel[data-gfu="' + id + '"]');
+      if (target) target.style.display = 'block';
+    });
 
-    // Check if the container already has meaningful content (real data rendered)
-    var text = container.textContent.trim();
-    if (text.length > 500) return true; // Real content already showing
+    // Insert into summary container or after stock header
+    var container = document.querySelector('.built-in-stock-summary');
+    if (container) { container.appendChild(wrap); return true; }
 
-    var wrapper = document.createElement('div');
-    wrapper.className = 'gf-unlocked-summary';
-    wrapper.style.cssText = 'padding:15px;overflow-x:auto;';
-    wrapper.innerHTML = '<h3 style="margin:0 0 10px;font-size:16px;color:#333;">Financial Summary</h3>' + tableHtml;
-
-    // Insert at the beginning of the container or replace empty content
-    if (container.children.length === 0 || container.offsetHeight < 50) {
-      container.innerHTML = '';
-      container.appendChild(wrapper);
-    } else {
-      container.insertBefore(wrapper, container.firstChild);
+    var header = document.querySelector('.stock-header');
+    if (header && header.parentElement) {
+      header.parentElement.insertBefore(wrap, header.nextSibling);
+      return true;
     }
 
-    return true;
+    var main = document.querySelector('.el-main');
+    if (main) { main.insertBefore(wrap, main.firstChild); return true; }
+
+    return false;
   }
 
-  // Try injection at multiple points
+  // --- Run ---
   var attempts = 0;
-  var maxAttempts = 30;
-
-  function tryInject() {
-    attempts++;
-    if (injectSummary()) return;
-    if (attempts < maxAttempts) {
-      setTimeout(tryInject, 500);
-    }
+  function run() {
+    removePaywall();
+    if (injectFinancials()) return;
+    if (++attempts < 40) setTimeout(run, 500);
   }
 
-  // Start trying after DOM is ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-      setTimeout(tryInject, 500);
-    });
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(run, 500); });
   } else {
-    setTimeout(tryInject, 500);
+    setTimeout(run, 500);
   }
 
-  // Also watch for SPA navigation (Nuxt route changes)
+  // Periodic paywall removal + SPA navigation
   var lastPath = window.location.pathname;
   setInterval(function () {
+    removePaywall();
     if (window.location.pathname !== lastPath) {
       lastPath = window.location.pathname;
-      if (/\/stock\/[^/]+\/summary/.test(lastPath) || /\/stock\/[^/]+\/?$/.test(lastPath)) {
-        attempts = 0;
-        setTimeout(tryInject, 1000);
-      }
+      var old = document.querySelector('.gf-u-wrap');
+      if (old) old.remove();
+      attempts = 0;
+      setTimeout(run, 1000);
     }
-  }, 1000);
+  }, 2000);
 })();
