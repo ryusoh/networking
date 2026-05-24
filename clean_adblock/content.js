@@ -282,13 +282,35 @@
         style.id = 'gurufocus-fix';
         style.textContent = `
           .el-dialog__wrapper.gf,
-          .v-modal {
+          .el-dialog__wrapper:has([href*="pricing"]),
+          .el-dialog__wrapper:has([action*="register"]),
+          .el-dialog__wrapper:has([id*="register"]),
+          .el-dialog__wrapper:has(.registration-dialog),
+          .v-modal,
+          .paywall-shadow,
+          .paywall-node {
             display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            max-height: 0 !important;
+            overflow: hidden !important;
+            pointer-events: none !important;
           }
-          html:has(.el-dialog__wrapper.gf),
-          body:has(.el-dialog__wrapper.gf),
+          body:has(.paywall-shadow) *,
+          body:has(.paywall-node) * {
+            filter: none !important;
+            backdrop-filter: none !important;
+          }
+          html:has(.el-dialog__wrapper),
+          body:has(.el-dialog__wrapper),
           html:has(.v-modal),
-          body:has(.v-modal) {
+          body:has(.v-modal),
+          html:has(.paywall-shadow),
+          body:has(.paywall-shadow),
+          html:has(.paywall-node),
+          body:has(.paywall-node) {
             overflow: auto !important;
             overflow-y: auto !important;
             position: static !important;

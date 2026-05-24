@@ -88,8 +88,11 @@ describe('Clean AdBlock Content Script', () => {
     expect(styleEl).not.toBeNull();
     expect(styleEl.textContent).toContain('.el-dialog__wrapper.gf');
     expect(styleEl.textContent).toContain('.v-modal');
-    expect(styleEl.textContent).toContain('html:has(.el-dialog__wrapper.gf)');
+    expect(styleEl.textContent).toContain('.paywall-shadow');
+    expect(styleEl.textContent).toContain('.paywall-node');
+    expect(styleEl.textContent).toContain('html:has(.el-dialog__wrapper)');
     expect(styleEl.textContent).toContain('body:has(.v-modal)');
+    expect(styleEl.textContent).toContain('html:has(.paywall-shadow)');
     expect(styleEl.textContent).toContain('overflow: auto !important');
 
     // Restore original location
