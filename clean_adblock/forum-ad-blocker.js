@@ -184,26 +184,11 @@
       pointer-events: none !important;
     }
 
-    /* Un-blur content under the GuruFocus summary paywall */
-    body:has(.paywall-shadow) *,
-    body:has(.paywall-node) * {
-      filter: none !important;
-      backdrop-filter: none !important;
-    }
-
     /* Prevent body scroll lock from ad overlays and paywalls */
     body.fc-overflow-hidden,
     html.fc-overflow-hidden,
     body[style*="overflow: hidden"],
-    html[style*="overflow: hidden"],
-    html:has(.el-dialog__wrapper),
-    body:has(.el-dialog__wrapper),
-    html:has(.v-modal),
-    body:has(.v-modal),
-    html:has(.paywall-shadow),
-    body:has(.paywall-shadow),
-    html:has(.paywall-node),
-    body:has(.paywall-node) {
+    html[style*="overflow: hidden"] {
       overflow: auto !important;
       overflow-y: auto !important;
       position: static !important;

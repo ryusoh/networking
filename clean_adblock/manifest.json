@@ -110,6 +110,12 @@
       "world": "MAIN"
     },
     {
+      "matches": ["*://*.gurufocus.com/*"],
+      "js": ["gurufocus-unlocked.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
       "matches": ["*://*.youtube.com/*"],
       "js": ["youtube-ad-blocker.js"],
       "run_at": "document_start"
