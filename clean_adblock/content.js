@@ -8,10 +8,19 @@
 
   // Skip search engines — broad keyword/element scanning causes false positives on results pages
   const _host = window.location.hostname;
-  if (_host.endsWith('google.com') || _host.endsWith('google.co.uk') || _host.endsWith('google.ca') ||
-      _host.endsWith('google.com.au') || _host.endsWith('google.de') || _host.endsWith('google.fr') ||
-      _host.endsWith('google.co.jp') || _host.endsWith('google.co.in') ||
-      _host.endsWith('bing.com') || _host.endsWith('duckduckgo.com') || _host.endsWith('baidu.com')) {
+  if (
+    _host.endsWith('google.com') ||
+    _host.endsWith('google.co.uk') ||
+    _host.endsWith('google.ca') ||
+    _host.endsWith('google.com.au') ||
+    _host.endsWith('google.de') ||
+    _host.endsWith('google.fr') ||
+    _host.endsWith('google.co.jp') ||
+    _host.endsWith('google.co.in') ||
+    _host.endsWith('bing.com') ||
+    _host.endsWith('duckduckgo.com') ||
+    _host.endsWith('baidu.com')
+  ) {
     return;
   }
 
@@ -262,6 +271,28 @@
         style.textContent = `
           #aw, [id*="aw"], [class*="aw"], [id*="adblock"], [class*="adblock"] { display: none !important; }
           #embed-html { display: block !important; }
+        `;
+        document.documentElement.appendChild(style);
+      }
+    },
+    'gurufocus.com': () => {
+      log('Running GuruFocus module');
+      if (!document.getElementById('gurufocus-fix')) {
+        const style = document.createElement('style');
+        style.id = 'gurufocus-fix';
+        style.textContent = `
+          .el-dialog__wrapper.gf,
+          .v-modal {
+            display: none !important;
+          }
+          html:has(.el-dialog__wrapper.gf),
+          body:has(.el-dialog__wrapper.gf),
+          html:has(.v-modal),
+          body:has(.v-modal) {
+            overflow: auto !important;
+            overflow-y: auto !important;
+            position: static !important;
+          }
         `;
         document.documentElement.appendChild(style);
       }

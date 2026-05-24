@@ -165,11 +165,28 @@
       pointer-events: none !important;
     }
 
+    /* GuruFocus registration popup and backdrop */
+    .el-dialog__wrapper.gf,
+    .el-dialog__wrapper:has([href*="pricing"]),
+    .el-dialog__wrapper:has([action*="register"]),
+    .el-dialog__wrapper:has([id*="register"]),
+    .el-dialog__wrapper:has(.registration-dialog),
+    .v-modal {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
     /* Prevent body scroll lock from ad overlays */
     body.fc-overflow-hidden,
     html.fc-overflow-hidden,
     body[style*="overflow: hidden"],
-    html[style*="overflow: hidden"] {
+    html[style*="overflow: hidden"],
+    html:has(.el-dialog__wrapper),
+    body:has(.el-dialog__wrapper),
+    html:has(.v-modal),
+    body:has(.v-modal) {
       overflow: auto !important;
       overflow-y: auto !important;
       position: static !important;
@@ -427,9 +444,11 @@
         el.removeAttribute('inert');
         el.removeAttribute('aria-hidden');
       });
-      document.querySelectorAll('#gateway-content, [data-testid="onsite-messaging-unit-gateway"]').forEach((el) => {
-        hideAd(el);
-      });
+      document
+        .querySelectorAll('#gateway-content, [data-testid="onsite-messaging-unit-gateway"]')
+        .forEach((el) => {
+          hideAd(el);
+        });
     }
 
     // Restore scroll if ad overlay locked it
