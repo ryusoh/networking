@@ -40,7 +40,11 @@
   window.open = function (url) {
     if (url && typeof url === 'string') {
       const lower = url.toLowerCase();
-      if (COOKIE_POPUP_PATTERNS.some(function (p) { return lower.includes(p); })) {
+      if (
+        COOKIE_POPUP_PATTERNS.some(function (p) {
+          return lower.includes(p);
+        })
+      ) {
         return null;
       }
     }

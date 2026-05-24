@@ -55,26 +55,82 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "exclude_matches": ["*://*.lyeutsaon.com/*", "*://*.x.com/*", "*://*.twitter.com/*", "*://*.google.com/*", "*://*.google.co.uk/*", "*://*.google.ca/*", "*://*.google.com.au/*", "*://*.google.de/*", "*://*.google.fr/*", "*://*.google.co.jp/*", "*://*.google.co.in/*", "*://*.bing.com/*", "*://*.duckduckgo.com/*"],
+      "exclude_matches": [
+        "*://*.lyeutsaon.com/*",
+        "*://*.x.com/*",
+        "*://*.twitter.com/*",
+        "*://*.google.com/*",
+        "*://*.google.co.uk/*",
+        "*://*.google.ca/*",
+        "*://*.google.com.au/*",
+        "*://*.google.de/*",
+        "*://*.google.fr/*",
+        "*://*.google.co.jp/*",
+        "*://*.google.co.in/*",
+        "*://*.bing.com/*",
+        "*://*.duckduckgo.com/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["<all_urls>"],
-      "exclude_matches": ["*://*.lyeutsaon.com/*", "*://*.x.com/*", "*://*.twitter.com/*", "*://*.google.com/*", "*://*.google.co.uk/*", "*://*.google.ca/*", "*://*.google.com.au/*", "*://*.google.de/*", "*://*.google.fr/*", "*://*.google.co.jp/*", "*://*.google.co.in/*", "*://*.bing.com/*", "*://*.duckduckgo.com/*"],
+      "exclude_matches": [
+        "*://*.lyeutsaon.com/*",
+        "*://*.x.com/*",
+        "*://*.twitter.com/*",
+        "*://*.google.com/*",
+        "*://*.google.co.uk/*",
+        "*://*.google.ca/*",
+        "*://*.google.com.au/*",
+        "*://*.google.de/*",
+        "*://*.google.fr/*",
+        "*://*.google.co.jp/*",
+        "*://*.google.co.in/*",
+        "*://*.bing.com/*",
+        "*://*.duckduckgo.com/*"
+      ],
       "js": ["cookie-banner-blocker.js"],
       "run_at": "document_start"
     },
     {
       "matches": ["<all_urls>"],
-      "exclude_matches": ["*://*.lyeutsaon.com/*", "*://*.x.com/*", "*://*.twitter.com/*", "*://*.google.com/*", "*://*.google.co.uk/*", "*://*.google.ca/*", "*://*.google.com.au/*", "*://*.google.de/*", "*://*.google.fr/*", "*://*.google.co.jp/*", "*://*.google.co.in/*", "*://*.bing.com/*", "*://*.duckduckgo.com/*"],
+      "exclude_matches": [
+        "*://*.lyeutsaon.com/*",
+        "*://*.x.com/*",
+        "*://*.twitter.com/*",
+        "*://*.google.com/*",
+        "*://*.google.co.uk/*",
+        "*://*.google.ca/*",
+        "*://*.google.com.au/*",
+        "*://*.google.de/*",
+        "*://*.google.fr/*",
+        "*://*.google.co.jp/*",
+        "*://*.google.co.in/*",
+        "*://*.bing.com/*",
+        "*://*.duckduckgo.com/*"
+      ],
       "js": ["cookie-popup-blocker-main.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
       "matches": ["<all_urls>"],
-      "exclude_matches": ["*://*.lyeutsaon.com/*", "*://*.x.com/*", "*://*.twitter.com/*", "*://*.google.com/*", "*://*.google.co.uk/*", "*://*.google.ca/*", "*://*.google.com.au/*", "*://*.google.de/*", "*://*.google.fr/*", "*://*.google.co.jp/*", "*://*.google.co.in/*", "*://*.bing.com/*", "*://*.duckduckgo.com/*"],
+      "exclude_matches": [
+        "*://*.lyeutsaon.com/*",
+        "*://*.x.com/*",
+        "*://*.twitter.com/*",
+        "*://*.google.com/*",
+        "*://*.google.co.uk/*",
+        "*://*.google.ca/*",
+        "*://*.google.com.au/*",
+        "*://*.google.de/*",
+        "*://*.google.fr/*",
+        "*://*.google.co.jp/*",
+        "*://*.google.co.in/*",
+        "*://*.bing.com/*",
+        "*://*.duckduckgo.com/*"
+      ],
       "js": ["forum-ad-blocker.js"],
       "run_at": "document_start"
     },

@@ -27,7 +27,7 @@ describe('Cookie Banner Blocker - Popup Blocking', () => {
   });
 
   function loadScript() {
-    const code = fs.readFileSync(path.resolve(__dirname, './cookie-banner-blocker.js'), 'utf8');
+    const code = fs.readFileSync(path.resolve(__dirname, './cookie-popup-blocker-main.js'), 'utf8');
     eval(code);
   }
 
@@ -322,7 +322,9 @@ describe('Cookie Banner Blocker - shouldCloseTab patterns (background.js)', () =
 
     // This is the current implementation - it will fail for swatch URLs
     shouldCloseTab = (url) => {
-      if (!url) {return false;}
+      if (!url) {
+        return false;
+      }
       try {
         const urlObj = new URL(url);
         const pathLower = urlObj.pathname.toLowerCase();

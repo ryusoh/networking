@@ -10,15 +10,15 @@ function setupLocation() {
   Object.defineProperty(window, 'location', {
     value: {
       hostname: 'www.gurufocus.com',
-      pathname: '/stock/ANET/forecast',
+      pathname: '/stock/ANET/forecast'
     },
     writable: true,
-    configurable: true,
+    configurable: true
   });
 }
 
 function wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 describe('GuruFocus Unlocked - blur removal', () => {
@@ -39,7 +39,8 @@ describe('GuruFocus Unlocked - blur removal', () => {
   });
 
   test('clears inline filter:blur style', () => {
-    document.body.innerHTML = '<div id="t2" style="filter: blur(5px); pointer-events: none;">content</div>';
+    document.body.innerHTML =
+      '<div id="t2" style="filter: blur(5px); pointer-events: none;">content</div>';
     loadScript();
     jest.advanceTimersByTime(1000);
     const el = document.getElementById('t2');
@@ -101,7 +102,9 @@ describe('GuruFocus Unlocked - blur image removal', () => {
     document.body.innerHTML = '<div>content</div>';
     loadScript();
     jest.advanceTimersByTime(1000);
-    const allCSS = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('\n');
+    const allCSS = Array.from(document.querySelectorAll('style'))
+      .map((s) => s.textContent)
+      .join('\n');
     expect(allCSS).toContain('img[src*="blur"]');
     expect(allCSS).toContain('display: none !important');
   });
@@ -268,7 +271,10 @@ describe('GuruFocus Unlocked - paywall overlay removal', () => {
     document.body.style.overflow = 'hidden';
     loadScript();
     jest.advanceTimersByTime(1000);
-    expect(document.querySelectorAll('.paywall-shadow, .paywall-node, .el-dialog__wrapper.gf, .v-modal').length).toBe(0);
+    expect(
+      document.querySelectorAll('.paywall-shadow, .paywall-node, .el-dialog__wrapper.gf, .v-modal')
+        .length
+    ).toBe(0);
     expect(document.body.style.overflow).toBe('visible');
   });
 });
@@ -288,7 +294,7 @@ describe('GuruFocus Unlocked - forecast data from Vue components', () => {
       loading: opts.loading || false,
       noData: opts.noData || false,
       estimateData: estimateData,
-      priceData: priceData,
+      priceData: priceData
     };
     return el;
   }
@@ -301,11 +307,11 @@ describe('GuruFocus Unlocked - forecast data from Vue components', () => {
       med: 310,
       mean: 308.44,
       num: 39,
-      entry_date: '2026-05-22',
+      entry_date: '2026-05-22'
     };
     const priceData = [
       ['2026-05-20', 250],
-      ['2026-05-21', 255.5],
+      ['2026-05-21', 255.5]
     ];
     const container = document.createElement('div');
     container.className = 'el-main';
@@ -328,7 +334,14 @@ describe('GuruFocus Unlocked - forecast data from Vue components', () => {
   });
 
   test('computes upside percentage correctly', async () => {
-    const estimateData = { high: 300, low: 100, med: 200, mean: 200, num: 10, entry_date: '2026-01-01' };
+    const estimateData = {
+      high: 300,
+      low: 100,
+      med: 200,
+      mean: 200,
+      num: 10,
+      entry_date: '2026-01-01'
+    };
     const priceData = [['2026-01-01', 100]]; // mean=200, price=100 → +100% upside
     const container = document.createElement('div');
     container.className = 'el-main';
@@ -344,7 +357,14 @@ describe('GuruFocus Unlocked - forecast data from Vue components', () => {
   });
 
   test('shows negative upside for overvalued stock', async () => {
-    const estimateData = { high: 150, low: 50, med: 100, mean: 100, num: 5, entry_date: '2026-01-01' };
+    const estimateData = {
+      high: 150,
+      low: 50,
+      med: 100,
+      mean: 100,
+      num: 5,
+      entry_date: '2026-01-01'
+    };
     const priceData = [['2026-01-01', 200]]; // mean=100, price=200 → -50% upside
     const container = document.createElement('div');
     container.className = 'el-main';
@@ -480,7 +500,9 @@ describe('GuruFocus Unlocked - full forecast page simulation', () => {
     expect(document.body.style.overflow).toBe('visible');
 
     // CSS injected with blur override
-    const allCSS = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('\n');
+    const allCSS = Array.from(document.querySelectorAll('style'))
+      .map((s) => s.textContent)
+      .join('\n');
     expect(allCSS).toContain('.blur');
     expect(allCSS).toContain('filter: none !important');
 

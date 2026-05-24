@@ -151,9 +151,13 @@
   function dismissKnownCMP() {
     for (const cmp of KNOWN_CMPS) {
       const banner = document.querySelector(cmp.banner);
-      if (!banner) {continue;}
+      if (!banner) {
+        continue;
+      }
       const bannerId = cmp.banner;
-      if (processedBanners.has(bannerId)) {continue;}
+      if (processedBanners.has(bannerId)) {
+        continue;
+      }
 
       for (const btnSelector of cmp.buttons) {
         const btn = banner.querySelector(btnSelector) || document.querySelector(btnSelector);
@@ -212,9 +216,13 @@
   function dismissConsentDialog() {
     const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
     for (const dialog of dialogs) {
-      if (!isConsentDialog(dialog)) {continue;}
+      if (!isConsentDialog(dialog)) {
+        continue;
+      }
       const dialogId = 'dialog:' + (dialog.className || 'unknown');
-      if (processedBanners.has(dialogId)) {continue;}
+      if (processedBanners.has(dialogId)) {
+        continue;
+      }
 
       const rejectBtn = findButtonByText(dialog, REJECT_TEXT);
       if (rejectBtn) {
@@ -330,10 +338,14 @@
 
   function blockCookieBanner() {
     // Try known CMPs first (no heuristic needed)
-    if (dismissKnownCMP()) {return;}
+    if (dismissKnownCMP()) {
+      return;
+    }
 
     // Try generic dialog-based consent detection (text matching)
-    if (dismissConsentDialog()) {return;}
+    if (dismissConsentDialog()) {
+      return;
+    }
 
     // Fall back to heuristic detection
     const banner = findCookieBanner();

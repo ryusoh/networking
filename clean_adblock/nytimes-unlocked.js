@@ -5,7 +5,9 @@
 (function () {
   'use strict';
 
-  if (!window.location.hostname.endsWith('nytimes.com')) return;
+  if (!window.location.hostname.endsWith('nytimes.com')) {
+    return;
+  }
 
   // --- CSS: hide regiwall, scrim, overlays, iframes ---
   const style = document.createElement('style');
@@ -55,14 +57,22 @@
   // --- Intercept scrollTo/scroll to prevent scroll-lock scripts ---
   const origScrollTo = window.scrollTo.bind(window);
   let userHasScrolled = false;
-  window.addEventListener('wheel', () => { userHasScrolled = true; }, { passive: true, once: true });
+  window.addEventListener(
+    'wheel',
+    () => {
+      userHasScrolled = true;
+    },
+    { passive: true, once: true }
+  );
 
   window.scrollTo = function (...args) {
     // Allow scrollTo(0, 0) only before user interacts; block regiwall scroll resets
     if (userHasScrolled) {
-      const x = typeof args[0] === 'object' ? (args[0].left || 0) : (args[0] || 0);
-      const y = typeof args[0] === 'object' ? (args[0].top || 0) : (args[1] || 0);
-      if (x === 0 && y === 0) return; // Block scroll-to-top resets
+      const x = typeof args[0] === 'object' ? args[0].left || 0 : args[0] || 0;
+      const y = typeof args[0] === 'object' ? args[0].top || 0 : args[1] || 0;
+      if (x === 0 && y === 0) {
+        return;
+      } // Block scroll-to-top resets
     }
     return origScrollTo(...args);
   };
@@ -77,9 +87,11 @@
 
   function hideOverlays() {
     // Gateway overlays
-    document.querySelectorAll('#gateway-content, [data-testid="onsite-messaging-unit-gateway"]').forEach((el) => {
-      el.style.setProperty('display', 'none', 'important');
-    });
+    document
+      .querySelectorAll('#gateway-content, [data-testid="onsite-messaging-unit-gateway"]')
+      .forEach((el) => {
+        el.style.setProperty('display', 'none', 'important');
+      });
     // vi-gateway-container: wraps the page as position:fixed — unfix to allow scroll
     document.querySelectorAll('.vi-gateway-container').forEach((el) => {
       el.style.setProperty('position', 'static', 'important');
@@ -107,7 +119,9 @@
     document.querySelectorAll('div').forEach((div) => {
       const s = window.getComputedStyle(div);
       if ((s.position === 'fixed' || s.position === 'absolute') && s.display !== 'none') {
-        const iframe = div.querySelector('iframe[src*="regiwall"], iframe[src*="RegiWall"], iframe[src*="gateway"]');
+        const iframe = div.querySelector(
+          'iframe[src*="regiwall"], iframe[src*="RegiWall"], iframe[src*="gateway"]'
+        );
         if (iframe) {
           div.style.setProperty('display', 'none', 'important');
         }
@@ -140,27 +154,41 @@
    */
   let restored = false;
   function restoreArticle() {
-    if (restored) return;
+    if (restored) {
+      return;
+    }
     const data = window.__preloadedData;
-    if (!data || !data.initialData || !data.initialData.data) return;
+    if (!data || !data.initialData || !data.initialData.data) {
+      return;
+    }
 
     const article = data.initialData.data.article;
-    if (!article || !article.sprinkledBody || !article.sprinkledBody.content) return;
+    if (!article || !article.sprinkledBody || !article.sprinkledBody.content) {
+      return;
+    }
 
-    const articleBody = document.querySelector('section[name="articleBody"], section.meteredContent');
-    if (!articleBody) return;
+    const articleBody = document.querySelector(
+      'section[name="articleBody"], section.meteredContent'
+    );
+    if (!articleBody) {
+      return;
+    }
 
     // Collect existing paragraph texts to avoid duplicates
     const existingTexts = new Set();
     articleBody.querySelectorAll('p').forEach((p) => {
       const t = p.textContent.trim();
-      if (t) existingTexts.add(t);
+      if (t) {
+        existingTexts.add(t);
+      }
     });
 
     // Extract paragraphs from sprinkledBody
     const newParagraphs = [];
     for (const block of article.sprinkledBody.content) {
-      if (block.__typename !== 'ParagraphBlock' || !block.content) continue;
+      if (block.__typename !== 'ParagraphBlock' || !block.content) {
+        continue;
+      }
 
       let text = '';
       let html = '';
@@ -169,12 +197,15 @@
           let t = inline.text || '';
           if (inline.formats && inline.formats.length > 0) {
             for (const fmt of inline.formats) {
-              if (fmt.__typename === 'BoldFormat') t = '<strong>' + t + '</strong>';
-              else if (fmt.__typename === 'ItalicFormat') t = '<em>' + t + '</em>';
+              if (fmt.__typename === 'BoldFormat') {
+                t = '<strong>' + t + '</strong>';
+              } else if (fmt.__typename === 'ItalicFormat') {
+                t = '<em>' + t + '</em>';
+              }
             }
           }
           html += t;
-          text += (inline.text || '');
+          text += inline.text || '';
         }
       }
 
@@ -185,11 +216,16 @@
       }
     }
 
-    if (newParagraphs.length === 0) return;
+    if (newParagraphs.length === 0) {
+      return;
+    }
 
-    const companion = articleBody.querySelector('.StoryBodyCompanionColumn .css-53u6y8') ||
-                      articleBody.querySelector('[data-testid="companionColumn-0"] > div');
-    if (!companion) return;
+    const companion =
+      articleBody.querySelector('.StoryBodyCompanionColumn .css-53u6y8') ||
+      articleBody.querySelector('[data-testid="companionColumn-0"] > div');
+    if (!companion) {
+      return;
+    }
 
     const existingP = companion.querySelector('p');
     const pClass = existingP ? existingP.className : '';
@@ -230,16 +266,23 @@
   const interval = setInterval(() => {
     run();
     checks++;
-    if (checks >= 20) clearInterval(interval);
+    if (checks >= 20) {
+      clearInterval(interval);
+    }
   }, 500);
 
   // Observer for dynamic changes
   const startObserver = () => {
-    if (!document.body) { requestAnimationFrame(startObserver); return; }
+    if (!document.body) {
+      requestAnimationFrame(startObserver);
+      return;
+    }
     const observer = new MutationObserver(() => {
       removeInert();
       hideOverlays();
-      if (!restored) restoreArticle();
+      if (!restored) {
+        restoreArticle();
+      }
     });
     observer.observe(document.body, { childList: true, subtree: true });
   };
