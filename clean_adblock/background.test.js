@@ -49,7 +49,7 @@ global.chrome = {
 };
 
 // Import background.js to trigger onInstalled handler
-require('./background.js');
+require('././background.js');
 
 const validateRules = (hostnames) => {
   const uniqueHosts = Array.from(new Set(hostnames || [])).filter((h) => h && h.trim());
