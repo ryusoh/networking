@@ -3,8 +3,8 @@
  * TDD: Tests for enhanced cookie notice popup blocking
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('./fs');
+const path = require('./path');
 
 describe('Cookie Banner Blocker - Popup Blocking', () => {
   let originalOpen;

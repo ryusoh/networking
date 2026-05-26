@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require('./fs');
+const path = require('./path');
 
 describe('Clean AdBlock Content Script', () => {
   const contentScriptPath = path.resolve(__dirname, './content.js');
