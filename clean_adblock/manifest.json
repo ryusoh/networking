@@ -172,6 +172,12 @@
       "world": "MAIN"
     },
     {
+      "matches": ["*://*.hedgefollow.com/*"],
+      "js": ["hedgefollow-unlocked.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
       "matches": ["*://*.youtube.com/*"],
       "js": ["youtube-ad-blocker.js"],
       "run_at": "document_start"
