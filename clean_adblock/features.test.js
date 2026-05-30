@@ -1,6 +1,8 @@
 /**
  * Tests for clean_adblock feature modules
  */
+const fs = require('fs');
+const path = require('path');
 
 describe('Feature Toggles', () => {
   test('should have default features enabled in background', () => {
@@ -60,8 +62,6 @@ describe('Feature Toggles', () => {
 
 describe('Cookie Banner Blocker', () => {
   test('cookie-banner-blocker.js should exist and be valid JS', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const content = fs.readFileSync(path.join(__dirname, 'cookie-banner-blocker.js'), 'utf8');
     expect(content).toContain('CookieBannerBlocker');
     expect(content).toContain('COOKIE_BANNER_SELECTORS');
@@ -70,8 +70,6 @@ describe('Cookie Banner Blocker', () => {
 
 describe('Social Media Blocker', () => {
   test('social-media-blocker.js should exist and be valid JS', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const content = fs.readFileSync(path.join(__dirname, 'social-media-blocker.js'), 'utf8');
     expect(content).toContain('SocialMediaBlocker');
     expect(content).toContain('PLATFORM_CONFIG');
@@ -80,8 +78,6 @@ describe('Social Media Blocker', () => {
 
 describe('YouTube Ad Blocker', () => {
   test('youtube-ad-blocker.js should exist and be valid JS', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const content = fs.readFileSync(path.join(__dirname, 'youtube-ad-blocker.js'), 'utf8');
     expect(content).toContain('YouTubeAdBlocker');
     expect(content).toContain('AD_SELECTORS');
@@ -90,8 +86,6 @@ describe('YouTube Ad Blocker', () => {
 
 describe('Video Stream Ad Blocker', () => {
   test('video-stream-ad-blocker.js should exist and be valid JS', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const content = fs.readFileSync(path.join(__dirname, 'video-stream-ad-blocker.js'), 'utf8');
     expect(content).toContain('VideoStreamAdBlocker');
     expect(content).toContain('AD_SERVER_DOMAINS');
@@ -100,8 +94,6 @@ describe('Video Stream Ad Blocker', () => {
 
 describe('Twitch Ad Blocker', () => {
   test('twitch-ad-blocker.js should exist and be valid JS', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const content = fs.readFileSync(path.join(__dirname, 'twitch-ad-blocker.js'), 'utf8');
     expect(content).toContain('TwitchAdBlocker');
     expect(content).toContain('AD_SELECTORS');
@@ -110,8 +102,6 @@ describe('Twitch Ad Blocker', () => {
 
 describe('Forum Ad Blocker', () => {
   test('forum-ad-blocker.js should exist and be valid JS', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const content = fs.readFileSync(path.join(__dirname, 'forum-ad-blocker.js'), 'utf8');
     expect(content).toContain('ForumAdBlocker');
     expect(content).toContain('FORUM_AD_SELECTORS');
@@ -120,16 +110,12 @@ describe('Forum Ad Blocker', () => {
 
 describe('LinkedIn Unlocked', () => {
   test('linkedin-unlocked.js should exist and be valid JS', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const content = fs.readFileSync(path.join(__dirname, 'linkedin-unlocked.js'), 'utf8');
     expect(content).toContain('getDestinationForCard');
     expect(content).toContain('proactivelyCleanLinks');
   });
 
   test('linkedin-hide-promoted.js should exist and be valid JS', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const content = fs.readFileSync(path.join(__dirname, 'linkedin-hide-promoted.js'), 'utf8');
     expect(content).toContain('hidePromoted');
   });
@@ -137,16 +123,12 @@ describe('LinkedIn Unlocked', () => {
 
 describe('X (Twitter) Unlocked', () => {
   test('x-unlocked.js should exist and be valid JS', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const content = fs.readFileSync(path.join(__dirname, 'x-unlocked.js'), 'utf8');
     expect(content).toContain('tryTabSwitch');
     expect(content).toContain('preferredTab');
   });
 
   test('x-twitter-bird.js should exist and be valid JS', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const content = fs.readFileSync(path.join(__dirname, 'x-twitter-bird.js'), 'utf8');
     expect(content).toContain('replaceFavicon');
     expect(content).toContain('injectCSS');
@@ -155,8 +137,6 @@ describe('X (Twitter) Unlocked', () => {
 
 describe('Manifest Configuration', () => {
   test('manifest.json should include all content scripts', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'manifest.json'), 'utf8'));
 
     const expectedScripts = [
@@ -181,8 +161,6 @@ describe('Manifest Configuration', () => {
   });
 
   test('manifest.json should have correct host permissions', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'manifest.json'), 'utf8'));
 
     expect(manifest.host_permissions).toContain('*://*.youtube.com/*');
@@ -193,8 +171,6 @@ describe('Manifest Configuration', () => {
   });
 
   test('manifest.json should include LinkedIn DNR rules', () => {
-    const fs = require('./fs');
-    const path = require('./path');
     const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'manifest.json'), 'utf8'));
 
     expect(manifest.declarative_net_request).toBeDefined();
