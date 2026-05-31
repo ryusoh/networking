@@ -19,7 +19,8 @@
     _host.endsWith('google.co.in') ||
     _host.endsWith('bing.com') ||
     _host.endsWith('duckduckgo.com') ||
-    _host.endsWith('baidu.com')
+    _host.endsWith('baidu.com') ||
+    _host.endsWith('wsj.com')
   ) {
     return;
   }

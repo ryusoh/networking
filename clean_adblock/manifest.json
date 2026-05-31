@@ -178,6 +178,12 @@
       "world": "MAIN"
     },
     {
+      "matches": ["*://*.wsj.com/*"],
+      "js": ["wsj-unlocked.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
       "matches": ["*://*.youtube.com/*"],
       "js": ["youtube-ad-blocker.js"],
       "run_at": "document_start"
