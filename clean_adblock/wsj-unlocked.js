@@ -9,9 +9,22 @@
   const style = document.createElement('style');
   style.id = 'clean-adblock-wsj';
   style.textContent = `
-    /* Paywall overlay / modal / curtain */
+    /* Piano paywall doorslam — snippet overlay */
+    #cx-snippet-overlay-container,
+    #cx-snippet-overlay,
+    #cx-snippet-promotion,
+    #cx-snippet-overlay-primary-button,
+    #cx-snippet-overlay-sign-in-text,
+    [id*="cx-snippet"],
+    iframe[src*="piano.vx.wsj.com"],
+    iframe[id^="offer_"],
+
+    /* Generic paywall selectors */
     .wsj-snippet-login,
     .snippet--login-overlay,
+    [class*="SnippetOverlay"],
+    [class*="SnippetSubheadline"],
+    [class*="StandalonePrimaryButton"],
     [class*="paywall"],
     [id*="paywall"],
     [class*="snippet-promotion"],
@@ -20,13 +33,21 @@
     [id*="cx-scrim"],
     .scrim,
     div[class*="PianoOverlay"],
-    div[id*="piano"],
     [class*="regwall"],
     [data-module="snippet.login"],
-    [data-module-name="snippet.login"] {
+    [data-module-name="snippet.login"],
+
+    /* Piano tp-container */
+    .tp-container-inner,
+    .tp-modal,
+    .tp-backdrop {
       display: none !important;
       visibility: hidden !important;
       opacity: 0 !important;
+      height: 0 !important;
+      min-height: 0 !important;
+      max-height: 0 !important;
+      overflow: hidden !important;
       pointer-events: none !important;
     }
 
@@ -59,14 +80,29 @@
 
   // --- Phase 2: Remove paywall elements after DOM loads ---
   function removePaywall() {
-    // Remove scrim / overlay divs
-    document
-      .querySelectorAll(
-        '.wsj-snippet-login, [id*="cx-scrim"], .scrim, [class*="PianoOverlay"], [id*="piano"]'
-      )
-      .forEach((el) => {
-        el.remove();
-      });
+    // Remove Piano snippet overlay and paywall elements
+    const paywallSelectors = [
+      '#cx-snippet-overlay-container',
+      '#cx-snippet-overlay',
+      '[id*="cx-snippet"]',
+      'iframe[src*="piano.vx.wsj.com"]',
+      'iframe[id^="offer_"]',
+      '.wsj-snippet-login',
+      '[id*="cx-scrim"]',
+      '.scrim',
+      '[class*="PianoOverlay"]',
+      '.tp-container-inner',
+      '.tp-modal',
+      '.tp-backdrop'
+    ];
+    for (const sel of paywallSelectors) {
+      document.querySelectorAll(sel).forEach((el) => el.remove());
+    }
+
+    // The doorslam container wraps everything — find it by its child structure
+    document.querySelectorAll('div:has(> #cx-snippet-overlay-container)').forEach((el) => {
+      el.remove();
+    });
 
     // Remove inert attribute from article body (paywall hides content via inert)
     document.querySelectorAll('article[inert], [data-type="article-body"][inert]').forEach((el) => {
