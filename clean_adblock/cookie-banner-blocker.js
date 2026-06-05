@@ -32,7 +32,8 @@
     'google.fr',
     'google.co.jp',
     'google.co.in',
-    'wsj.com'
+    'wsj.com',
+    'nvidia.com'
   ];
   const host = window.location.hostname;
   if (HARDCODED_SKIP.some((d) => host === d || host.endsWith('.' + d))) {
