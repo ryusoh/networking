@@ -28,3 +28,9 @@ lan_scanner
 wol
 netmon
 speedtest
+
+# Testing and Python Artifacts
+__pycache__/
+*.pyc
+.coverage
+coverage/
