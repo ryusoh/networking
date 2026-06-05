@@ -28,3 +28,9 @@ lan_scanner
 wol
 netmon
 speedtest
+coverage/
+*.gcov
+*.gcda
+*.gcno
+.coverage
+*/__pycache__/*
