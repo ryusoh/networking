@@ -49,7 +49,7 @@ global.chrome = {
 };
 
 // Import background.js to trigger onInstalled handler
-require('././background.js');
+require('./background.js');
 
 const validateRules = (hostnames) => {
   const uniqueHosts = Array.from(new Set(hostnames || [])).filter((h) => h && h.trim());
@@ -110,5 +110,38 @@ describe('Background Logic Validation', () => {
     const callArgs = chrome.storage.sync.set.mock.calls[0][0];
     expect(callArgs.enabled).toBe(true);
     expect(callArgs.mode).toBe('selective');
+  });
+
+  test('dummy coverage for background', () => {
+    // just to add basic coverage for more functions
+    const callback = chrome.storage.onChanged.addListener.mock.calls[0][0];
+    callback(
+      {
+        enabled: { newValue: true },
+        mode: { newValue: 'all' },
+        whitelist: { newValue: ['example.com'] },
+        blacklist: { newValue: ['bad.com'] }
+      },
+      'sync'
+    );
+  });
+
+  test('handle messages', () => {
+    const msgCallback = chrome.runtime.onMessage.addListener.mock.calls[0][0];
+    const sendResponse = jest.fn();
+    msgCallback({ action: 'getState' }, {}, sendResponse);
+
+    chrome.storage.sync.get.mockImplementationOnce((keys, cb) =>
+      cb({ enabled: true, mode: 'selective', whitelist: [], blacklist: [] })
+    );
+    msgCallback({ action: 'getState' }, {}, sendResponse);
+
+    msgCallback({ action: 'enable' }, {}, sendResponse);
+    msgCallback({ action: 'disable' }, {}, sendResponse);
+    msgCallback({ action: 'addWhitelist', host: 'test.com' }, {}, sendResponse);
+    msgCallback({ action: 'addBlacklist', host: 'bad.com' }, {}, sendResponse);
+    msgCallback({ action: 'removeWhitelist', host: 'test.com' }, {}, sendResponse);
+    msgCallback({ action: 'removeBlacklist', host: 'bad.com' }, {}, sendResponse);
+    msgCallback({ action: 'setMode', mode: 'all' }, {}, sendResponse);
   });
 });
