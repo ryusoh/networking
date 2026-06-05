@@ -36,4 +36,16 @@ describe('cookie-popup-blocker-main.js', () => {
     window.open('https://example.com/cookie-notice');
     expect(mockOpen).toHaveBeenCalledWith('https://example.com/cookie-notice');
   });
+
+  it('allows object urls without throwing', () => {
+    require('./cookie-popup-blocker-main.js');
+    window.open({ url: 'https://example.com/cookie-notice' });
+    expect(mockOpen).toHaveBeenCalledWith({ url: 'https://example.com/cookie-notice' });
+  });
+
+  it('allows null urls', () => {
+    require('./cookie-popup-blocker-main.js');
+    window.open(null);
+    expect(mockOpen).toHaveBeenCalledWith(null);
+  });
 });
