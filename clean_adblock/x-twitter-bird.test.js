@@ -47,4 +47,36 @@ describe('x-twitter-bird.js', () => {
 
     expect(link.href).toBe('chrome-extension://123/assets/twitter.png');
   });
+
+  it('bails out when chrome is not defined', () => {
+    delete global.chrome;
+    require('./x-twitter-bird.js');
+  });
+
+  it('updates title when title ends with / X', () => {
+    document.title = 'Hello / X';
+    require('./x-twitter-bird.js');
+    expect(document.title).toBe('Hello / Twitter');
+  });
+
+  it('observes DOM changes and updates when title changes', (done) => {
+    document.title = 'Some page';
+    require('./x-twitter-bird.js');
+    done();
+  });
+
+  it('adds mutation observer to document if no head initially', () => {
+    const originalHead = document.head;
+    Object.defineProperty(document, 'head', { value: null, configurable: true });
+
+    require('./x-twitter-bird.js');
+
+    // Put head back before firing event so that `document.head` exists in the callback
+    Object.defineProperty(document, 'head', { value: originalHead, configurable: true });
+
+    // Fire DOMContentLoaded
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+  });
 });

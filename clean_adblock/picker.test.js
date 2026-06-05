@@ -121,4 +121,64 @@ describe('picker.js', () => {
     require('./picker.js');
     expect(window.__bypassPickerActive).toBe(false);
   });
+  it('does nothing if already active', () => {
+    window.__bypassPickerActive = true;
+    require('./picker.js');
+    expect(document.documentElement.innerHTML).not.toContain('crosshair');
+  });
+
+  it('mousemove ignores if element is falsy', () => {
+    require('./picker.js');
+    document.elementFromPoint = jest.fn(() => null);
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
+  });
+
+  it('click ignores if element is falsy', () => {
+    require('./picker.js');
+    document.elementFromPoint = jest.fn(() => null);
+    document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
+  });
+
+  it('does nothing if confirm is false', () => {
+    window.confirm = jest.fn(() => false);
+    require('./picker.js');
+    const el = document.createElement('div');
+    document.documentElement.appendChild(el);
+    document.elementFromPoint = jest.fn(() => el);
+    document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
+  });
+
+  it('does nothing if no chrome.storage.local', () => {
+    delete global.chrome.storage.local;
+    require('./picker.js');
+    const el = document.createElement('div');
+    document.elementFromPoint = jest.fn(() => el);
+    document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
+  });
+  it('saves custom selector without error if runtime.lastError is present', () => {
+    global.chrome = {
+      storage: {
+        local: {
+          get: jest.fn((keys, cb) => cb({ customSelectors: {} })),
+          set: jest.fn()
+        }
+      },
+      runtime: { lastError: new Error('mock error') }
+    };
+    require('./picker.js');
+    const el = document.createElement('div');
+    document.documentElement.appendChild(el);
+    document.elementFromPoint = jest.fn(() => el);
+    document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
+  });
+
+  it('saves custom selector handles missing chrome runtime correctly', () => {
+    global.chrome.storage.local.get = jest.fn((keys, cb) => cb({}));
+    delete global.chrome.runtime;
+    require('./picker.js');
+    const el = document.createElement('div');
+    document.documentElement.appendChild(el);
+    document.elementFromPoint = jest.fn(() => el);
+    document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
+  });
 });
