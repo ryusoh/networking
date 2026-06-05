@@ -30,8 +30,8 @@ test:
 	@npm test
 
 test-ebpf:
-	@echo "Running eBPF Kernel Tests (via Docker)..."
-	-@docker run --rm -v $(shell pwd):/app ebpf-builder make -C vps_kernel_proxy test
+	@echo "Running eBPF Kernel Tests (via python)..."
+	-@python3 -m unittest discover -s vps_kernel_proxy -p "test_*.py"
 
 test-nas:
 	@echo "Running C-based NAS Tool Tests..."
@@ -49,3 +49,9 @@ build-nas-tools:
 	@gcc -O3 bin/dependency_sideloader.c -o bin/dependency_sideloader -lcurl
 	@gcc -O3 bin/fs_overdrive.c -o bin/fs_overdrive
 	@gcc -O3 bin/dist_build_client.c -o bin/dist_build_client
+
+coverage:
+	@npm run coverage
+	@coverage run -m unittest discover -s retriever -p "test_*.py" || true
+	@coverage run -a -m unittest discover -s vps_kernel_proxy -p "test_*.py" || true
+	@coverage report -m
