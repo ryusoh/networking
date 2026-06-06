@@ -220,27 +220,22 @@ async function extendCookies() {
     try {
       const cookies = await chrome.cookies.getAll({ domain });
       for (const cookie of cookies) {
-        if (!isAuthCookie(cookie.name)) {
-          continue;
-        }
-        if (cookie.session) {
-          continue;
-        } // session cookies can't have expiry set
-
-        try {
-          await chrome.cookies.set({
-            url: `https://www.1point3acres.com${cookie.path}`,
-            name: cookie.name,
-            value: cookie.value,
-            domain: cookie.domain,
-            path: cookie.path,
-            secure: cookie.secure,
-            httpOnly: cookie.httpOnly,
-            sameSite: cookie.sameSite || 'unspecified',
-            expirationDate: futureDate
-          });
-        } catch {
-          // httpOnly cookies may fail — that's OK
+        if (isAuthCookie(cookie.name) && !cookie.session) {
+          try {
+            await chrome.cookies.set({
+              url: `https://www.1point3acres.com${cookie.path}`,
+              name: cookie.name,
+              value: cookie.value,
+              domain: cookie.domain,
+              path: cookie.path,
+              secure: cookie.secure,
+              httpOnly: cookie.httpOnly,
+              sameSite: cookie.sameSite || 'unspecified',
+              expirationDate: futureDate
+            });
+          } catch {
+            // httpOnly cookies may fail — that's OK
+          }
         }
       }
     } catch {
@@ -270,13 +265,11 @@ async function sessionKeepAlive() {
   try {
     const cookies = await chrome.cookies.getAll({ domain: '1point3acres.com' });
     const hasAuth = cookies.some((c) => isAuthCookie(c.name) && c.value);
-    if (!hasAuth) {
-      return;
+    if (hasAuth) {
+      await extendCookies();
+      await heartbeat();
+      console.log('[SessionKeeper] 1p3a session refreshed');
     }
-
-    await extendCookies();
-    await heartbeat();
-    console.log('[SessionKeeper] 1p3a session refreshed');
   } catch (e) {
     console.warn('[SessionKeeper] Error:', e.message);
   }
@@ -310,9 +303,6 @@ const COOKIE_NOTICE_PATH_PATTERNS = [
 ];
 
 function shouldCloseTab(url) {
-  if (!url) {
-    return false;
-  }
   try {
     const urlObj = new URL(url);
     if (urlObj.hostname.includes('getadblock.com')) {
@@ -350,9 +340,6 @@ chrome.runtime.onMessage.addListener((msg) => {
 });
 
 function isLinkedInPremium(url) {
-  if (!url) {
-    return false;
-  }
   return url.includes('linkedin.com/premium');
 }
 

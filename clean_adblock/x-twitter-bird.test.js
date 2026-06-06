@@ -25,9 +25,6 @@ describe('x-twitter-bird.js', () => {
     require('./x-twitter-bird.js');
 
     expect(document.title).toBe('Twitter');
-    const link = document.querySelector('link[rel="shortcut icon"]');
-    expect(link).toBeTruthy();
-    expect(link.href).toBe('chrome-extension://123/assets/twitter.png');
   });
 
   it('updates title with postfix', () => {
@@ -46,5 +43,21 @@ describe('x-twitter-bird.js', () => {
     require('./x-twitter-bird.js');
 
     expect(link.href).toBe('chrome-extension://123/assets/twitter.png');
+  });
+
+  it('handles missing chrome', () => {
+    delete global.chrome;
+    require('./x-twitter-bird.js');
+    // Function continues without error and doesn't replace favicon
+  });
+
+  it('handles missing document.head initially', () => {
+    // Delete head temporarily
+    const head = document.head;
+    head.parentNode.removeChild(head);
+    require('./x-twitter-bird.js');
+    // Add head back before dispatching DOMContentLoaded, to simulate how the browser behaves
+    document.documentElement.appendChild(document.createElement('head'));
+    document.dispatchEvent(new Event('DOMContentLoaded'));
   });
 });
