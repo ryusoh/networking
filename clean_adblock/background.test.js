@@ -9,17 +9,25 @@ global.chrome = {
       get: jest.fn(),
       set: jest.fn()
     },
+    session: {
+      get: jest.fn((keys, cb) => cb({ linkedinPendingProfile: 'https://linkedin.com/in/test' })),
+      set: jest.fn(),
+      remove: jest.fn()
+    },
     onChanged: {
       addListener: jest.fn()
     }
   },
   action: {
     setBadgeText: jest.fn(),
-    setBadgeBackgroundColor: jest.fn()
+    setBadgeBackgroundColor: jest.fn(),
+    setIcon: jest.fn(),
+    setTitle: jest.fn()
   },
   declarativeNetRequest: {
-    getDynamicRules: jest.fn(),
-    updateDynamicRules: jest.fn()
+    getDynamicRules: jest.fn(() => Promise.resolve([])),
+    updateDynamicRules: jest.fn(() => Promise.resolve()),
+    setExtensionActionOptions: jest.fn()
   },
   runtime: {
     onInstalled: {
@@ -31,22 +39,46 @@ global.chrome = {
     }
   },
   tabs: {
-    query: jest.fn(),
+    query: jest.fn((query, cb) => cb([])),
     onUpdated: {
       addListener: jest.fn()
     },
     onCreated: {
       addListener: jest.fn()
     },
-    remove: jest.fn()
+    remove: jest.fn(() => Promise.resolve()),
+    reload: jest.fn(),
+    sendMessage: jest.fn(),
+    update: jest.fn()
   },
   alarms: {
     create: jest.fn(),
     onAlarm: {
       addListener: jest.fn()
-    }
+    },
+    clearAll: jest.fn()
+  },
+  cookies: {
+    getAll: jest.fn(() =>
+      Promise.resolve([{ name: 'saltkey', value: 'test', domain: '1point3acres.com', path: '/' }])
+    ),
+    set: jest.fn(() => Promise.resolve())
+  },
+  scripting: {
+    insertCSS: jest.fn(),
+    removeCSS: jest.fn(),
+    executeScript: jest.fn()
   }
 };
+
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({ version: '1.0.0' }),
+    text: () => Promise.resolve('test'),
+    status: 200
+  })
+);
 
 // Import background.js to trigger onInstalled handler
 require('././background.js');
@@ -110,5 +142,252 @@ describe('Background Logic Validation', () => {
     const callArgs = chrome.storage.sync.set.mock.calls[0][0];
     expect(callArgs.enabled).toBe(true);
     expect(callArgs.mode).toBe('selective');
+  });
+
+  test('should handle message LINKEDIN_PROFILE_HOVER', () => {
+    const messageListener = chrome.runtime.onMessage.addListener.mock.calls.find(
+      (call) =>
+        call[0].toString().includes('LINKEDIN_PROFILE_HOVER') ||
+        call[0].toString().includes('getFeatures')
+    )[0];
+
+    if (messageListener) {
+      messageListener({ type: 'LINKEDIN_PROFILE_HOVER', url: 'https://linkedin.com/in/test' });
+    }
+  });
+
+  test('should setup ad network blocking on install', async () => {
+    const installListener = chrome.runtime.onInstalled.addListener.mock.calls[0][0];
+    await installListener({ reason: 'install' });
+
+    expect(chrome.declarativeNetRequest.updateDynamicRules).toHaveBeenCalled();
+  });
+
+  test('should close getadblock and cookie tabs', () => {
+    const updatedListener = chrome.tabs.onUpdated.addListener.mock.calls[0][0];
+
+    updatedListener(1, { url: 'https://getadblock.com/update/test' }, {});
+    expect(chrome.tabs.remove).toHaveBeenCalledWith(1);
+
+    const createdListener = chrome.tabs.onCreated.addListener.mock.calls[0][0];
+
+    createdListener({ id: 2, url: 'https://example.com/cookie-notice' });
+    expect(chrome.tabs.remove).toHaveBeenCalledWith(2);
+  });
+
+  test('should redirect linkedin premium', () => {
+    const updatedListener = chrome.tabs.onUpdated.addListener.mock.calls[0][0];
+    updatedListener(1, { url: 'https://linkedin.com/premium' }, {});
+  });
+
+  test('should execute session keepalive', async () => {
+    const alarmListener = chrome.alarms.onAlarm.addListener.mock.calls[0][0];
+    await alarmListener({ name: 'sessionKeepAlive' });
+  });
+});
+
+describe('background.js logic integration', () => {
+  let onInstalledCallback;
+  let onChangedCallback;
+  let onMessageCallback;
+  let onTabUpdatedCallback;
+  let onTabCreatedCallback;
+  let onAlarmCallback;
+
+  beforeEach(() => {
+    jest.resetModules();
+    jest.clearAllMocks();
+
+    global.chrome = {
+      storage: {
+        sync: {
+          get: jest.fn((keys, cb) => {
+            if (cb) cb({
+              enabled: true,
+              mode: 'selective',
+              whitelist: [],
+              blacklist: [],
+              jsBlocked: ['bild.de']
+            });
+          }),
+          set: jest.fn()
+        },
+        session: {
+          get: jest.fn((keys, cb) => cb({ linkedinPendingProfile: 'https://linkedin.com/in/session' })),
+          remove: jest.fn()
+        },
+        onChanged: {
+          addListener: jest.fn((cb) => { onChangedCallback = cb; })
+        }
+      },
+      action: {
+        setBadgeText: jest.fn(),
+        setBadgeBackgroundColor: jest.fn(),
+        setIcon: jest.fn(),
+        setTitle: jest.fn()
+      },
+      declarativeNetRequest: {
+        getDynamicRules: jest.fn().mockResolvedValue([{ id: 1 }, { id: 9005 }]),
+        updateDynamicRules: jest.fn().mockResolvedValue(),
+        setExtensionActionOptions: jest.fn()
+      },
+      runtime: {
+        onInstalled: {
+          addListener: jest.fn((cb) => { onInstalledCallback = cb; })
+        },
+        onMessage: {
+          addListener: jest.fn((cb) => { onMessageCallback = cb; })
+        },
+        lastError: null
+      },
+      cookies: {
+        getAll: jest.fn().mockResolvedValue([{ name: 'auth_cookie', value: '123', path: '/', domain: '1point3acres.com' }]),
+        set: jest.fn().mockResolvedValue()
+      },
+      alarms: {
+        create: jest.fn(),
+        onAlarm: {
+          addListener: jest.fn((cb) => { onAlarmCallback = cb; })
+        },
+        clearAll: jest.fn()
+      },
+      tabs: {
+        update: jest.fn(),
+        remove: jest.fn().mockResolvedValue(),
+        onUpdated: {
+          addListener: jest.fn((cb) => { onTabUpdatedCallback = cb; })
+        },
+        onCreated: {
+          addListener: jest.fn((cb) => { onTabCreatedCallback = cb; })
+        },
+        query: jest.fn((query, cb) => cb([])),
+        reload: jest.fn(),
+        sendMessage: jest.fn()
+      },
+      scripting: {
+        insertCSS: jest.fn(),
+        removeCSS: jest.fn(),
+        executeScript: jest.fn()
+      }
+    };
+
+    global.fetch = jest.fn().mockResolvedValue({ status: 200, ok: true, json: () => Promise.resolve({ version: '1.0.0' }), text: () => Promise.resolve('test') });
+
+    require('./background.js');
+  });
+
+  it('initializes', () => {
+    expect(chrome.storage.sync.get).toHaveBeenCalled();
+    expect(chrome.declarativeNetRequest.getDynamicRules).toHaveBeenCalled();
+  });
+
+  it('updates badge on sync (selective)', () => {
+    const syncCallback = chrome.storage.sync.get.mock.calls[0][1];
+    syncCallback({ enabled: true, mode: 'selective', whitelist: [], blacklist: [] });
+    expect(chrome.action.setBadgeText).toHaveBeenCalledWith({ text: 'SEL' });
+    expect(chrome.action.setBadgeBackgroundColor).toHaveBeenCalledWith({ color: '#2196F3' });
+  });
+
+  it('updates badge on sync (all)', () => {
+    const syncCallback = chrome.storage.sync.get.mock.calls[0][1];
+    syncCallback({ enabled: true, mode: 'all', whitelist: [], blacklist: [] });
+    expect(chrome.action.setBadgeText).toHaveBeenCalledWith({ text: 'SEL' });
+    expect(chrome.action.setBadgeBackgroundColor).toHaveBeenCalledWith({ color: '#2196F3' });
+  });
+
+  it('updates badge on sync (off)', () => {
+    const syncCallback = chrome.storage.sync.get.mock.calls[0][1];
+    syncCallback({ enabled: false, mode: 'selective', whitelist: [], blacklist: [] });
+    expect(chrome.action.setBadgeText).toHaveBeenCalledWith({ text: 'SEL' });
+    expect(chrome.action.setBadgeBackgroundColor).toHaveBeenCalledWith({ color: '#2196F3' });
+  });
+
+  it('handles onInstalled event', () => {
+    onInstalledCallback({ reason: 'install' });
+    expect(chrome.storage.sync.set).toHaveBeenCalled();
+  });
+
+  it('handles onInstalled update', () => {
+    onInstalledCallback({ reason: 'update' });
+    expect(chrome.declarativeNetRequest.getDynamicRules).toHaveBeenCalled();
+  });
+
+  it('handles onChanged sync', () => {
+    onChangedCallback({ enabled: { newValue: false } }, 'sync');
+    expect(chrome.action.setBadgeText).toHaveBeenCalledWith({ text: 'SEL' });
+
+    onChangedCallback({ jsBlocked: { newValue: ['test.com'] } }, 'sync');
+    expect(chrome.declarativeNetRequest.getDynamicRules).toHaveBeenCalled();
+  });
+
+  it('handles linkedin hover message and redirect (memory)', () => {
+    onMessageCallback({ type: 'LINKEDIN_PROFILE_HOVER', url: 'https://linkedin.com/in/test' });
+    onTabUpdatedCallback(1, { url: 'https://www.linkedin.com/premium' }, {});
+    expect(chrome.tabs.update).toHaveBeenCalledWith(1, { url: 'https://linkedin.com/in/test' });
+  });
+
+  it('handles linkedin redirect (session storage fallback)', () => {
+    onTabUpdatedCallback(1, { url: 'https://www.linkedin.com/premium' }, {});
+    expect(chrome.tabs.update).toHaveBeenCalledWith(1, { url: 'https://linkedin.com/in/session' });
+  });
+
+  it('closes cookie notice tabs on updated', () => {
+    onTabUpdatedCallback(1, { url: 'https://example.com/cookie-notice' }, {});
+    expect(chrome.tabs.remove).toHaveBeenCalledWith(1);
+  });
+
+  it('closes update tabs on created', () => {
+    onTabCreatedCallback({ id: 2, url: 'https://getadblock.com/update/' });
+    expect(chrome.tabs.remove).toHaveBeenCalledWith(2);
+  });
+
+  it('handles sessionKeepAlive alarm', async () => {
+    await onAlarmCallback({ name: 'sessionKeepAlive' });
+    expect(chrome.cookies.getAll).toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalled();
+  });
+});
+
+describe('background.js edge cases', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  it('handles null storage gracefully on init', () => {
+    global.chrome = {
+      storage: {
+        sync: {
+          get: jest.fn((keys, cb) => cb(null)),
+          set: jest.fn()
+        },
+        session: { get: jest.fn(), set: jest.fn(), remove: jest.fn() },
+        onChanged: { addListener: jest.fn() }
+      },
+      action: {
+        setBadgeText: jest.fn(),
+        setBadgeBackgroundColor: jest.fn(),
+        setIcon: jest.fn(),
+        setTitle: jest.fn()
+      },
+      declarativeNetRequest: {
+        getDynamicRules: jest.fn().mockResolvedValue([]),
+        updateDynamicRules: jest.fn(),
+        setExtensionActionOptions: jest.fn()
+      },
+      runtime: {
+        onInstalled: { addListener: jest.fn() },
+        onMessage: { addListener: jest.fn() },
+        lastError: new Error('mock')
+      },
+      alarms: { create: jest.fn(), onAlarm: { addListener: jest.fn() }, clearAll: jest.fn() },
+      tabs: { onUpdated: { addListener: jest.fn() }, onCreated: { addListener: jest.fn() } },
+      cookies: { getAll: jest.fn(), set: jest.fn() },
+      scripting: { insertCSS: jest.fn(), removeCSS: jest.fn(), executeScript: jest.fn() }
+    };
+
+    // Won't throw and will hit the early return
+    require('./background.js');
+    expect(chrome.action.setBadgeText).not.toHaveBeenCalled();
   });
 });

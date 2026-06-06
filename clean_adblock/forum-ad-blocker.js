@@ -38,7 +38,8 @@
     'google.fr',
     'google.co.jp',
     'google.co.in',
-    'wsj.com'
+    'wsj.com',
+    'nvidia.com'
   ];
   const host = window.location.hostname;
   if (EXCLUDED_DOMAINS.some((d) => host === d || host.endsWith('.' + d))) {
