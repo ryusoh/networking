@@ -5,7 +5,7 @@ describe('picker.js DOM test', () => {
     window.__bypassPickerActive = false;
     window.confirm = jest.fn(() => true);
     window.alert = jest.fn();
-    window.CSS = { escape: jest.fn(str => str) }; // Mock CSS.escape
+    window.CSS = { escape: jest.fn((str) => str) }; // Mock CSS.escape
     global.chrome = {
       storage: {
         local: {
@@ -24,19 +24,18 @@ describe('picker.js DOM test', () => {
   });
 
   it('triggers all paths', () => {
-    require('./picker.js');
+    require('../picker.js');
 
     // Line 10: window.__bypassPickerActive = true;
     window.__bypassPickerActive = true;
-    require('./picker.js'); // should return early
+    require('../picker.js'); // should return early
 
     // Reset to test handlers
     jest.resetModules();
     window.__bypassPickerActive = false;
-    require('./picker.js');
+    require('../picker.js');
 
     const overlay = document.documentElement.children[0];
-    const highlight = document.documentElement.children[1];
 
     // Line 39 & 55: el is overlay
     document.elementFromPoint = jest.fn(() => overlay);
@@ -53,7 +52,7 @@ describe('picker.js DOM test', () => {
     // Normal element with class
     jest.resetModules();
     window.__bypassPickerActive = false;
-    require('./picker.js');
+    require('../picker.js');
     const el2 = document.createElement('div');
     el2.className = 'my-class other-class';
     document.elementFromPoint = jest.fn(() => el2);
@@ -62,7 +61,7 @@ describe('picker.js DOM test', () => {
     // Normal element with no class/id
     jest.resetModules();
     window.__bypassPickerActive = false;
-    require('./picker.js');
+    require('../picker.js');
     const el3 = document.createElement('span');
     document.elementFromPoint = jest.fn(() => el3);
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
@@ -70,13 +69,13 @@ describe('picker.js DOM test', () => {
     // Keydown escape
     jest.resetModules();
     window.__bypassPickerActive = false;
-    require('./picker.js');
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    require('../picker.js');
+    document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' }));
 
     // test saveCustomSelector early returns inside catch
     jest.resetModules();
     window.__bypassPickerActive = false;
-    require('./picker.js');
+    require('../picker.js');
     const elId = document.createElement('div');
     elId.id = 'my-id-2';
     document.elementFromPoint = jest.fn(() => elId);
@@ -90,7 +89,7 @@ describe('picker.js DOM test', () => {
     // inner early return inside get callback
     jest.resetModules();
     window.__bypassPickerActive = false;
-    require('./picker.js');
+    require('../picker.js');
     document.elementFromPoint = jest.fn(() => elId);
     global.chrome.runtime.lastError = { message: 'err' };
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
@@ -99,20 +98,24 @@ describe('picker.js DOM test', () => {
     // catch block for local storage get
     jest.resetModules();
     window.__bypassPickerActive = false;
-    require('./picker.js');
+    require('../picker.js');
     document.elementFromPoint = jest.fn(() => elId);
     console.error = jest.fn();
-    global.chrome.storage.local.get = jest.fn(() => { throw new Error('get error'); });
+    global.chrome.storage.local.get = jest.fn(() => {
+      throw new Error('get error');
+    });
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
     expect(console.error).toHaveBeenCalled();
 
     // catch block inside callback
     jest.resetModules();
     window.__bypassPickerActive = false;
-    require('./picker.js');
+    require('../picker.js');
     document.elementFromPoint = jest.fn(() => elId);
     global.chrome.storage.local.get = jest.fn((keys, cb) => {
-      global.chrome.storage.local.set = jest.fn(() => { throw new Error('set error'); });
+      global.chrome.storage.local.set = jest.fn(() => {
+        throw new Error('set error');
+      });
       cb({});
     });
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
@@ -121,7 +124,7 @@ describe('picker.js DOM test', () => {
     // test existing selector
     jest.resetModules();
     window.__bypassPickerActive = false;
-    require('./picker.js');
+    require('../picker.js');
     document.elementFromPoint = jest.fn(() => elId);
     global.chrome.storage.local.get = jest.fn((keys, cb) => {
       cb({ customSelectors: { [window.location.hostname]: ['#my-id-2'] } });
@@ -131,51 +134,51 @@ describe('picker.js DOM test', () => {
 
   it('early return if window.__bypassPickerActive is true', () => {
     window.__bypassPickerActive = true;
-    require('./picker.js');
+    require('../picker.js');
   });
 
   it('does nothing if no document.elementFromPoint on move', () => {
-    require('./picker.js');
+    require('../picker.js');
     document.elementFromPoint = jest.fn(() => null);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
   });
 
   it('does nothing if overlay is hit on move', () => {
-    require('./picker.js');
+    require('../picker.js');
     const overlay = document.querySelector('div[style*="background: rgba(0, 100, 255, 0.1)"]');
     document.elementFromPoint = jest.fn(() => overlay);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
   });
 
   it('does nothing if highlight is hit on move', () => {
-    require('./picker.js');
+    require('../picker.js');
     const highlight = document.querySelector('div[style*="border: 2px solid red"]');
     document.elementFromPoint = jest.fn(() => highlight);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
   });
 
   it('does nothing on click if no document.elementFromPoint', () => {
-    require('./picker.js');
+    require('../picker.js');
     document.elementFromPoint = jest.fn(() => null);
     document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
   });
 
   it('does nothing on click if overlay is hit', () => {
-    require('./picker.js');
+    require('../picker.js');
     const overlay = document.querySelector('div[style*="background: rgba(0, 100, 255, 0.1)"]');
     document.elementFromPoint = jest.fn(() => overlay);
     document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
   });
 
   it('does nothing on click if highlight is hit', () => {
-    require('./picker.js');
+    require('../picker.js');
     const highlight = document.querySelector('div[style*="border: 2px solid red"]');
     document.elementFromPoint = jest.fn(() => highlight);
     document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
   });
 
   it('generateSelector falls back correctly', () => {
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     document.documentElement.appendChild(el);
     document.elementFromPoint = jest.fn(() => el);
@@ -183,7 +186,7 @@ describe('picker.js DOM test', () => {
   });
 
   it('generateSelector stringly typed classname', () => {
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     el.className = 123;
     document.documentElement.appendChild(el);
@@ -193,7 +196,7 @@ describe('picker.js DOM test', () => {
 
   it('saveCustomSelector does nothing if chrome.runtime.lastError', () => {
     global.chrome.runtime = { lastError: new Error('test') };
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     el.id = 'test';
     document.documentElement.appendChild(el);
@@ -203,7 +206,7 @@ describe('picker.js DOM test', () => {
 
   it('saveCustomSelector does nothing if no local', () => {
     delete global.chrome.storage.local;
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     el.id = 'test';
     document.documentElement.appendChild(el);
@@ -215,7 +218,7 @@ describe('picker.js DOM test', () => {
     global.chrome.storage.local.get.mockImplementationOnce(() => {
       throw new Error('test error synchronously');
     });
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     el.id = 'test';
     document.documentElement.appendChild(el);
@@ -230,7 +233,7 @@ describe('picker.js DOM test', () => {
     global.chrome.storage.local.set.mockImplementationOnce(() => {
       throw new Error('test error callback');
     });
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     el.id = 'test';
     document.documentElement.appendChild(el);
@@ -240,9 +243,9 @@ describe('picker.js DOM test', () => {
 
   it('does not save if already includes selector', () => {
     global.chrome.storage.local.get = jest.fn((keys, cb) =>
-      cb({ customSelectors: { 'localhost': ['#test'] } })
+      cb({ customSelectors: { localhost: ['#test'] } })
     );
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     el.id = 'test';
     document.documentElement.appendChild(el);
@@ -253,7 +256,7 @@ describe('picker.js DOM test', () => {
   });
 
   it('handles click and confirms false', () => {
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     el.id = 'test-id';
     document.documentElement.appendChild(el);
@@ -265,14 +268,14 @@ describe('picker.js DOM test', () => {
   });
 
   it('handleKeydown ignores other keys', () => {
-    require('./picker.js');
+    require('../picker.js');
     document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'A' }));
     // bypassPickerActive should still be true since we didn't cleanup
     expect(window.__bypassPickerActive).toBe(true);
   });
 
   it('generateSelector empty classname string falls back to tag', () => {
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     el.className = '   '; // spaces that split to empty string for first element
     document.documentElement.appendChild(el);
@@ -291,7 +294,7 @@ describe('picker.js DOM test', () => {
       cb({});
       global.chrome.storage = origStorage;
     });
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     document.documentElement.appendChild(el);
     document.elementFromPoint = jest.fn(() => el);
@@ -305,7 +308,7 @@ describe('picker.js DOM test', () => {
       global.chrome.runtime.lastError = new Error('test');
       cb({});
     });
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     document.documentElement.appendChild(el);
     document.elementFromPoint = jest.fn(() => el);
@@ -314,14 +317,14 @@ describe('picker.js DOM test', () => {
 
   it('exits early if already active', () => {
     window.__bypassPickerActive = true;
-    require('./picker.js');
+    require('../picker.js');
     // Ensure no overlay is added
     const overlays = document.querySelectorAll('div[style*="cursor: crosshair"]');
     expect(overlays.length).toBe(0);
   });
 
   it('does nothing when moving over overlay or highlight', () => {
-    require('./picker.js');
+    require('../picker.js');
     const overlay = document.querySelector('div[style*="cursor: crosshair"]');
     document.elementFromPoint = jest.fn(() => overlay);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
@@ -331,14 +334,16 @@ describe('picker.js DOM test', () => {
   });
 
   it('does nothing when clicking over overlay', () => {
-    require('./picker.js');
+    require('../picker.js');
     // To ensure the exact reference matches the one captured in the closure,
     // we fire the event and mock elementFromPoint to return an element from the closure.
     // However, since we can't easily access the closure's `overlay`, we mock the elementFromPoint
     // to return the last created div with 'fixed' position (which is the overlay).
-    const overlay = Array.from(document.querySelectorAll('div')).reverse().find(el => el.style.cursor === 'crosshair');
+    const overlay = Array.from(document.querySelectorAll('div'))
+      .reverse()
+      .find((el) => el.style.cursor === 'crosshair');
 
-    document.elementFromPoint = jest.fn((x, y) => overlay);
+    document.elementFromPoint = jest.fn(() => overlay);
     // Add a custom property so we can identify it inside the closure if it does comparison
     const clickEvent = new MouseEvent('click', { clientX: 50, clientY: 50, bubbles: true });
     document.dispatchEvent(clickEvent);
@@ -348,16 +353,18 @@ describe('picker.js DOM test', () => {
   });
 
   it('does nothing when clicking over highlight', () => {
-    require('./picker.js');
-    const highlight = Array.from(document.querySelectorAll('div')).reverse().find(el => el.style.border.includes('red'));
+    require('../picker.js');
+    const highlight = Array.from(document.querySelectorAll('div'))
+      .reverse()
+      .find((el) => el.style.border.includes('red'));
 
-    document.elementFromPoint = jest.fn((x, y) => highlight);
+    document.elementFromPoint = jest.fn(() => highlight);
     const clickEvent = new MouseEvent('click', { clientX: 50, clientY: 50, bubbles: true });
     document.dispatchEvent(clickEvent);
   });
 
   it('does nothing when clicking over null', () => {
-    require('./picker.js');
+    require('../picker.js');
     document.elementFromPoint = jest.fn(() => null);
     const clickEvent = new MouseEvent('click', { clientX: 50, clientY: 50 });
     document.dispatchEvent(clickEvent);
@@ -365,7 +372,7 @@ describe('picker.js DOM test', () => {
   });
 
   it('does nothing when moving over null', () => {
-    require('./picker.js');
+    require('../picker.js');
     document.elementFromPoint = jest.fn(() => null);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
     const highlight = document.querySelector('div[style*="border: 2px solid red"]');
@@ -373,7 +380,7 @@ describe('picker.js DOM test', () => {
   });
 
   it('handles saveCustomSelector storage error gracefully', () => {
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     el.id = 'error-id';
     document.documentElement.appendChild(el);
@@ -381,24 +388,27 @@ describe('picker.js DOM test', () => {
 
     // Mock storage to throw error
     global.chrome.storage.local.get = jest.fn(() => {
-        throw new Error("Storage Error");
+      throw new Error('Storage Error');
     });
     console.error = jest.fn();
 
     document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
-    expect(console.error).toHaveBeenCalledWith('Picker local storage access failed:', expect.any(Error));
+    expect(console.error).toHaveBeenCalledWith(
+      'Picker local storage access failed:',
+      expect.any(Error)
+    );
   });
 
   it('handles callback runtime error gracefully', () => {
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     el.id = 'error-cb-id';
     document.documentElement.appendChild(el);
     document.elementFromPoint = jest.fn(() => el);
 
     global.chrome.storage.local.get = jest.fn((keys, cb) => {
-        global.chrome.runtime = { lastError: { message: "Error" } };
-        cb({ customSelectors: {} });
+      global.chrome.runtime = { lastError: { message: 'Error' } };
+      cb({ customSelectors: {} });
     });
 
     document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
@@ -406,13 +416,15 @@ describe('picker.js DOM test', () => {
   });
 
   it('does not save duplicate selectors', () => {
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     el.id = 'dup-id';
     document.documentElement.appendChild(el);
     document.elementFromPoint = jest.fn(() => el);
 
-    global.chrome.storage.local.get = jest.fn((keys, cb) => cb({ customSelectors: { 'localhost': ['#dup-id'] } }));
+    global.chrome.storage.local.get = jest.fn((keys, cb) =>
+      cb({ customSelectors: { localhost: ['#dup-id'] } })
+    );
 
     document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
     expect(global.chrome.storage.local.set).not.toHaveBeenCalled();
@@ -421,7 +433,7 @@ describe('picker.js DOM test', () => {
   it('handles early returns for no element found', () => {
     jest.resetModules();
     window.__bypassPickerActive = false;
-    require('./picker.js');
+    require('../picker.js');
     document.elementFromPoint = jest.fn(() => null);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
@@ -431,21 +443,21 @@ describe('picker.js DOM test', () => {
     jest.resetModules();
     const oldChrome = global.chrome;
     delete global.chrome;
-    require('./picker.js');
+    require('../picker.js');
     global.chrome = oldChrome;
   });
 
   it('handles early return for missing chrome storage', () => {
     jest.resetModules();
     global.chrome = { storage: undefined };
-    require('./picker.js');
+    require('../picker.js');
   });
 
   it('covers early return inside IIFE for missing active', () => {
     jest.resetModules();
     global.chrome = { storage: {} };
     window.__bypassPickerActive = true;
-    require('./picker.js');
+    require('../picker.js');
     expect(window.__bypassPickerActive).toBe(true);
   });
 
@@ -453,7 +465,7 @@ describe('picker.js DOM test', () => {
     jest.resetModules();
     window.__bypassPickerActive = false;
     global.chrome = { storage: { local: { get: jest.fn(), set: jest.fn() } }, runtime: {} };
-    require('./picker.js');
+    require('../picker.js');
     const highlight = document.documentElement.children[1];
     document.elementFromPoint = jest.fn(() => highlight);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
@@ -464,7 +476,7 @@ describe('picker.js DOM test', () => {
     jest.resetModules();
     window.__bypassPickerActive = false;
     global.chrome = { storage: { local: { get: jest.fn(), set: jest.fn() } }, runtime: {} };
-    require('./picker.js');
+    require('../picker.js');
     const overlay = document.documentElement.children[0];
     document.elementFromPoint = jest.fn(() => overlay);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
@@ -475,7 +487,7 @@ describe('picker.js DOM test', () => {
     jest.resetModules();
     window.__bypassPickerActive = false;
     global.chrome = { storage: { local: { get: jest.fn(), set: jest.fn() } }, runtime: {} };
-    require('./picker.js');
+    require('../picker.js');
 
     // The code does: el === overlay || el === highlight
     // We need to return exactly those objects.
@@ -495,16 +507,15 @@ describe('picker.js DOM test', () => {
     jest.resetModules();
     window.__bypassPickerActive = false;
     global.chrome = { storage: { local: { get: jest.fn(), set: jest.fn() } }, runtime: {} };
-    require('./picker.js');
+    require('../picker.js');
 
     // override elementFromPoint dynamically
     let returnsOverlay = true;
     document.elementFromPoint = () => {
       if (returnsOverlay) {
         return document.documentElement.children[0];
-      } else {
-        return document.documentElement.children[1];
       }
+      return document.documentElement.children[1];
     };
 
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
@@ -516,25 +527,25 @@ describe('picker.js DOM test', () => {
   });
   it('does nothing if already active', () => {
     window.__bypassPickerActive = true;
-    require('./picker.js');
+    require('../picker.js');
     expect(document.documentElement.innerHTML).not.toContain('crosshair');
   });
 
   it('mousemove ignores if element is falsy', () => {
-    require('./picker.js');
+    require('../picker.js');
     document.elementFromPoint = jest.fn(() => null);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
   });
 
   it('click ignores if element is falsy', () => {
-    require('./picker.js');
+    require('../picker.js');
     document.elementFromPoint = jest.fn(() => null);
     document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
   });
 
   it('does nothing if confirm is false', () => {
     window.confirm = jest.fn(() => false);
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     document.documentElement.appendChild(el);
     document.elementFromPoint = jest.fn(() => el);
@@ -543,7 +554,7 @@ describe('picker.js DOM test', () => {
 
   it('does nothing if no chrome.storage.local', () => {
     delete global.chrome.storage.local;
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     document.elementFromPoint = jest.fn(() => el);
     document.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50 }));
@@ -558,7 +569,7 @@ describe('picker.js DOM test', () => {
       },
       runtime: { lastError: new Error('mock error') }
     };
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     document.documentElement.appendChild(el);
     document.elementFromPoint = jest.fn(() => el);
@@ -568,7 +579,7 @@ describe('picker.js DOM test', () => {
   it('saves custom selector handles missing chrome runtime correctly', () => {
     global.chrome.storage.local.get = jest.fn((keys, cb) => cb({}));
     delete global.chrome.runtime;
-    require('./picker.js');
+    require('../picker.js');
     const el = document.createElement('div');
     document.documentElement.appendChild(el);
     document.elementFromPoint = jest.fn(() => el);

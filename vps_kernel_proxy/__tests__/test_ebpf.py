@@ -10,8 +10,9 @@ class TestEBPFPrograms(unittest.TestCase):
         # We only compile if we are on Linux (e.g. inside Docker or a Linux runner)
         cls.can_compile = sys.platform.startswith("linux")
         if cls.can_compile:
-            subprocess.run(["make", "clean"], capture_output=True)
-            cls.make_result = subprocess.run(["make"], capture_output=True, text=True)
+            cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            subprocess.run(["make", "clean"], capture_output=True, cwd=cwd)
+            cls.make_result = subprocess.run(["make"], capture_output=True, text=True, cwd=cwd)
         else:
             cls.make_result = None
 
@@ -31,21 +32,21 @@ class TestEBPFPrograms(unittest.TestCase):
 
     def test_snat_maps(self):
         """Verify that the SNAT filter has its map."""
-        path = os.path.join(os.path.dirname(__file__), "ebpf_snat.bpf.c")
+        path = os.path.join(os.path.dirname(__file__), "..", "ebpf_snat.bpf.c")
         with open(path, "r") as f:
             content = f.read()
         self.assertIn("snat_map", content, "Map 'snat_map' missing from ebpf_snat.bpf.c")
 
     def test_xdp_forwarder_maps(self):
         """Verify that the XDP forwarder has its redirect map."""
-        path = os.path.join(os.path.dirname(__file__), "xdp_forwarder.bpf.c")
+        path = os.path.join(os.path.dirname(__file__), "..", "xdp_forwarder.bpf.c")
         with open(path, "r") as f:
             content = f.read()
         self.assertIn("forward_map", content, "Map 'forward_map' missing from xdp_forwarder.bpf.c")
 
     def test_bloom_filter_maps(self):
         """Verify that the Bloom filter has its specialized map."""
-        path = os.path.join(os.path.dirname(__file__), "bloom_filter.bpf.c")
+        path = os.path.join(os.path.dirname(__file__), "..", "bloom_filter.bpf.c")
         with open(path, "r") as f:
             content = f.read()
         self.assertIn("bloom_filter", content, "Map 'bloom_filter' missing from bloom_filter.bpf.c")
@@ -53,28 +54,28 @@ class TestEBPFPrograms(unittest.TestCase):
 
     def test_sni_filter_maps(self):
         """Verify that the SNI filter has its blacklist map."""
-        path = os.path.join(os.path.dirname(__file__), "sni_filter.bpf.c")
+        path = os.path.join(os.path.dirname(__file__), "..", "sni_filter.bpf.c")
         with open(path, "r") as f:
             content = f.read()
         self.assertIn("sni_blacklist", content, "Map 'sni_blacklist' missing from sni_filter.bpf.c")
 
     def test_adblock_maps(self):
         """Verify that the adblock program has its blocklist map."""
-        path = os.path.join(os.path.dirname(__file__), "adblock.bpf.c")
+        path = os.path.join(os.path.dirname(__file__), "..", "adblock.bpf.c")
         with open(path, "r") as f:
             content = f.read()
         self.assertIn("blocklist_map", content, "Map 'blocklist_map' missing from adblock.bpf.c")
 
     def test_dns_filter_maps(self):
         """Verify that the dns_filter program has its hits map."""
-        path = os.path.join(os.path.dirname(__file__), "dns_filter.bpf.c")
+        path = os.path.join(os.path.dirname(__file__), "..", "dns_filter.bpf.c")
         with open(path, "r") as f:
             content = f.read()
         self.assertIn("dns_hits", content, "Map 'dns_hits' missing from dns_filter.bpf.c")
 
     def test_reputation_maps(self):
         """Verify that the reputation monitor has both heat-map and watchlist."""
-        path = os.path.join(os.path.dirname(__file__), "reputation.bpf.c")
+        path = os.path.join(os.path.dirname(__file__), "..", "reputation.bpf.c")
         with open(path, "r") as f:
             content = f.read()
         self.assertIn("stats_map", content, "Map 'stats_map' missing from reputation.bpf.c")
@@ -93,8 +94,8 @@ class TestMainBlock(unittest.TestCase):
         import runpy
         import sys
 
-        with patch.object(sys, 'argv', ['vps_kernel_proxy/test_ebpf.py']):
-            runpy.run_path('vps_kernel_proxy/test_ebpf.py', run_name='__main__')
+        with patch.object(sys, 'argv', [__file__]):
+            runpy.run_path(__file__, run_name='__main__')
             mock_main.assert_called_once()
 
 if __name__ == "__main__":

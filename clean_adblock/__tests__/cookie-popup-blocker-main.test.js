@@ -15,7 +15,7 @@ describe('cookie-popup-blocker-main.js', () => {
   });
 
   it('blocks cookie popup URLs', () => {
-    require('./cookie-popup-blocker-main.js');
+    require('../cookie-popup-blocker-main.js');
 
     expect(window.open('https://example.com/cookie-notice')).toBeNull();
     expect(window.open('https://example.com/privacy-policy/cookie')).toBeNull();
@@ -23,7 +23,7 @@ describe('cookie-popup-blocker-main.js', () => {
   });
 
   it('allows non-cookie URLs', () => {
-    require('./cookie-popup-blocker-main.js');
+    require('../cookie-popup-blocker-main.js');
 
     window.open('https://example.com/about');
     expect(mockOpen).toHaveBeenCalledWith('https://example.com/about');
@@ -31,7 +31,7 @@ describe('cookie-popup-blocker-main.js', () => {
 
   it('skips skip hosts', () => {
     window.location = new URL('https://twitter.com');
-    require('./cookie-popup-blocker-main.js');
+    require('../cookie-popup-blocker-main.js');
 
     window.open('https://example.com/cookie-notice');
     expect(mockOpen).toHaveBeenCalledWith('https://example.com/cookie-notice');
@@ -40,20 +40,20 @@ describe('cookie-popup-blocker-main.js', () => {
   it('window.open handles non string url', () => {
     const originalOpen = window.open;
     window.open = jest.fn().mockReturnValue('original');
-    require('./cookie-popup-blocker-main.js');
+    require('../cookie-popup-blocker-main.js');
     expect(window.open(null)).toBe('original');
     expect(window.open({})).toBe('original');
     window.open = originalOpen;
   });
 
   it('allows object urls without throwing', () => {
-    require('./cookie-popup-blocker-main.js');
+    require('../cookie-popup-blocker-main.js');
     window.open({ url: 'https://example.com/cookie-notice' });
     expect(mockOpen).toHaveBeenCalledWith({ url: 'https://example.com/cookie-notice' });
   });
 
   it('allows null urls', () => {
-    require('./cookie-popup-blocker-main.js');
+    require('../cookie-popup-blocker-main.js');
     window.open(null);
     expect(mockOpen).toHaveBeenCalledWith(null);
   });

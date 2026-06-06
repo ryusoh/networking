@@ -34,7 +34,7 @@ describe('tianditu-defaults', () => {
     document.body.appendChild(btn);
 
     Object.defineProperty(document, 'readyState', { value: 'complete', configurable: true });
-    require('./tianditu-defaults.js');
+    require('../tianditu-defaults.js');
     jest.advanceTimersByTime(1000);
   });
 
@@ -58,7 +58,7 @@ describe('tianditu-defaults', () => {
     document.body.appendChild(el3);
 
     Object.defineProperty(document, 'readyState', { value: 'complete', configurable: true });
-    require('./tianditu-defaults.js');
+    require('../tianditu-defaults.js');
     jest.useFakeTimers();
     jest.advanceTimersByTime(1000);
     jest.useRealTimers();
@@ -80,7 +80,7 @@ describe('tianditu-defaults', () => {
 
     Object.defineProperty(document, 'readyState', { value: 'complete', configurable: true });
 
-    require('./tianditu-defaults.js');
+    require('../tianditu-defaults.js');
     jest.advanceTimersByTime(1000);
 
     expect(btn.click).toHaveBeenCalled();
@@ -105,7 +105,7 @@ describe('tianditu-defaults', () => {
 
     Object.defineProperty(document, 'readyState', { value: 'complete', configurable: true });
 
-    require('./tianditu-defaults.js');
+    require('../tianditu-defaults.js');
     jest.advanceTimersByTime(1000);
 
     expect(btn.click).toHaveBeenCalled();
@@ -119,7 +119,7 @@ describe('tianditu-defaults', () => {
   it('retries until max attempts and gives up', () => {
     Object.defineProperty(document, 'readyState', { value: 'complete', configurable: true });
 
-    require('./tianditu-defaults.js');
+    require('../tianditu-defaults.js');
     jest.advanceTimersByTime(1000); // 1st try
     for (let i = 0; i < 35; i++) {
       jest.advanceTimersByTime(500); // multiple retries
@@ -130,7 +130,7 @@ describe('tianditu-defaults', () => {
   it('listens for load event if document is not complete', () => {
     Object.defineProperty(document, 'readyState', { value: 'loading', configurable: true });
 
-    require('./tianditu-defaults.js');
+    require('../tianditu-defaults.js');
 
     // wait a bit, should not have triggered trySelect
     jest.advanceTimersByTime(2000);

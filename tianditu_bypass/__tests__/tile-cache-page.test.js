@@ -29,13 +29,13 @@ describe('tile-cache-page', () => {
 
   it('initializes and logs', () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-    require('./tile-cache-page.js');
+    require('../tile-cache-page.js');
     expect(consoleSpy).toHaveBeenCalledWith('[TileCache] Fetch interceptor active');
     consoleSpy.mockRestore();
   });
 
   it('intercepts fetch for tile urls and checks cache', async () => {
-    require('./tile-cache-page.js');
+    require('../tile-cache-page.js');
 
     // not a tile URL
     mockFetch.mockResolvedValueOnce('real-fetch');
@@ -68,7 +68,7 @@ describe('tile-cache-page', () => {
   });
 
   it('intercepts fetch for tile urls with input object', async () => {
-    require('./tile-cache-page.js');
+    require('../tile-cache-page.js');
 
     // tile URL, mock postMessage to resolve immediately with hit
     const postMessageSpy = jest.spyOn(window, 'postMessage').mockImplementation((data) => {
@@ -95,7 +95,7 @@ describe('tile-cache-page', () => {
   });
 
   it('falls back to real fetch on cache miss', async () => {
-    require('./tile-cache-page.js');
+    require('../tile-cache-page.js');
     mockFetch.mockResolvedValueOnce('real-fetch-fallback');
 
     const postMessageSpy = jest.spyOn(window, 'postMessage').mockImplementation((data) => {
@@ -119,7 +119,7 @@ describe('tile-cache-page', () => {
   });
 
   it('falls back to real fetch on timeout', async () => {
-    require('./tile-cache-page.js');
+    require('../tile-cache-page.js');
     mockFetch.mockResolvedValueOnce('timeout-fetch');
 
     const postMessageSpy = jest.spyOn(window, 'postMessage').mockImplementation(() => {
@@ -135,7 +135,7 @@ describe('tile-cache-page', () => {
   });
 
   it('ignores other messages', () => {
-    require('./tile-cache-page.js');
+    require('../tile-cache-page.js');
 
     // other source
     window.dispatchEvent(
@@ -163,7 +163,7 @@ describe('tile-cache-page', () => {
   });
 
   it('handles falsy input url', async () => {
-    require('./tile-cache-page.js');
+    require('../tile-cache-page.js');
     mockFetch.mockResolvedValueOnce('falsy-input-fetch');
 
     // passing null or empty string

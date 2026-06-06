@@ -14,7 +14,7 @@ describe('tile-cache-interceptor', () => {
 
   it('injects script and sets up listener', () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-    require('./tile-cache-interceptor.js');
+    require('../tile-cache-interceptor.js');
 
     const script = document.querySelector('script');
     expect(script).toBeTruthy();
@@ -29,7 +29,7 @@ describe('tile-cache-interceptor', () => {
   });
 
   it('ignores invalid messages', () => {
-    require('./tile-cache-interceptor.js');
+    require('../tile-cache-interceptor.js');
     const postMessageSpy = jest.spyOn(window, 'postMessage').mockImplementation();
 
     // Wrong source
@@ -69,7 +69,7 @@ describe('tile-cache-interceptor', () => {
       contentType: 'image/png'
     });
 
-    require('./tile-cache-interceptor.js');
+    require('../tile-cache-interceptor.js');
 
     const postMessageSpy = jest.spyOn(window, 'postMessage').mockImplementation();
 
@@ -111,7 +111,7 @@ describe('tile-cache-interceptor', () => {
       hit: false
     });
 
-    require('./tile-cache-interceptor.js');
+    require('../tile-cache-interceptor.js');
 
     const postMessageSpy = jest.spyOn(window, 'postMessage').mockImplementation();
 
@@ -146,7 +146,7 @@ describe('tile-cache-interceptor', () => {
       new Error('Extension context invalidated')
     );
 
-    require('./tile-cache-interceptor.js');
+    require('../tile-cache-interceptor.js');
 
     const postMessageSpy = jest.spyOn(window, 'postMessage').mockImplementation();
 
@@ -183,7 +183,7 @@ describe('tile-cache-interceptor', () => {
       configurable: true
     });
 
-    require('./tile-cache-interceptor.js');
+    require('../tile-cache-interceptor.js');
 
     const script = document.documentElement.querySelector('script');
     expect(script).toBeTruthy();

@@ -6,6 +6,9 @@ import shutil
 import json
 from unittest.mock import patch, mock_open
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pull
 
 class TestRetriever(unittest.TestCase):

@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock, mock_open
 import os
 import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from nas_proxy import cache_proxy
 
 class TestCacheProxy(unittest.TestCase):

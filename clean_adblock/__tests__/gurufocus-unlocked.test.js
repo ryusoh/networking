@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 function loadScript() {
-  const code = fs.readFileSync(path.join(__dirname, 'gurufocus-unlocked.js'), 'utf8');
+  const code = fs.readFileSync(path.join(__dirname, '..', 'gurufocus-unlocked.js'), 'utf8');
   eval(code);
 }
 

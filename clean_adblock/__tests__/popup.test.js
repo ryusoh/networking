@@ -1,6 +1,6 @@
 describe('popup.js button setup', () => {
-    it('sets button states', () => {
-        document.body.innerHTML = `
+  it('sets button states', () => {
+    document.body.innerHTML = `
           <input type="checkbox" id="enabled" />
           <select id="mode">
             <option value="selective">Selective</option>
@@ -19,26 +19,26 @@ describe('popup.js button setup', () => {
           <button id="picker"></button>
         `;
 
-        global.chrome = {
-            storage: {
-              sync: {
-                get: jest.fn((keys, cb) => {
-                    cb({ blacklist: ['example.com'], jsBlocked: ['example.com'] });
-                }),
-                set: jest.fn()
-              }
-            },
-            tabs: { query: jest.fn((q, cb) => cb([{ id: 1, url: 'http://example.com' }])) },
-            runtime: { lastError: null }
-        };
-        require('./popup.js');
-        document.dispatchEvent(new Event('DOMContentLoaded'));
-    });
+    global.chrome = {
+      storage: {
+        sync: {
+          get: jest.fn((keys, cb) => {
+            cb({ blacklist: ['example.com'], jsBlocked: ['example.com'] });
+          }),
+          set: jest.fn()
+        }
+      },
+      tabs: { query: jest.fn((q, cb) => cb([{ id: 1, url: 'http://example.com' }])) },
+      runtime: { lastError: null }
+    };
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+  });
 });
 
 describe('popup.js button setup more', () => {
-    it('sets button states without features object in storage get', () => {
-        document.body.innerHTML = `
+  it('sets button states without features object in storage get', () => {
+    document.body.innerHTML = `
           <input type="checkbox" id="enabled" />
           <select id="mode">
             <option value="selective">Selective</option>
@@ -57,23 +57,23 @@ describe('popup.js button setup more', () => {
           <button id="picker"></button>
         `;
 
-        global.chrome = {
-            storage: {
-              sync: {
-                get: jest.fn((keys, cb) => {
-                    cb({}); // Empty so missing features object triggers line 89 logic inside toggle
-                }),
-                set: jest.fn()
-              }
-            },
-            tabs: { query: jest.fn((q, cb) => cb([{ id: 1, url: 'http://example.com' }])) },
-            runtime: { lastError: null }
-        };
-        require('./popup.js');
-        document.dispatchEvent(new Event('DOMContentLoaded'));
-        const toggle = document.getElementById('feature-cookieBanner');
-        toggle.dispatchEvent(new Event('change'));
-    });
+    global.chrome = {
+      storage: {
+        sync: {
+          get: jest.fn((keys, cb) => {
+            cb({}); // Empty so missing features object triggers line 89 logic inside toggle
+          }),
+          set: jest.fn()
+        }
+      },
+      tabs: { query: jest.fn((q, cb) => cb([{ id: 1, url: 'http://example.com' }])) },
+      runtime: { lastError: null }
+    };
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    const toggle = document.getElementById('feature-cookieBanner');
+    toggle.dispatchEvent(new Event('change'));
+  });
 });
 
 describe('popup.js', () => {
@@ -101,14 +101,18 @@ describe('popup.js', () => {
         sync: {
           get: jest.fn((keys, cb) => {
             if (Array.isArray(keys) && keys[0] === 'features') {
-                cb({ features: { cookieBannerBlocker: true } });
+              cb({ features: { cookieBannerBlocker: true } });
             } else if (Array.isArray(keys) && keys[0] === 'whitelist') {
-                cb({ whitelist: ['example.com'] });
+              cb({ whitelist: ['example.com'] });
             } else {
-                cb({ enabled: true, mode: 'selective', features: {} });
+              cb({ enabled: true, mode: 'selective', features: {} });
             }
           }),
-          set: jest.fn((data, cb) => { if(cb) cb(); })
+          set: jest.fn((data, cb) => {
+            if (cb) {
+              cb();
+            }
+          })
         }
       },
       tabs: {
@@ -132,12 +136,12 @@ describe('popup.js', () => {
 
   it('handles empty query', () => {
     global.chrome.tabs.query = jest.fn((query, cb) => cb([]));
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
   });
 
   it('handles empty query on click', () => {
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
     global.chrome.tabs.query = jest.fn((query, cb) => cb([]));
 
@@ -146,35 +150,39 @@ describe('popup.js', () => {
   });
 
   it('handles invalid url query', () => {
-    global.chrome.tabs.query = jest.fn((query, cb) => cb([{url: 'invalid://url'}]));
-    require('./popup.js');
+    global.chrome.tabs.query = jest.fn((query, cb) => cb([{ url: 'invalid://url' }]));
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
   });
 
   it('handles invalid url query on click', () => {
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    global.chrome.tabs.query = jest.fn((query, cb) => cb([{url: 'invalid://url'}]));
+    global.chrome.tabs.query = jest.fn((query, cb) => cb([{ url: 'invalid://url' }]));
 
     const addWhitelist = document.getElementById('addWhitelist');
     addWhitelist.dispatchEvent(new MouseEvent('click'));
   });
 
   it('handles exception in setup', () => {
-    global.chrome.storage.sync.get = () => { throw new Error('Test'); };
-    require('./popup.js');
+    global.chrome.storage.sync.get = () => {
+      throw new Error('Test');
+    };
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
   });
 
   it('handles no chrome object', () => {
     delete global.chrome;
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
   });
 
   it('handles toggle changes with error', () => {
-    global.chrome.storage.sync.set = () => { throw new Error('Test'); };
-    require('./popup.js');
+    global.chrome.storage.sync.set = () => {
+      throw new Error('Test');
+    };
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
     const enabled = document.getElementById('enabled');
@@ -187,7 +195,7 @@ describe('popup.js', () => {
   });
 
   it('handles toggle changes', () => {
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
     const enabled = document.getElementById('enabled');
@@ -202,7 +210,7 @@ describe('popup.js', () => {
   });
 
   it('handles feature changes', () => {
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
     const cookieBanner = document.getElementById('feature-cookieBanner');
@@ -214,10 +222,12 @@ describe('popup.js', () => {
   });
 
   it('handles feature changes with error', () => {
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
-    global.chrome.storage.sync.get = () => { throw new Error('Test'); };
+    global.chrome.storage.sync.get = () => {
+      throw new Error('Test');
+    };
 
     const cookieBanner = document.getElementById('feature-cookieBanner');
     cookieBanner.checked = false;
@@ -225,22 +235,26 @@ describe('popup.js', () => {
   });
 
   it('handles button clicks error in query', () => {
-    global.chrome.tabs.query = () => { throw new Error('Test'); };
-    require('./popup.js');
+    global.chrome.tabs.query = () => {
+      throw new Error('Test');
+    };
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
   });
 
   it('handles button clicks error in query add', () => {
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
-    global.chrome.tabs.query = () => { throw new Error('Test'); };
+    global.chrome.tabs.query = () => {
+      throw new Error('Test');
+    };
     const addWhitelist = document.getElementById('addWhitelist');
     addWhitelist.dispatchEvent(new MouseEvent('click'));
   });
 
   it('handles button clicks remove', () => {
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
     const addWhitelist = document.getElementById('addWhitelist');
@@ -251,9 +265,9 @@ describe('popup.js', () => {
 
   it('handles button clicks add', () => {
     global.chrome.storage.sync.get = jest.fn((keys, cb) => {
-        cb({ whitelist: [] });
+      cb({ whitelist: [] });
     });
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
     const addWhitelist = document.getElementById('addWhitelist');
@@ -263,10 +277,12 @@ describe('popup.js', () => {
   });
 
   it('handles get list error', () => {
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
-    global.chrome.storage.sync.get = () => { throw new Error('Test'); };
+    global.chrome.storage.sync.get = () => {
+      throw new Error('Test');
+    };
     const addWhitelist = document.getElementById('addWhitelist');
     addWhitelist.dispatchEvent(new MouseEvent('click'));
   });
@@ -279,40 +295,46 @@ describe('popup.js', () => {
         cb({ enabled: true, mode: 'selective', features: {} });
       }
     };
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
   });
 
   it('handles runtime error during setup', () => {
     global.chrome.storage.sync.get = (keys, cb) => {
-        global.chrome.runtime.lastError = new Error('Test');
-        cb({});
+      global.chrome.runtime.lastError = new Error('Test');
+      cb({});
     };
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
   });
 
   it('handles scan click', () => {
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
     const scanBtn = document.getElementById('scan');
     scanBtn.dispatchEvent(new MouseEvent('click'));
-    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(1, { action: 'scan' }, expect.any(Function));
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(
+      1,
+      { action: 'scan' },
+      expect.any(Function)
+    );
   });
 
   it('handles scan error', () => {
     global.chrome.runtime.lastError = new Error('Test');
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
     const scanBtn = document.getElementById('scan');
     scanBtn.dispatchEvent(new MouseEvent('click'));
-    expect(window.alert).toHaveBeenCalledWith('Error: Could not communicate with page. Please refresh.');
+    expect(window.alert).toHaveBeenCalledWith(
+      'Error: Could not communicate with page. Please refresh.'
+    );
   });
 
   it('handles picker click', () => {
-    require('./popup.js');
+    require('../popup.js');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
     const pickerBtn = document.getElementById('picker');
@@ -326,8 +348,8 @@ describe('popup.js', () => {
 });
 
 describe('popup.js specific lines', () => {
-    beforeEach(() => {
-        document.body.innerHTML = `
+  beforeEach(() => {
+    document.body.innerHTML = `
           <input type="checkbox" id="enabled" />
           <select id="mode">
             <option value="selective">Selective</option>
@@ -345,107 +367,111 @@ describe('popup.js specific lines', () => {
           <button id="scan"></button>
           <button id="picker"></button>
         `;
-        global.chrome = {
-          storage: {
-            sync: {
-              get: jest.fn((keys, cb) => {
-                  cb({ enabled: true, mode: 'selective' });
-              }),
-              set: jest.fn((data, cb) => { if(cb) cb(); })
+    global.chrome = {
+      storage: {
+        sync: {
+          get: jest.fn((keys, cb) => {
+            cb({ enabled: true, mode: 'selective' });
+          }),
+          set: jest.fn((data, cb) => {
+            if (cb) {
+              cb();
             }
-          },
-          tabs: {
-            query: jest.fn((query, cb) => cb([{ id: 1, url: 'https://example.com' }])),
-            sendMessage: jest.fn((id, msg, cb) => cb())
-          },
-          scripting: {
-            executeScript: jest.fn()
-          },
-          runtime: {
-            lastError: null
-          }
-        };
-        window.alert = jest.fn();
-        window.close = jest.fn();
-      });
+          })
+        }
+      },
+      tabs: {
+        query: jest.fn((query, cb) => cb([{ id: 1, url: 'https://example.com' }])),
+        sendMessage: jest.fn((id, msg, cb) => cb())
+      },
+      scripting: {
+        executeScript: jest.fn()
+      },
+      runtime: {
+        lastError: null
+      }
+    };
+    window.alert = jest.fn();
+    window.close = jest.fn();
+  });
 
-      afterEach(() => {
-        jest.resetModules();
-      });
+  afterEach(() => {
+    jest.resetModules();
+  });
 
-      it('covers missing features object', () => {
-          require('./popup.js');
-          document.dispatchEvent(new Event('DOMContentLoaded'));
-      });
+  it('covers missing features object', () => {
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+  });
 
-      it('covers initial undefined lists on updateButtonStates', () => {
-          require('./popup.js');
-          document.dispatchEvent(new Event('DOMContentLoaded'));
-      });
+  it('covers initial undefined lists on updateButtonStates', () => {
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+  });
 
-      it('covers missing list array on toggle', () => {
-          global.chrome.storage.sync.get = jest.fn((keys, cb) => {
-              if (Array.isArray(keys) && keys[0] === 'whitelist') {
-                  cb({}); // whitelist is missing
-              } else {
-                  cb({});
-              }
-          });
-          require('./popup.js');
-          document.dispatchEvent(new Event('DOMContentLoaded'));
-          const btn = document.getElementById('addWhitelist');
-          btn.dispatchEvent(new MouseEvent('click'));
-      });
+  it('covers missing list array on toggle', () => {
+    global.chrome.storage.sync.get = jest.fn((keys, cb) => {
+      if (Array.isArray(keys) && keys[0] === 'whitelist') {
+        cb({}); // whitelist is missing
+      } else {
+        cb({});
+      }
+    });
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    const btn = document.getElementById('addWhitelist');
+    btn.dispatchEvent(new MouseEvent('click'));
+  });
 
-      it('covers error on tab query in updateButtonStates', () => {
-          global.chrome.runtime.lastError = new Error('Test');
-          require('./popup.js');
-          document.dispatchEvent(new Event('DOMContentLoaded'));
-      });
+  it('covers error on tab query in updateButtonStates', () => {
+    global.chrome.runtime.lastError = new Error('Test');
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+  });
 
-      it('covers error on storage get in updateButtonStates', () => {
-          global.chrome.storage.sync.get = jest.fn((keys, cb) => {
-              if (Array.isArray(keys) && keys[0] === 'whitelist') {
-                  global.chrome.runtime.lastError = new Error('Test');
-                  cb({});
-              } else {
-                  cb({});
-              }
-          });
-          require('./popup.js');
-          document.dispatchEvent(new Event('DOMContentLoaded'));
-      });
+  it('covers error on storage get in updateButtonStates', () => {
+    global.chrome.storage.sync.get = jest.fn((keys, cb) => {
+      if (Array.isArray(keys) && keys[0] === 'whitelist') {
+        global.chrome.runtime.lastError = new Error('Test');
+        cb({});
+      } else {
+        cb({});
+      }
+    });
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+  });
 
-      it('covers runtime error on tab query in toggleCurrentIn', () => {
-          require('./popup.js');
-          document.dispatchEvent(new Event('DOMContentLoaded'));
+  it('covers runtime error on tab query in toggleCurrentIn', () => {
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
 
-          global.chrome.runtime.lastError = new Error('Test');
-          const btn = document.getElementById('addWhitelist');
-          btn.dispatchEvent(new MouseEvent('click'));
-      });
+    global.chrome.runtime.lastError = new Error('Test');
+    const btn = document.getElementById('addWhitelist');
+    btn.dispatchEvent(new MouseEvent('click'));
+  });
 
-      it('covers runtime error on storage get in toggleCurrentIn', () => {
-          require('./popup.js');
-          document.dispatchEvent(new Event('DOMContentLoaded'));
+  it('covers runtime error on storage get in toggleCurrentIn', () => {
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
 
-          global.chrome.storage.sync.get = jest.fn((keys, cb) => {
-            if (Array.isArray(keys) && keys[0] === 'whitelist') {
-                global.chrome.runtime.lastError = new Error('Test');
-                cb({});
-            } else {
-                cb({});
-            }
-          });
+    global.chrome.storage.sync.get = jest.fn((keys, cb) => {
+      if (Array.isArray(keys) && keys[0] === 'whitelist') {
+        global.chrome.runtime.lastError = new Error('Test');
+        cb({});
+      } else {
+        cb({});
+      }
+    });
 
-          const btn = document.getElementById('addWhitelist');
-          btn.dispatchEvent(new MouseEvent('click'));
-      });
+    const btn = document.getElementById('addWhitelist');
+    btn.dispatchEvent(new MouseEvent('click'));
+  });
 });
 
 describe('popup.js more lines', () => {
-    beforeEach(() => {
-        document.body.innerHTML = `
+  beforeEach(() => {
+    document.body.innerHTML = `
           <input type="checkbox" id="enabled" />
           <select id="mode">
             <option value="selective">Selective</option>
@@ -463,60 +489,64 @@ describe('popup.js more lines', () => {
           <button id="scan"></button>
           <button id="picker"></button>
         `;
-        global.chrome = {
-          storage: {
-            sync: {
-              get: jest.fn((keys, cb) => {
-                  cb({ enabled: true, mode: 'selective' });
-              }),
-              set: jest.fn((data, cb) => { if(cb) cb(); })
+    global.chrome = {
+      storage: {
+        sync: {
+          get: jest.fn((keys, cb) => {
+            cb({ enabled: true, mode: 'selective' });
+          }),
+          set: jest.fn((data, cb) => {
+            if (cb) {
+              cb();
             }
-          },
-          tabs: {
-            query: jest.fn((query, cb) => cb([{ id: 1, url: 'https://example.com' }])),
-            sendMessage: jest.fn((id, msg, cb) => cb())
-          },
-          scripting: {
-            executeScript: jest.fn()
-          },
-          runtime: {
-            lastError: null
-          }
-        };
-        window.alert = jest.fn();
-        window.close = jest.fn();
-      });
+          })
+        }
+      },
+      tabs: {
+        query: jest.fn((query, cb) => cb([{ id: 1, url: 'https://example.com' }])),
+        sendMessage: jest.fn((id, msg, cb) => cb())
+      },
+      scripting: {
+        executeScript: jest.fn()
+      },
+      runtime: {
+        lastError: null
+      }
+    };
+    window.alert = jest.fn();
+    window.close = jest.fn();
+  });
 
-      afterEach(() => {
-        jest.resetModules();
-      });
+  afterEach(() => {
+    jest.resetModules();
+  });
 
-      it('covers missing url in tab query in updateButtonStates', () => {
-          global.chrome.tabs.query = jest.fn((query, cb) => cb([{ id: 1 }]));
-          require('./popup.js');
-          document.dispatchEvent(new Event('DOMContentLoaded'));
-      });
+  it('covers missing url in tab query in updateButtonStates', () => {
+    global.chrome.tabs.query = jest.fn((query, cb) => cb([{ id: 1 }]));
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+  });
 
-      it('covers missing host in toggleCurrentIn', () => {
-          require('./popup.js');
-          document.dispatchEvent(new Event('DOMContentLoaded'));
+  it('covers missing host in toggleCurrentIn', () => {
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
 
-          global.chrome.tabs.query = jest.fn((query, cb) => cb([{ id: 1, url: 'invalid:' }]));
+    global.chrome.tabs.query = jest.fn((query, cb) => cb([{ id: 1, url: 'invalid:' }]));
 
-          const btn = document.getElementById('addWhitelist');
-          btn.dispatchEvent(new MouseEvent('click'));
-      });
+    const btn = document.getElementById('addWhitelist');
+    btn.dispatchEvent(new MouseEvent('click'));
+  });
 
-      it('covers missing host in updateButtonStates', () => {
-          global.chrome.tabs.query = jest.fn((query, cb) => cb([{ id: 1, url: 'invalid:' }]));
-          require('./popup.js');
-          document.dispatchEvent(new Event('DOMContentLoaded'));
-      });
+  it('covers missing host in updateButtonStates', () => {
+    global.chrome.tabs.query = jest.fn((query, cb) => cb([{ id: 1, url: 'invalid:' }]));
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+  });
 });
 
 describe('popup.js very specific line', () => {
-    beforeEach(() => {
-        document.body.innerHTML = `
+  beforeEach(() => {
+    document.body.innerHTML = `
           <input type="checkbox" id="enabled" />
           <select id="mode">
             <option value="selective">Selective</option>
@@ -535,29 +565,29 @@ describe('popup.js very specific line', () => {
           <button id="picker"></button>
         `;
 
-        global.chrome = {
-            storage: {
-              sync: {
-                get: jest.fn((keys, cb) => cb({})),
-                set: jest.fn()
-              }
-            },
-            tabs: { query: jest.fn((q, cb) => cb([{ id: 1, url: 'http://example.com' }])) },
-            runtime: { lastError: null }
-        };
+    global.chrome = {
+      storage: {
+        sync: {
+          get: jest.fn((keys, cb) => cb({})),
+          set: jest.fn()
+        }
+      },
+      tabs: { query: jest.fn((q, cb) => cb([{ id: 1, url: 'http://example.com' }])) },
+      runtime: { lastError: null }
+    };
 
-        window.alert = jest.fn();
-        window.close = jest.fn();
-      });
+    window.alert = jest.fn();
+    window.close = jest.fn();
+  });
 
-      afterEach(() => {
-        jest.resetModules();
-      });
+  afterEach(() => {
+    jest.resetModules();
+  });
 
-      it('tests click when button exists but feature array misses toggle', () => {
-        // We will remove one toggle
-        document.getElementById('feature-cookieBanner').remove();
-        require('./popup.js');
-        document.dispatchEvent(new Event('DOMContentLoaded'));
-      });
+  it('tests click when button exists but feature array misses toggle', () => {
+    // We will remove one toggle
+    document.getElementById('feature-cookieBanner').remove();
+    require('../popup.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+  });
 });

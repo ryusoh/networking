@@ -1,5 +1,8 @@
 import unittest
 from unittest.mock import patch, MagicMock
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import monitor
 import socket
 
@@ -160,9 +163,10 @@ class TestMonitorMainBlock(unittest.TestCase):
         import runpy
         import sys
 
-        with patch.object(sys, 'argv', ['vps_kernel_proxy/monitor.py']):
+        monitor_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'monitor.py')
+        with patch.object(sys, 'argv', [monitor_path]):
             with patch('builtins.print') as mock_print:
-                runpy.run_path('vps_kernel_proxy/monitor.py', run_name='__main__')
+                runpy.run_path(monitor_path, run_name='__main__')
                 mock_print.assert_called_with("Usage: ./monitor.py [status|dns|block <ip>|block-domain <domain>]")
 
 if __name__ == '__main__':

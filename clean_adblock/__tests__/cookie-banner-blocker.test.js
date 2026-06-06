@@ -27,7 +27,10 @@ describe('Cookie Banner Blocker - Popup Blocking', () => {
   });
 
   function loadScript() {
-    const code = fs.readFileSync(path.resolve(__dirname, './cookie-popup-blocker-main.js'), 'utf8');
+    const code = fs.readFileSync(
+      path.resolve(__dirname, '../cookie-popup-blocker-main.js'),
+      'utf8'
+    );
     eval(code);
   }
 
@@ -80,7 +83,7 @@ describe('Cookie Banner Blocker - Direct CMP Auto-Dismiss', () => {
   });
 
   function loadScript() {
-    const code = fs.readFileSync(path.resolve(__dirname, './cookie-banner-blocker.js'), 'utf8');
+    const code = fs.readFileSync(path.resolve(__dirname, '../cookie-banner-blocker.js'), 'utf8');
     eval(code);
   }
 
@@ -205,7 +208,7 @@ describe('Cookie Banner Blocker - Gravity UI / Custom CMP consent popups', () =>
   });
 
   function loadScript() {
-    const code = fs.readFileSync(path.resolve(__dirname, './cookie-banner-blocker.js'), 'utf8');
+    const code = fs.readFileSync(path.resolve(__dirname, '../cookie-banner-blocker.js'), 'utf8');
     eval(code);
   }
 

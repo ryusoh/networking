@@ -14,7 +14,7 @@ describe('x-twitter-bird.js', () => {
   });
 
   it('injects style', () => {
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
     const style = document.getElementById('twitter-bird-style');
     expect(style).toBeTruthy();
     expect(style.textContent).toContain('display: none !important');
@@ -22,7 +22,7 @@ describe('x-twitter-bird.js', () => {
 
   it('updates favicon and title', () => {
     document.title = 'X';
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
 
     expect(document.title).toBe('Twitter');
     const link = document.querySelector('link[rel="shortcut icon"]');
@@ -32,7 +32,7 @@ describe('x-twitter-bird.js', () => {
 
   it('updates title with postfix', () => {
     document.title = 'Some page / X';
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
 
     expect(document.title).toBe('Some page / Twitter');
   });
@@ -43,25 +43,25 @@ describe('x-twitter-bird.js', () => {
     link.href = 'https://example.com/favicon.ico';
     document.head.appendChild(link);
 
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
 
     expect(link.href).toBe('chrome-extension://123/assets/twitter.png');
   });
 
   it('bails out when chrome is not defined', () => {
     delete global.chrome;
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
   });
 
   it('updates title when title ends with / X', () => {
     document.title = 'Hello / X';
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
     expect(document.title).toBe('Hello / Twitter');
   });
 
   it('observes DOM changes and updates when title changes', (done) => {
     document.title = 'Some page';
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
     done();
   });
 
@@ -69,7 +69,7 @@ describe('x-twitter-bird.js', () => {
     const OriginalHead = document.head;
     const fakeHead = document.createElement('head');
     Object.defineProperty(document, 'head', { value: null, configurable: true });
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
     Object.defineProperty(document, 'head', { value: fakeHead, configurable: true });
     const event = new Event('DOMContentLoaded');
     document.dispatchEvent(event);
@@ -85,9 +85,11 @@ describe('x-twitter-bird.js', () => {
       }
       observe() {}
     };
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
     document.title = 'X';
-    if (cb) {cb();}
+    if (cb) {
+      cb();
+    }
     expect(document.title).toBe('Twitter');
     global.MutationObserver = OriginalObserver;
   });
@@ -95,7 +97,7 @@ describe('x-twitter-bird.js', () => {
   it('covers document.head null but document.documentElement present', () => {
     const OriginalHead = document.head;
     Object.defineProperty(document, 'head', { value: null, configurable: true });
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
     Object.defineProperty(document, 'head', { value: OriginalHead, configurable: true });
   });
 
@@ -120,7 +122,7 @@ describe('x-twitter-bird.js', () => {
       configurable: true
     });
 
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
 
     Object.defineProperty(document, 'head', { value: OriginalHead, configurable: true });
     Object.defineProperty(document, 'documentElement', {
@@ -134,7 +136,7 @@ describe('x-twitter-bird.js', () => {
     link.rel = 'icon';
     link.href = 'chrome-extension://123/assets/twitter.png';
     document.head.appendChild(link);
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
   });
 
   it('binds to DOMContentLoaded if head not ready', () => {
@@ -142,7 +144,7 @@ describe('x-twitter-bird.js', () => {
     Object.defineProperty(document, 'head', { value: null, configurable: true });
 
     jest.resetModules();
-    require('./x-twitter-bird.js');
+    require('../x-twitter-bird.js');
 
     Object.defineProperty(document, 'head', { value: origHead, configurable: true });
 

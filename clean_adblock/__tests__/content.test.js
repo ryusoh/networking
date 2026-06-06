@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 describe('Clean AdBlock Content Script', () => {
-  const contentScriptPath = path.resolve(__dirname, './content.js');
+  const contentScriptPath = path.resolve(__dirname, '../content.js');
 
   beforeEach(() => {
     // Clear the chrome global and other state

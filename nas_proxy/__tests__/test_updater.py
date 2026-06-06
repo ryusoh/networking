@@ -3,7 +3,7 @@ from unittest.mock import patch, mock_open, MagicMock
 import os
 import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from nas_proxy import updater
 
 class TestUpdater(unittest.TestCase):

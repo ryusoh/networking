@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 import os
 import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from nas_proxy import tile_cache
 
 class TestTileCache(unittest.TestCase):
