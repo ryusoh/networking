@@ -28,9 +28,12 @@ lan_scanner
 wol
 netmon
 speedtest
+# Testing and Python Artifacts
+__pycache__/
+*/__pycache__/*
+*.pyc
+.coverage
 coverage/
 *.gcov
 *.gcda
 *.gcno
-.coverage
-*/__pycache__/*

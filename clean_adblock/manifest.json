@@ -68,7 +68,8 @@
         "*://*.google.co.jp/*",
         "*://*.google.co.in/*",
         "*://*.bing.com/*",
-        "*://*.duckduckgo.com/*"
+        "*://*.duckduckgo.com/*",
+        "*://*.nvidia.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
@@ -88,7 +89,8 @@
         "*://*.google.co.jp/*",
         "*://*.google.co.in/*",
         "*://*.bing.com/*",
-        "*://*.duckduckgo.com/*"
+        "*://*.duckduckgo.com/*",
+        "*://*.nvidia.com/*"
       ],
       "js": ["cookie-banner-blocker.js"],
       "run_at": "document_start"
@@ -108,7 +110,8 @@
         "*://*.google.co.jp/*",
         "*://*.google.co.in/*",
         "*://*.bing.com/*",
-        "*://*.duckduckgo.com/*"
+        "*://*.duckduckgo.com/*",
+        "*://*.nvidia.com/*"
       ],
       "js": ["cookie-popup-blocker-main.js"],
       "run_at": "document_start",
@@ -129,7 +132,8 @@
         "*://*.google.co.jp/*",
         "*://*.google.co.in/*",
         "*://*.bing.com/*",
-        "*://*.duckduckgo.com/*"
+        "*://*.duckduckgo.com/*",
+        "*://*.nvidia.com/*"
       ],
       "js": ["forum-ad-blocker.js"],
       "run_at": "document_start"
