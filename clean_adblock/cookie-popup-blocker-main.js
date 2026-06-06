@@ -18,7 +18,9 @@
     'youtube.com',
     'nasdaq.com',
     'fintel.io',
-    'xueqiu.com'
+    'xueqiu.com',
+    'wsj.com',
+    'nvidia.com'
   ];
   const host = window.location.hostname;
   if (SKIP_HOSTS.some((d) => host === d || host.endsWith('.' + d))) {

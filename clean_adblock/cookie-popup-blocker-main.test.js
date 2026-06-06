@@ -36,4 +36,25 @@ describe('cookie-popup-blocker-main.js', () => {
     window.open('https://example.com/cookie-notice');
     expect(mockOpen).toHaveBeenCalledWith('https://example.com/cookie-notice');
   });
+
+  it('window.open handles non string url', () => {
+    const originalOpen = window.open;
+    window.open = jest.fn().mockReturnValue('original');
+    require('./cookie-popup-blocker-main.js');
+    expect(window.open(null)).toBe('original');
+    expect(window.open({})).toBe('original');
+    window.open = originalOpen;
+  });
+
+  it('allows object urls without throwing', () => {
+    require('./cookie-popup-blocker-main.js');
+    window.open({ url: 'https://example.com/cookie-notice' });
+    expect(mockOpen).toHaveBeenCalledWith({ url: 'https://example.com/cookie-notice' });
+  });
+
+  it('allows null urls', () => {
+    require('./cookie-popup-blocker-main.js');
+    window.open(null);
+    expect(mockOpen).toHaveBeenCalledWith(null);
+  });
 });
