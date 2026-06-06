@@ -133,3 +133,27 @@ describe('x-twitter-bird.js', () => {
     require('./x-twitter-bird.js');
   });
 });
+
+  it('bails if no chrome', () => {
+    const origChrome = global.chrome;
+    delete global.chrome;
+    require('./x-twitter-bird.js');
+    global.chrome = origChrome;
+  });
+
+  it('binds to DOMContentLoaded if head not ready', () => {
+    // temporarily remove document.head to cover the else branch
+    const origHead = document.head;
+    Object.defineProperty(document, 'head', { value: null, configurable: true });
+
+    // reset modules to run it again
+    jest.resetModules();
+    require('./x-twitter-bird.js');
+
+    Object.defineProperty(document, 'head', { value: origHead, configurable: true });
+
+    // dispatch DOMContentLoaded
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+  });
