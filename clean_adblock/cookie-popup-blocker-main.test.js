@@ -45,4 +45,16 @@ describe('cookie-popup-blocker-main.js', () => {
     expect(window.open({})).toBe('original');
     window.open = originalOpen;
   });
+
+  it('allows object urls without throwing', () => {
+    require('./cookie-popup-blocker-main.js');
+    window.open({ url: 'https://example.com/cookie-notice' });
+    expect(mockOpen).toHaveBeenCalledWith({ url: 'https://example.com/cookie-notice' });
+  });
+
+  it('allows null urls', () => {
+    require('./cookie-popup-blocker-main.js');
+    window.open(null);
+    expect(mockOpen).toHaveBeenCalledWith(null);
+  });
 });

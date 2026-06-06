@@ -37,7 +37,9 @@
     'google.de',
     'google.fr',
     'google.co.jp',
-    'google.co.in'
+    'google.co.in',
+    'wsj.com',
+    'nvidia.com'
   ];
   const host = window.location.hostname;
   if (EXCLUDED_DOMAINS.some((d) => host === d || host.endsWith('.' + d))) {
@@ -150,6 +152,52 @@
     #gateway-content,
     [data-testid="onsite-messaging-unit-gateway"],
 
+    /* BuySellAds (BSA) — used by hedgefollow.com and others */
+    div[id^="bsa-zone"],
+    div[class*="bsa-zone"],
+    div[id*="_bsa_"],
+    .bsa_it_ad,
+    .bsa_it_p,
+    .bsa_it_i,
+    .bsa_sticky,
+    [id*="buysellads"],
+    [class*="buysellads"],
+
+    /* Google DV360 / DoubleClick display ads */
+    a[id^="img_anch_"],
+    a[href*="adclick.g.doubleclick.net"],
+    a[href*="ad.doubleclick.net"],
+    img[src*="2mdn.net"],
+    img[src*="s0.2mdn.net"],
+    img[src*="simgad"],
+    div:has(> a[href*="adclick.g.doubleclick.net"]),
+    div:has(> a[id^="img_anch_"]),
+
+    /* PubNation / Mediavine / Google SafeFrame ad units */
+    .ad_gutter,
+    .ad_gutter_left,
+    .ad_gutter_right,
+    #ad_gutter_left,
+    #ad_gutter_right,
+    .adunitwrapper,
+    .adunit,
+    [id*="_btf_wrapper"],
+    [id*="_atf_wrapper"],
+    [data-wrapper*="sidebar_btf"],
+    [data-wrapper*="sidebar_atf"],
+    [data-wrapper*="leaderboard"],
+    [data-wrapper*="content_btf"],
+    .ahover,
+    .upo-label,
+    mv-ad-reporter,
+    [data-offering-name="pubnation"],
+    [data-offering-domain="pubnation.com"],
+    [data-google-query-id],
+    [data-slot-rendered-gutteratf],
+    iframe[id*="google_ads_iframe_"],
+    iframe[src*="safeframe.googlesyndication.com"],
+    iframe[src*="upapi=true"],
+
     /* Sticky/floating ads */
     [id*="sticky-ad"],
     [class*="sticky-ad"],
@@ -218,6 +266,17 @@
     'admiral-media.com',
     'admiral.mgr.consensu.org',
     'admiralcdn.com',
+    'cdn.buysellads.com',
+    'srv.buysellads.com',
+    's.buysellads.com',
+    'cdn4.buysellads.net',
+    'pubnation.com',
+    'scripts.mediavine.com',
+    'ads.mediavine.com',
+    'ad.doubleclick.net',
+    'adclick.g.doubleclick.net',
+    's0.2mdn.net',
+    'tpc.googlesyndication.com',
     'cdn.taboola.com',
     'trc.taboola.com',
     'api.taboola.com',
@@ -370,7 +429,40 @@
     '[class*="banner-ad"]',
     '[id*="banner-ad"]',
     '[id*="sticky-ad"]',
-    '[class*="sticky-ad"]'
+    '[class*="sticky-ad"]',
+
+    // BuySellAds (BSA)
+    'div[id^="bsa-zone"]',
+    'div[class*="bsa-zone"]',
+    '.bsa_it_ad',
+    '.bsa_it_p',
+    '.bsa_sticky',
+    '[id*="buysellads"]',
+
+    // Google DV360 / DoubleClick display ads
+    'a[id^="img_anch_"]',
+    'a[href*="adclick.g.doubleclick.net"]',
+    'a[href*="ad.doubleclick.net"]',
+    'img[src*="2mdn.net"]',
+    'img[src*="simgad"]',
+
+    // PubNation / Mediavine ad units
+    '.ad_gutter',
+    '#ad_gutter_left',
+    '#ad_gutter_right',
+    '.adunitwrapper',
+    '.adunit',
+    '[id*="_btf_wrapper"]',
+    '[id*="_atf_wrapper"]',
+    '.ahover',
+    '.upo-label',
+    'mv-ad-reporter',
+    '[data-offering-name="pubnation"]',
+    '[data-google-query-id]',
+    '[data-slot-rendered-gutteratf]',
+    'iframe[id*="google_ads_iframe_"]',
+    'iframe[src*="safeframe.googlesyndication.com"]',
+    'iframe[src*="upapi=true"]'
   ];
 
   const processedElements = new WeakSet();
@@ -431,6 +523,42 @@
         }
       }
     });
+
+    // Hide DoubleClick / DV360 display ads and their containers
+    // These are often injected dynamically by BSA or GPT into ad zones
+    const dcSelectors = [
+      'a[href*="adclick.g.doubleclick.net"]',
+      'a[href*="ad.doubleclick.net"]',
+      'a[id^="img_anch_"]',
+      'img[src*="2mdn.net"]',
+      'img[src*="simgad"]'
+    ];
+    for (const sel of dcSelectors) {
+      document.querySelectorAll(sel).forEach((el) => {
+        // Walk up to the nearest BSA zone or ad-sized container
+        let target = el;
+        let parent = el.parentElement;
+        for (let i = 0; i < 10 && parent && parent !== document.body; i++) {
+          const id = parent.id || '';
+          const cls = parent.className || '';
+          if (
+            id.startsWith('bsa-zone') ||
+            cls.includes('bsa') ||
+            id.includes('buysellads') ||
+            id.includes('div-gpt-ad') ||
+            cls.includes('ad-container') ||
+            cls.includes('ad-slot') ||
+            cls.includes('ad-unit')
+          ) {
+            target = parent;
+            break;
+          }
+          target = parent;
+          parent = parent.parentElement;
+        }
+        hideAd(target);
+      });
+    }
 
     // Hide Douban erebor redirect ad containers
     document.querySelectorAll('a[href*="erebor.douban.com"]').forEach((link) => {
