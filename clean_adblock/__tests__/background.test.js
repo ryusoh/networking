@@ -102,7 +102,6 @@ describe('background.js', () => {
     // In background.js, the cookies need to match the domain exactly.
     // It queries `chrome.cookies.getAll({ domain: '1point3acres.com' })`
     // and then calls `extendCookies()` which loops `SESSION_KEEP_DOMAINS` ('1point3acres.com', '.1point3acres.com')
-    // Wait, the promise might not resolve in time before assertions.
     chrome.cookies.getAll.mockResolvedValue([
       {
         name: 'saltkey',
