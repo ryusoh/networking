@@ -25,7 +25,8 @@
     "*://*.twitter.com/*",
     "*://*.instagram.com/*",
     "*://*.reddit.com/*",
-    "*://*.pinterest.com/*"
+    "*://*.pinterest.com/*",
+    "*://*.xiaohongshu.com/*"
   ],
   "declarative_net_request": {
     "rule_resources": [

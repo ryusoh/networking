@@ -294,6 +294,111 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 sessionKeepAlive();
 
 /**
+ * Session Keeper for xiaohongshu.com (Little Red Book)
+ * ----------------------------------------------------
+ * Same two-pronged approach as 1point3acres:
+ * 1. Extend cookie expiration — pushes expiry 30 days out
+ * 2. Heartbeat fetch — keeps the server-side session alive
+ *
+ * XHS forces re-login aggressively; these cookies are critical for auth.
+ */
+
+const XHS_DOMAINS = ['xiaohongshu.com', '.xiaohongshu.com'];
+const XHS_INTERVAL_MINS = 8;
+
+const XHS_AUTH_COOKIE_PATTERNS = [
+  'web_session',
+  'a1',
+  'webid',
+  'gid',
+  'customerclientid',
+  'xsecappid',
+  'acw_tc',
+  'websectiga',
+  'sec_poison_id'
+];
+
+function isXhsAuthCookie(name) {
+  const lower = name.toLowerCase();
+  return XHS_AUTH_COOKIE_PATTERNS.some((p) => lower.includes(p));
+}
+
+async function extendXhsCookies() {
+  const futureDate = Date.now() / 1000 + COOKIE_EXTEND_DAYS * 24 * 3600;
+
+  for (const domain of XHS_DOMAINS) {
+    try {
+      const cookies = await chrome.cookies.getAll({ domain });
+      for (const cookie of cookies) {
+        if (!isXhsAuthCookie(cookie.name)) {
+          continue;
+        }
+        if (cookie.session) {
+          continue;
+        }
+
+        try {
+          await chrome.cookies.set({
+            url: `https://www.xiaohongshu.com${cookie.path}`,
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path,
+            secure: cookie.secure,
+            httpOnly: cookie.httpOnly,
+            sameSite: cookie.sameSite || 'unspecified',
+            expirationDate: futureDate
+          });
+        } catch {
+          // httpOnly cookies may fail
+        }
+      }
+    } catch {
+      // Domain might have no cookies yet
+    }
+  }
+}
+
+async function xhsHeartbeat() {
+  try {
+    const resp = await fetch('https://www.xiaohongshu.com/api/sns/v1/system_service/config', {
+      method: 'GET',
+      credentials: 'include',
+      redirect: 'follow',
+      cache: 'no-store'
+    });
+    console.log(`[SessionKeeper] XHS heartbeat: HTTP ${resp.status}`);
+  } catch (e) {
+    console.warn('[SessionKeeper] XHS heartbeat failed:', e.message);
+  }
+}
+
+async function xhsSessionKeepAlive() {
+  try {
+    const cookies = await chrome.cookies.getAll({ domain: 'xiaohongshu.com' });
+    const hasAuth = cookies.some((c) => isXhsAuthCookie(c.name) && c.value);
+    if (!hasAuth) {
+      return;
+    }
+
+    await extendXhsCookies();
+    await xhsHeartbeat();
+    console.log('[SessionKeeper] XHS session refreshed');
+  } catch (e) {
+    console.warn('[SessionKeeper] XHS error:', e.message);
+  }
+}
+
+chrome.alarms.create('xhsSessionKeepAlive', { periodInMinutes: XHS_INTERVAL_MINS });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'xhsSessionKeepAlive') {
+    xhsSessionKeepAlive();
+  }
+});
+
+xhsSessionKeepAlive();
+
+/**
  * Tab Management: Auto-Close Annoying Update Pages
  */
 // URL path patterns that indicate a cookie/privacy notice popup
