@@ -1,6 +1,7 @@
 import sys
 import time
 from playwright.sync_api import sync_playwright
+from playwright_stealth import stealth_sync
 from rich.console import Console
 from rich.panel import Panel
 
@@ -21,6 +22,9 @@ def main():
         )
         
         page = browser.pages[0] if browser.pages else browser.new_page()
+        
+        # Cloak Playwright from xhs_as.js telemetry (hides navigator.webdriver, etc.)
+        stealth_sync(page)
         
         console.print("[cyan]Navigating to Xiaohongshu...[/cyan]")
         page.goto("https://www.xiaohongshu.com/")
