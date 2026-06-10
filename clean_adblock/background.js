@@ -323,6 +323,11 @@ function isXhsAuthCookie(name) {
   return XHS_AUTH_COOKIE_PATTERNS.some((p) => lower.includes(p));
 }
 
+// We check if the user is actually logged in by looking for core session cookies
+function hasXhsCoreAuth(cookies) {
+  return cookies.some((c) => (c.name === 'web_session' || c.name === 'a1') && c.value);
+}
+
 async function extendXhsCookies() {
   const futureDate = Date.now() / 1000 + COOKIE_EXTEND_DAYS * 24 * 3600;
 
@@ -330,9 +335,8 @@ async function extendXhsCookies() {
     try {
       const cookies = await chrome.cookies.getAll({ domain });
       for (const cookie of cookies) {
-        if (!isXhsAuthCookie(cookie.name)) {
-          continue;
-        }
+        // We extend ALL cookies because XHS frequently introduces new tracking/session cookies
+        // If we miss extending a new critical cookie, the session will drop after 1 day.
         if (cookie.session) {
           continue;
         }
@@ -361,13 +365,18 @@ async function extendXhsCookies() {
 
 async function xhsHeartbeat() {
   try {
-    const resp = await fetch('https://www.xiaohongshu.com/api/sns/v1/system_service/config', {
-      method: 'GET',
-      credentials: 'include',
-      redirect: 'follow',
-      cache: 'no-store'
-    });
-    console.log(`[SessionKeeper] XHS heartbeat: HTTP ${resp.status}`);
+    // Hit multiple standard endpoints instead of an API to avoid signature requirements
+    const urls = ['https://www.xiaohongshu.com/explore', 'https://www.xiaohongshu.com/'];
+
+    for (const url of urls) {
+      const resp = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        redirect: 'follow',
+        cache: 'no-store'
+      });
+      console.log(`[SessionKeeper] XHS heartbeat (${url}): HTTP ${resp.status}`);
+    }
   } catch (e) {
     console.warn('[SessionKeeper] XHS heartbeat failed:', e.message);
   }
@@ -376,8 +385,7 @@ async function xhsHeartbeat() {
 async function xhsSessionKeepAlive() {
   try {
     const cookies = await chrome.cookies.getAll({ domain: 'xiaohongshu.com' });
-    const hasAuth = cookies.some((c) => isXhsAuthCookie(c.name) && c.value);
-    if (!hasAuth) {
+    if (!hasXhsCoreAuth(cookies)) {
       return;
     }
 
