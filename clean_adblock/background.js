@@ -306,30 +306,15 @@ sessionKeepAlive();
 const XHS_DOMAINS = ['xiaohongshu.com', '.xiaohongshu.com'];
 const XHS_INTERVAL_MINS = 8;
 
-const XHS_AUTH_COOKIE_PATTERNS = [
-  'web_session',
-  'a1',
-  'webid',
-  'gid',
-  'customerclientid',
-  'xsecappid',
-  'acw_tc',
-  'websectiga',
-  'sec_poison_id'
-];
-
-function isXhsAuthCookie(name) {
-  const lower = name.toLowerCase();
-  return XHS_AUTH_COOKIE_PATTERNS.some((p) => lower.includes(p));
-}
-
 // We check if the user is actually logged in by looking for core session cookies
 function hasXhsCoreAuth(cookies) {
   return cookies.some((c) => (c.name === 'web_session' || c.name === 'a1') && c.value);
 }
 
+const XHS_COOKIE_EXTEND_DAYS = 365;
+
 async function extendXhsCookies() {
-  const futureDate = Date.now() / 1000 + COOKIE_EXTEND_DAYS * 24 * 3600;
+  const futureDate = Date.now() / 1000 + XHS_COOKIE_EXTEND_DAYS * 24 * 3600;
 
   for (const domain of XHS_DOMAINS) {
     try {
@@ -405,6 +390,46 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 xhsSessionKeepAlive();
+
+// Real-time cookie enforcer for Xiaohongshu
+if (typeof chrome !== 'undefined' && chrome.cookies && chrome.cookies.onChanged) {
+  chrome.cookies.onChanged.addListener(async (changeInfo) => {
+    const { cookie, removed, cause } = changeInfo;
+
+    if (removed || cause === 'evicted' || cause === 'expired_overwrite') {
+      return;
+    }
+    if (!cookie.domain.includes('xiaohongshu.com')) {
+      return;
+    }
+    if (cookie.session) {
+      return;
+    }
+
+    const futureDate = Date.now() / 1000 + XHS_COOKIE_EXTEND_DAYS * 24 * 3600;
+    // Prevent infinite loop if we just extended it
+    if (cookie.expirationDate && cookie.expirationDate > futureDate - 24 * 3600) {
+      return;
+    }
+
+    try {
+      await chrome.cookies.set({
+        url: `https://www.xiaohongshu.com${cookie.path}`,
+        name: cookie.name,
+        value: cookie.value,
+        domain: cookie.domain,
+        path: cookie.path,
+        secure: cookie.secure,
+        httpOnly: cookie.httpOnly,
+        sameSite: cookie.sameSite || 'unspecified',
+        expirationDate: futureDate
+      });
+      console.log(`[SessionKeeper] Real-time extended XHS cookie: ${cookie.name}`);
+    } catch (e) {
+      // Ignore httpOnly or permission failures
+    }
+  });
+}
 
 /**
  * Tab Management: Auto-Close Annoying Update Pages

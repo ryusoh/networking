@@ -217,6 +217,11 @@
       "matches": ["*://*.twitch.tv/*"],
       "js": ["twitch-ad-blocker.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["*://*.xiaohongshu.com/*"],
+      "js": ["xhs-keepalive.js"],
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
