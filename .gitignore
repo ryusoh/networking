@@ -28,6 +28,7 @@ lan_scanner
 wol
 netmon
 speedtest
+nas_proxy/out/
 # Testing and Python Artifacts
 __pycache__/
 */__pycache__/*
@@ -37,3 +38,4 @@ coverage/
 *.gcov
 *.gcda
 *.gcno
+coverage.info
