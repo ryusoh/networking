@@ -15,7 +15,7 @@ describe('cookie-popup-blocker-main.js', () => {
   });
 
   it('blocks cookie popup URLs', () => {
-    require('./cookie-popup-blocker-main.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'cookie-popup-blocker-main.js'), 'utf8'); eval(code);
 
     expect(window.open('https://example.com/cookie-notice')).toBeNull();
     expect(window.open('https://example.com/privacy-policy/cookie')).toBeNull();
@@ -23,7 +23,7 @@ describe('cookie-popup-blocker-main.js', () => {
   });
 
   it('allows non-cookie URLs', () => {
-    require('./cookie-popup-blocker-main.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'cookie-popup-blocker-main.js'), 'utf8'); eval(code);
 
     window.open('https://example.com/about');
     expect(mockOpen).toHaveBeenCalledWith('https://example.com/about');
@@ -31,7 +31,7 @@ describe('cookie-popup-blocker-main.js', () => {
 
   it('skips skip hosts', () => {
     window.location = new URL('https://twitter.com');
-    require('./cookie-popup-blocker-main.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'cookie-popup-blocker-main.js'), 'utf8'); eval(code);
 
     window.open('https://example.com/cookie-notice');
     expect(mockOpen).toHaveBeenCalledWith('https://example.com/cookie-notice');

@@ -28,3 +28,7 @@ lan_scanner
 wol
 netmon
 speedtest
+nas_proxy/out/
+*.gcda
+*.gcno
+coverage.info

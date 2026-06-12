@@ -29,7 +29,7 @@ describe('picker.js', () => {
   });
 
   it('initializes and cleans up on Escape', () => {
-    require('./picker.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'picker.js'), 'utf8'); eval(code);
     expect(window.__bypassPickerActive).toBe(true);
 
     document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' }));
@@ -38,7 +38,7 @@ describe('picker.js', () => {
   });
 
   it('handles mouse move and highlights element', () => {
-    require('./picker.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'picker.js'), 'utf8'); eval(code);
 
     const el = document.createElement('div');
     el.getBoundingClientRect = jest.fn(() => ({ top: 10, left: 20, width: 100, height: 50 }));
@@ -55,7 +55,7 @@ describe('picker.js', () => {
   });
 
   it('handles click and saves selector by ID', () => {
-    require('./picker.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'picker.js'), 'utf8'); eval(code);
 
     const el = document.createElement('div');
     el.id = 'test-id';
@@ -76,7 +76,7 @@ describe('picker.js', () => {
   });
 
   it('handles click and saves selector by class', () => {
-    require('./picker.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'picker.js'), 'utf8'); eval(code);
 
     const el = document.createElement('div');
     el.className = 'test-class other-class';
@@ -97,7 +97,7 @@ describe('picker.js', () => {
   });
 
   it('handles click and saves selector by tag', () => {
-    require('./picker.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'picker.js'), 'utf8'); eval(code);
 
     const el = document.createElement('span');
     document.documentElement.appendChild(el);
@@ -118,7 +118,7 @@ describe('picker.js', () => {
 
   it('does nothing if no chrome.storage', () => {
     delete global.chrome;
-    require('./picker.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'picker.js'), 'utf8'); eval(code);
     expect(window.__bypassPickerActive).toBe(false);
   });
 });

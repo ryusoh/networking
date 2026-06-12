@@ -14,7 +14,7 @@ describe('x-twitter-bird.js', () => {
   });
 
   it('injects style', () => {
-    require('./x-twitter-bird.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'x-twitter-bird.js'), 'utf8'); eval(code);
     const style = document.getElementById('twitter-bird-style');
     expect(style).toBeTruthy();
     expect(style.textContent).toContain('display: none !important');
@@ -22,7 +22,7 @@ describe('x-twitter-bird.js', () => {
 
   it('updates favicon and title', () => {
     document.title = 'X';
-    require('./x-twitter-bird.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'x-twitter-bird.js'), 'utf8'); eval(code);
 
     expect(document.title).toBe('Twitter');
     const link = document.querySelector('link[rel="shortcut icon"]');
@@ -32,7 +32,7 @@ describe('x-twitter-bird.js', () => {
 
   it('updates title with postfix', () => {
     document.title = 'Some page / X';
-    require('./x-twitter-bird.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'x-twitter-bird.js'), 'utf8'); eval(code);
 
     expect(document.title).toBe('Some page / Twitter');
   });
@@ -43,7 +43,7 @@ describe('x-twitter-bird.js', () => {
     link.href = 'https://example.com/favicon.ico';
     document.head.appendChild(link);
 
-    require('./x-twitter-bird.js');
+    const code = require('fs').readFileSync(require('path').join(__dirname, 'x-twitter-bird.js'), 'utf8'); eval(code);
 
     expect(link.href).toBe('chrome-extension://123/assets/twitter.png');
   });
