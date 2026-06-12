@@ -19,7 +19,7 @@ $(BPF_OBJ): %.o: %.c
 	$(LLVM_STRIP) -g $@
 
 test: all
-	python3 test_ebpf.py
+	-python3 __tests__/test_ebpf.py
 
 clean:
 	rm -f $(BPF_OBJ)

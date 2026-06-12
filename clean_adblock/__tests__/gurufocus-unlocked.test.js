@@ -2,8 +2,8 @@ const fs = require('fs');
 const path = require('path');
 
 function loadScript() {
-  const code = fs.readFileSync(path.join(__dirname, 'gurufocus-unlocked.js'), 'utf8');
-  eval(fs.readFileSync(path.join(__dirname, 'gurufocus-unlocked.js'), 'utf8'));
+  const code = fs.readFileSync(path.join(__dirname, '..', 'gurufocus-unlocked.js'), 'utf8');
+  eval(code);
 }
 
 function setupLocation() {
@@ -517,40 +517,4 @@ describe('GuruFocus Unlocked - full forecast page simulation', () => {
     expect(el.style.filter).not.toContain('blur');
     expect(el.style.pointerEvents).not.toBe('none');
   });
-});
-
-describe('Auto Generated Coverage', () => {
-    beforeEach(() => {
-        document.documentElement.innerHTML = '';
-        jest.resetModules();
-        if (!global.chrome) {
-            global.chrome = {
-                storage: {
-                    sync: { get: jest.fn((k, cb) => cb({ enabled: true, preferredTab: 'finance' })) },
-                    local: { get: jest.fn((k, cb) => cb({ customSelectors: {} })) }
-                },
-                runtime: {
-                    onMessage: { addListener: jest.fn() },
-                    sendMessage: jest.fn()
-                }
-            };
-        }
-    });
-
-    test('coverage execution', () => {
-        jest.useFakeTimers();
-
-        document.body.innerHTML = '<div class="ad-container"><div id="ad1">Ad</div></div><div class="promoted">Promoted</div>';
-
-        jest.isolateModules(() => {
-            require('./gurufocus-unlocked.js');
-        });
-
-        const event = document.createEvent('Event');
-        event.initEvent('DOMContentLoaded', true, true);
-        document.dispatchEvent(event);
-
-        jest.advanceTimersByTime(10000);
-        expect(true).toBe(true);
-    });
 });

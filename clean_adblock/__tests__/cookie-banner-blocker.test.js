@@ -27,8 +27,11 @@ describe('Cookie Banner Blocker - Popup Blocking', () => {
   });
 
   function loadScript() {
-    const code = fs.readFileSync(path.resolve(__dirname, './cookie-popup-blocker-main.js'), 'utf8');
-    eval(fs.readFileSync(path.resolve(__dirname, './cookie-popup-blocker-main.js'), 'utf8'));
+    const code = fs.readFileSync(
+      path.resolve(__dirname, '../cookie-popup-blocker-main.js'),
+      'utf8'
+    );
+    eval(code);
   }
 
   describe('window.open cookie popup interception', () => {
@@ -80,9 +83,9 @@ describe('Cookie Banner Blocker - Direct CMP Auto-Dismiss', () => {
   });
 
   function loadScript() {
-  const code = fs.readFileSync(path.resolve(__dirname, './cookie-banner-blocker.js'), 'utf8');
-  eval(code);
-}
+    const code = fs.readFileSync(path.resolve(__dirname, '../cookie-banner-blocker.js'), 'utf8');
+    eval(code);
+  }
 
   test('should prefer reject over accept on OneTrust banner', () => {
     document.body.innerHTML = `
@@ -205,9 +208,9 @@ describe('Cookie Banner Blocker - Gravity UI / Custom CMP consent popups', () =>
   });
 
   function loadScript() {
-  const code = fs.readFileSync(path.resolve(__dirname, './cookie-banner-blocker.js'), 'utf8');
-  eval(code);
-}
+    const code = fs.readFileSync(path.resolve(__dirname, '../cookie-banner-blocker.js'), 'utf8');
+    eval(code);
+  }
 
   test('should click "Required only" on Gravity UI consent popup (gc-consent-popup)', () => {
     document.body.innerHTML = `
