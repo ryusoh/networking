@@ -29,10 +29,13 @@ wol
 netmon
 speedtest
 nas_proxy/out/
+# Testing and Python Artifacts
+__pycache__/
+*/__pycache__/*
+*.pyc
+.coverage
+coverage/
+*.gcov
 *.gcda
 *.gcno
 coverage.info
-coverage/
-__pycache__/
-*.pyc
-.coverage

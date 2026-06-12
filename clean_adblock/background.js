@@ -294,6 +294,144 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 sessionKeepAlive();
 
 /**
+ * Session Keeper for xiaohongshu.com (Little Red Book)
+ * ----------------------------------------------------
+ * Same two-pronged approach as 1point3acres:
+ * 1. Extend cookie expiration — pushes expiry 30 days out
+ * 2. Heartbeat fetch — keeps the server-side session alive
+ *
+ * XHS forces re-login aggressively; these cookies are critical for auth.
+ */
+
+const XHS_DOMAINS = ['xiaohongshu.com', '.xiaohongshu.com'];
+const XHS_INTERVAL_MINS = 8;
+
+// We check if the user is actually logged in by looking for core session cookies
+function hasXhsCoreAuth(cookies) {
+  return cookies.some((c) => (c.name === 'web_session' || c.name === 'a1') && c.value);
+}
+
+const XHS_COOKIE_EXTEND_DAYS = 365;
+
+async function extendXhsCookies() {
+  const futureDate = Date.now() / 1000 + XHS_COOKIE_EXTEND_DAYS * 24 * 3600;
+
+  for (const domain of XHS_DOMAINS) {
+    try {
+      const cookies = await chrome.cookies.getAll({ domain });
+      for (const cookie of cookies) {
+        // We extend ALL cookies because XHS frequently introduces new tracking/session cookies
+        // If we miss extending a new critical cookie, the session will drop after 1 day.
+        if (cookie.session) {
+          continue;
+        }
+
+        try {
+          await chrome.cookies.set({
+            url: `https://www.xiaohongshu.com${cookie.path}`,
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path,
+            secure: cookie.secure,
+            httpOnly: cookie.httpOnly,
+            sameSite: cookie.sameSite || 'unspecified',
+            expirationDate: futureDate
+          });
+        } catch {
+          // httpOnly cookies may fail
+        }
+      }
+    } catch {
+      // Domain might have no cookies yet
+    }
+  }
+}
+
+async function xhsHeartbeat() {
+  try {
+    // Hit multiple standard endpoints instead of an API to avoid signature requirements
+    const urls = ['https://www.xiaohongshu.com/explore', 'https://www.xiaohongshu.com/'];
+
+    for (const url of urls) {
+      const resp = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        redirect: 'follow',
+        cache: 'no-store'
+      });
+      console.log(`[SessionKeeper] XHS heartbeat (${url}): HTTP ${resp.status}`);
+    }
+  } catch (e) {
+    console.warn('[SessionKeeper] XHS heartbeat failed:', e.message);
+  }
+}
+
+async function xhsSessionKeepAlive() {
+  try {
+    const cookies = await chrome.cookies.getAll({ domain: 'xiaohongshu.com' });
+    if (!hasXhsCoreAuth(cookies)) {
+      return;
+    }
+
+    await extendXhsCookies();
+    await xhsHeartbeat();
+    console.log('[SessionKeeper] XHS session refreshed');
+  } catch (e) {
+    console.warn('[SessionKeeper] XHS error:', e.message);
+  }
+}
+
+chrome.alarms.create('xhsSessionKeepAlive', { periodInMinutes: XHS_INTERVAL_MINS });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'xhsSessionKeepAlive') {
+    xhsSessionKeepAlive();
+  }
+});
+
+xhsSessionKeepAlive();
+
+// Real-time cookie enforcer for Xiaohongshu
+if (typeof chrome !== 'undefined' && chrome.cookies && chrome.cookies.onChanged) {
+  chrome.cookies.onChanged.addListener(async (changeInfo) => {
+    const { cookie, removed, cause } = changeInfo;
+
+    if (removed || cause === 'evicted' || cause === 'expired_overwrite') {
+      return;
+    }
+    if (!cookie.domain.includes('xiaohongshu.com')) {
+      return;
+    }
+    if (cookie.session) {
+      return;
+    }
+
+    const futureDate = Date.now() / 1000 + XHS_COOKIE_EXTEND_DAYS * 24 * 3600;
+    // Prevent infinite loop if we just extended it
+    if (cookie.expirationDate && cookie.expirationDate > futureDate - 24 * 3600) {
+      return;
+    }
+
+    try {
+      await chrome.cookies.set({
+        url: `https://www.xiaohongshu.com${cookie.path}`,
+        name: cookie.name,
+        value: cookie.value,
+        domain: cookie.domain,
+        path: cookie.path,
+        secure: cookie.secure,
+        httpOnly: cookie.httpOnly,
+        sameSite: cookie.sameSite || 'unspecified',
+        expirationDate: futureDate
+      });
+      console.log(`[SessionKeeper] Real-time extended XHS cookie: ${cookie.name}`);
+    } catch (e) {
+      // Ignore httpOnly or permission failures
+    }
+  });
+}
+
+/**
  * Tab Management: Auto-Close Annoying Update Pages
  */
 // URL path patterns that indicate a cookie/privacy notice popup

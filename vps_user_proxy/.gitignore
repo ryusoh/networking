@@ -1,0 +1,4 @@
+# Credentials — NEVER commit these
+.env
+*.db
+credentials.txt

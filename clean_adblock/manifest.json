@@ -25,7 +25,8 @@
     "*://*.twitter.com/*",
     "*://*.instagram.com/*",
     "*://*.reddit.com/*",
-    "*://*.pinterest.com/*"
+    "*://*.pinterest.com/*",
+    "*://*.xiaohongshu.com/*"
   ],
   "declarative_net_request": {
     "rule_resources": [
@@ -68,7 +69,8 @@
         "*://*.google.co.jp/*",
         "*://*.google.co.in/*",
         "*://*.bing.com/*",
-        "*://*.duckduckgo.com/*"
+        "*://*.duckduckgo.com/*",
+        "*://*.nvidia.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
@@ -88,7 +90,8 @@
         "*://*.google.co.jp/*",
         "*://*.google.co.in/*",
         "*://*.bing.com/*",
-        "*://*.duckduckgo.com/*"
+        "*://*.duckduckgo.com/*",
+        "*://*.nvidia.com/*"
       ],
       "js": ["cookie-banner-blocker.js"],
       "run_at": "document_start"
@@ -108,7 +111,8 @@
         "*://*.google.co.jp/*",
         "*://*.google.co.in/*",
         "*://*.bing.com/*",
-        "*://*.duckduckgo.com/*"
+        "*://*.duckduckgo.com/*",
+        "*://*.nvidia.com/*"
       ],
       "js": ["cookie-popup-blocker-main.js"],
       "run_at": "document_start",
@@ -129,7 +133,8 @@
         "*://*.google.co.jp/*",
         "*://*.google.co.in/*",
         "*://*.bing.com/*",
-        "*://*.duckduckgo.com/*"
+        "*://*.duckduckgo.com/*",
+        "*://*.nvidia.com/*"
       ],
       "js": ["forum-ad-blocker.js"],
       "run_at": "document_start"
@@ -178,6 +183,12 @@
       "world": "MAIN"
     },
     {
+      "matches": ["*://*.wsj.com/*"],
+      "js": ["wsj-unlocked.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
       "matches": ["*://*.youtube.com/*"],
       "js": ["youtube-ad-blocker.js"],
       "run_at": "document_start"
@@ -206,6 +217,11 @@
       "matches": ["*://*.twitch.tv/*"],
       "js": ["twitch-ad-blocker.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["*://*.xiaohongshu.com/*"],
+      "js": ["xhs-keepalive.js"],
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
