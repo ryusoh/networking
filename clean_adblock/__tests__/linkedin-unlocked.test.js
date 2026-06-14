@@ -279,7 +279,9 @@ describe('linkedin-unlocked.js deep coverage', () => {
     let handleInterceptMock;
     const originalAddEventListener = document.addEventListener;
     jest.spyOn(document, 'addEventListener').mockImplementation((type, callback, options) => {
-      if (type === 'click') {handleInterceptMock = callback;}
+      if (type === 'click') {
+        handleInterceptMock = callback;
+      }
       originalAddEventListener.call(document, type, callback, options);
     });
 
