@@ -43,8 +43,19 @@ networking / browser tooling subprojects.
 - **It exits `0` even when the output looks alarming.** Don't judge it by eyeballing
   the log — check the exit code and the `Tests: N passed` / `ALL C TESTS PASSED` lines.
 - **The eBPF step is intentionally ignored** (`-@docker ...` in the Makefile). If
-  Docker/Colima isn't running you'll see `Error 1 (ignored)` — that is expected, not a
-  failure. Start Colima only if you specifically need the eBPF kernel tests.
+  Docker/Colima isn't running you'll see `test-ebpf ... Error N (ignored)` — that is
+  expected, not a failure. The exit code varies by cause (`Error 1` when the build
+  fails, `Error 125` when Docker itself is absent in CI); any `(ignored)` is fine.
+  Start Colima only if you specifically need the eBPF kernel tests.
+- **`curl_easy_perform() failed: Unsupported protocol`** in the nas_proxy run is
+  expected: `tests.c` deliberately feeds `fetch_tile_to_mmap` an `invalid://schema`
+  URL. curl rejecting it is the test exercising the error path, not a failure.
+- **The nas_proxy C tests are smoke tests, not assertion suites.** `[PASS]` /
+  `ALL C TESTS PASSED` are `printf`'d after each `test_*()` returns, so "PASS" mostly
+  means "didn't crash." Only a few cases actually `assert` (e.g. the `get_tile`
+  round-trip in `test_tile_storage`); `test_tile_fetcher` asserts nothing. When you
+  touch nas_proxy logic, add real `assert(...)`s — a green line alone won't catch a
+  regression.
 - jsdom prints **async `unhandled exception` stack traces** for errors thrown inside
   content-script code, even when the test that triggered them passes. Treat these as
   real bugs to fix (see below), but know they do not fail the suite by themselves.

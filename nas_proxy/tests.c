@@ -32,9 +32,9 @@ void test_tile_storage() {
 
     uint32_t len;
     void *res = get_tile(12345, &len);
-    if(res) {
-        memcmp(res, data, len);
-    }
+    assert(res != NULL);
+    assert(len == strlen(data));
+    assert(memcmp(res, data, len) == 0);
 
     res = get_tile_data(12346, &len);
 

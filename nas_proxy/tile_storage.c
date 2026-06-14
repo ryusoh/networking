@@ -53,7 +53,11 @@ int init_storage() {
     struct stat st;
     fstat(fd, &st);
     if (st.st_size < STORAGE_SIZE) {
-        ftruncate(fd, STORAGE_SIZE);
+        if (ftruncate(fd, STORAGE_SIZE) != 0) {
+            perror("Error sizing storage file");
+            close(fd);
+            return -1;
+        }
     }
 
     mapped_mem = mmap(NULL, STORAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
