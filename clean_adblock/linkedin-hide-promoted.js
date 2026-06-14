@@ -9,6 +9,11 @@
   'use strict';
 
   function hidePromoted() {
+    // The MutationObserver can fire asynchronously during page teardown/bfcache
+    // (or test environment teardown), when `document` is no longer available.
+    if (typeof document === 'undefined' || !document) {
+      return;
+    }
     // 1. Target specific "Promoted" links and paragraphs
     const adSelectors = [
       'a[data-testid="header-url"][href*="/ads/start"]',

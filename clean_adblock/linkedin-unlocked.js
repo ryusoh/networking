@@ -114,6 +114,11 @@
   // --- Layer 1: Proactive DOM Rewrite ---
 
   function proactivelyCleanLinks() {
+    // The MutationObserver can fire asynchronously during page teardown/bfcache
+    // (or test environment teardown), when `document` is no longer available.
+    if (typeof document === 'undefined' || !document) {
+      return;
+    }
     const cards = document.querySelectorAll(CARD_SELECTORS);
     cards.forEach((card) => {
       const premiumLinks = card.querySelectorAll('a[href*="premium"]');
