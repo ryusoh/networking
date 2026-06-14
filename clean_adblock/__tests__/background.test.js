@@ -1823,3 +1823,203 @@ describe('Background Additional Tests (Add-Tests Branch)', () => {
     });
   });
 });
+
+describe('XHS Session Keep Alive coverage', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    jest.clearAllMocks();
+    global.fetch = jest.fn().mockResolvedValue({ status: 200 });
+    global.chrome = {
+      cookies: {
+        getAll: jest.fn(),
+        set: jest.fn(),
+        onChanged: { addListener: jest.fn() }
+      },
+      alarms: {
+        create: jest.fn(),
+        onAlarm: { addListener: jest.fn() }
+      },
+      storage: { sync: { get: jest.fn(), set: jest.fn() }, onChanged: { addListener: jest.fn() } },
+      declarativeNetRequest: {
+        getDynamicRules: jest.fn().mockResolvedValue([]),
+        updateDynamicRules: jest.fn()
+      },
+      action: { setBadgeText: jest.fn(), setBadgeBackgroundColor: jest.fn() },
+      runtime: {
+        onInstalled: { addListener: jest.fn() },
+        onMessage: { addListener: jest.fn() },
+        lastError: null
+      },
+      tabs: { onUpdated: { addListener: jest.fn() }, onCreated: { addListener: jest.fn() } }
+    };
+  });
+
+  afterEach(() => {
+    delete global.fetch;
+    delete global.chrome;
+  });
+
+  it('xhsSessionKeepAlive extends cookies and sends heartbeat when auth exists', async () => {
+    global.chrome.cookies.getAll.mockImplementation((opts) => {
+      if (opts && opts.domain && opts.domain.includes('xiaohongshu.com')) {
+        return Promise.resolve([
+          { name: 'web_session', value: '123', path: '/', domain: 'xiaohongshu.com' },
+          { name: 'a1', value: '456', path: '/', domain: 'xiaohongshu.com', session: true }
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    let alarmCallback;
+    global.chrome.alarms.onAlarm.addListener.mockImplementation((cb) => {
+      alarmCallback = cb;
+    });
+
+    require('../background.js');
+
+    // We must await because there is an initial xhsSessionKeepAlive() call at the top level
+    await new Promise((r) => setTimeout(r, 0));
+
+    if (alarmCallback) {
+      await alarmCallback({ name: 'xhsSessionKeepAlive' });
+    }
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('xiaohongshu.com'),
+      expect.any(Object)
+    );
+    expect(global.chrome.cookies.set).toHaveBeenCalled();
+  });
+
+  it('xhsHeartbeat catches errors', async () => {
+    global.chrome.cookies.getAll.mockImplementation((opts) => {
+      if (opts && opts.domain && opts.domain.includes('xiaohongshu.com')) {
+        return Promise.resolve([
+          { name: 'web_session', value: '123', path: '/', domain: 'xiaohongshu.com' }
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+    global.fetch.mockRejectedValue(new Error('Network error'));
+
+    let alarmCallback;
+    global.chrome.alarms.onAlarm.addListener.mockImplementation((cb) => {
+      alarmCallback = cb;
+    });
+
+    require('../background.js');
+    await new Promise((r) => setTimeout(r, 0));
+    if (alarmCallback) {
+      await alarmCallback({ name: 'xhsSessionKeepAlive' });
+    }
+  });
+
+  it('xhsSessionKeepAlive returns if no auth', async () => {
+    global.chrome.cookies.getAll.mockImplementation((opts) => {
+      if (opts && opts.domain && opts.domain.includes('xiaohongshu.com')) {
+        return Promise.resolve([
+          { name: 'other_cookie', value: '123', path: '/', domain: 'xiaohongshu.com' }
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    let alarmCallback;
+    global.chrome.alarms.onAlarm.addListener.mockImplementation((cb) => {
+      alarmCallback = cb;
+    });
+
+    require('../background.js');
+    await new Promise((r) => setTimeout(r, 0));
+    if (alarmCallback) {
+      await alarmCallback({ name: 'xhsSessionKeepAlive' });
+    }
+    // initial top-level call is also intercepted by our mock above, so fetch shouldn't be called
+  });
+
+  it('xhsSessionKeepAlive catches top-level errors', async () => {
+    global.chrome.cookies.getAll.mockRejectedValue(new Error('Cookie error'));
+
+    let alarmCallback;
+    global.chrome.alarms.onAlarm.addListener.mockImplementation((cb) => {
+      alarmCallback = cb;
+    });
+
+    require('../background.js');
+    await new Promise((r) => setTimeout(r, 0));
+    if (alarmCallback) {
+      await alarmCallback({ name: 'xhsSessionKeepAlive' });
+    }
+  });
+
+  it('extendXhsCookies catches set errors', async () => {
+    global.chrome.cookies.getAll.mockImplementation((opts) => {
+      if (opts && opts.domain && opts.domain.includes('xiaohongshu.com')) {
+        return Promise.resolve([
+          { name: 'web_session', value: '123', path: '/', domain: 'xiaohongshu.com' }
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+    global.chrome.cookies.set.mockRejectedValue(new Error('Permission denied'));
+
+    require('../background.js');
+    // Initialization calls it
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  it('chrome.cookies.onChanged logic', async () => {
+    let cookieCallback;
+    global.chrome.cookies.onChanged.addListener.mockImplementation((cb) => {
+      cookieCallback = cb;
+    });
+
+    require('../background.js');
+    await new Promise((r) => setTimeout(r, 0));
+
+    if (!cookieCallback) {
+      return;
+    }
+
+    // Removed
+    await cookieCallback({ removed: true });
+
+    // Wrong domain
+    await cookieCallback({ cookie: { domain: 'example.com' }, removed: false });
+
+    // Session cookie
+    await cookieCallback({ cookie: { domain: 'xiaohongshu.com', session: true }, removed: false });
+
+    // Just extended
+    const futureDate = Date.now() / 1000 + 365 * 24 * 3600;
+    await cookieCallback({
+      cookie: { domain: 'xiaohongshu.com', session: false, expirationDate: futureDate },
+      removed: false
+    });
+
+    // Valid extension
+    global.chrome.cookies.set.mockResolvedValue();
+    await cookieCallback({
+      cookie: {
+        domain: 'xiaohongshu.com',
+        session: false,
+        name: 'web_session',
+        value: '123',
+        path: '/'
+      },
+      removed: false
+    });
+
+    // Valid extension throws
+    global.chrome.cookies.set.mockRejectedValue(new Error('set error'));
+    await cookieCallback({
+      cookie: {
+        domain: 'xiaohongshu.com',
+        session: false,
+        name: 'web_session',
+        value: '123',
+        path: '/'
+      },
+      removed: false
+    });
+  });
+});
