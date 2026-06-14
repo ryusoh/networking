@@ -19,6 +19,25 @@ networking / browser tooling subprojects.
 - `make precommit` — same but check-only (`fmt:check`, no writes). Use before committing.
 - `npm test` — Jest only. `npm run lint` / `npm run fmt:check` — JS lint/format.
 
+### System dependencies
+
+- The NAS C tests (`make -C nas_proxy test`, run by both precommit targets) compile
+  with `-lcurl`, so a fresh machine or CI runner needs the libcurl dev headers
+  (`libcurl4-openssl-dev` on Debian/Ubuntu). The same applies to `make build-nas-tools`
+  and several `bin/*.c` accelerators. macOS dev boxes already have it via the SDK.
+
+### CI
+
+- `.github/workflows/ci.yml` runs on push/PR to `main` and is just `make precommit`
+  (check-only) on `ubuntu-latest` — **the Makefile is the single source of truth**, so
+  add new checks to the `precommit`/`precommit-fix` targets, not to the workflow.
+- CI installs `libcurl4-openssl-dev` (see above); gcc/make come with the runner.
+- The eBPF step is a no-op in CI (no `ebpf-builder` Docker image) and stays green
+  because the Makefile ignores it (`-@`, see below).
+- **Not covered by CI/precommit:** the `*.py` test suites (`nas_proxy`, `retriever`,
+  `vps_kernel_proxy`, `nas_tools`) aren't wired into any `make` target. If you add a
+  `test-py` target, hang it off `precommit` so CI picks it up automatically.
+
 ### Reading `make precommit-fix` output (important)
 
 - **It exits `0` even when the output looks alarming.** Don't judge it by eyeballing

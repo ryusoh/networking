@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      NODE_VERSION: '24'
+      RUN_PRECOMMIT: 'true'
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: 'false'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # NAS C tests (make -C nas_proxy test) link against libcurl.
+      - name: Install system dependencies (NAS C tests)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev
+
+      - name: Show versions
+        run: |
+          node -v
+          npm -v
+          gcc --version
+          make --version
+
+      - name: Install Node dependencies
+        if: ${{ hashFiles('package.json') != '' }}
+        run: npm ci
+
+      # Single source of truth: Makefile precommit target (check-only).
+      # Any new checks added locally must be added to 'make precommit'.
+      # Note: the test-ebpf step requires a local Docker image (ebpf-builder)
+      # and is intentionally ignored in the Makefile, so it is a no-op in CI.
+      - name: Run precommit (single source of truth)
+        if: ${{ env.RUN_PRECOMMIT == 'true' }}
+        run: make precommit
