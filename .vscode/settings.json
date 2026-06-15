@@ -1,0 +1,8 @@
+{
+  "files.associations": {
+    ".coveragerc": "ini",
+    ".flake8": "ini",
+    ".pylintrc": "ini",
+    "*.cfg": "ini"
+  }
+}

@@ -8,6 +8,25 @@ import signal
 import time
 import socket
 
+
+def _icmp_available():
+    """True if this process can send ICMP echoes the way netmon/lan_scanner do:
+    an unprivileged SOCK_DGRAM ICMP socket, or root (raw socket fallback)."""
+    try:
+        socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_ICMP).close()
+        return True
+    except OSError:
+        return hasattr(os, "geteuid") and os.geteuid() == 0
+
+
+def _iface_exists(name):
+    """True if a network interface named `name` is present on this host."""
+    try:
+        return any(iface == name for _, iface in socket.if_nameindex())
+    except (OSError, AttributeError):
+        return False
+
+
 class TestNasTools(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -57,6 +76,7 @@ class TestNasTools(unittest.TestCase):
         self.assertIn("is not a known device or valid MAC", output)
         self.assertIn("Known devices:", output)
 
+    @unittest.skipUnless(_icmp_available(), "needs ICMP sockets (unprivileged ICMP or root)")
     def test_netmon_run(self):
         process = subprocess.Popen([os.path.join(self.bin_dir, "netmon"), "127.0.0.1", "-i", "1000"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(2)
@@ -84,6 +104,7 @@ class TestNasTools(unittest.TestCase):
         output = result.stdout + result.stderr
         self.assertIn("Usage:", output)
 
+    @unittest.skipUnless(_iface_exists("eth0"), "needs an 'eth0' interface (absent on macOS/most dev boxes)")
     def test_lan_scanner_run(self):
         process = subprocess.Popen([os.path.join(self.bin_dir, "lan_scanner"), "-i", "eth0"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(3)

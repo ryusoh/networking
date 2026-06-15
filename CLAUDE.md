@@ -46,12 +46,14 @@ networking / browser tooling subprojects.
   `requirements-dev.txt` (pytest + pytest-cov); gcc/make come with the runner.
 - The eBPF step is a no-op in CI (no `ebpf-builder` Docker image) and stays green
   because the Makefile ignores it (`-@`, see below).
-- **Python tests:** `make test-py` runs `nas_proxy`, `retriever`, and
-  `vps_kernel_proxy` (clean, fast unit suites). `nas_tools` is **deliberately
-  excluded** — even though `test_tools.py` now parses, its tests shell out to compiled
-  binaries (`wol`, `netmon`, `lan_scanner`, `speedtest`) and need raw sockets / a real
-  network interface (`eth0`), so they don't belong in a fast unit gate. To add it,
-  build those binaries first and guard the socket/interface tests so they skip in CI.
+- **Python tests:** `make test-py` runs `nas_proxy`, `retriever`, `vps_kernel_proxy`,
+  and `nas_tools`. The target first runs `make -C nas_tools all` to build the C
+  binaries (`wol`, `netmon`, `lan_scanner`, `speedtest`) the tests shell out to.
+- **`nas_tools` privileged tests self-skip** via `skipUnless` guards in
+  `test_tools.py`: `test_netmon_run` needs ICMP sockets (unprivileged ICMP or root),
+  `test_lan_scanner_run` needs an `eth0` interface. They run on Linux/CI and skip on
+  macOS (no `eth0`) without failing the suite. If you add another binary that needs
+  raw sockets or a specific interface, guard it the same way rather than excluding it.
 
 ### Reading `make precommit-fix` output (important)
 

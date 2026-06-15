@@ -30,13 +30,16 @@ test:
 	@npm run test:coverage
 
 # Python unit tests + coverage (term-missing), mirroring the Jest coverage report.
-# Scoped to the three importable packages with clean unit suites. nas_tools is
-# deliberately excluded: its tests shell out to compiled binaries and need raw
-# sockets / a real interface, and test_tools.py currently has a syntax error.
+# Coverage is scoped to the three importable packages (the source modules);
+# nas_tools contributes C-binary integration tests but no Python source to cover.
+# nas_tools' privileged tests (ICMP / eth0) self-skip when the host lacks the
+# prerequisites — see the skipUnless guards in nas_tools/__tests__/test_tools.py.
 PY ?= python3
 test-py:
+	@echo "Building nas_tools binaries (needed by its tests)..."
+	@$(MAKE) -C nas_tools all
 	@echo "Running Python Tests (pytest + coverage)..."
-	@$(PY) -m pytest nas_proxy retriever vps_kernel_proxy \
+	@$(PY) -m pytest nas_proxy retriever vps_kernel_proxy nas_tools \
 		-p no:cacheprovider \
 		--cov=nas_proxy --cov=retriever --cov=vps_kernel_proxy \
 		--cov-report=term-missing
