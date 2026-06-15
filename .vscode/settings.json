@@ -3,6 +3,9 @@
     ".coveragerc": "ini",
     ".flake8": "ini",
     ".pylintrc": "ini",
-    "*.cfg": "ini"
+    "*.cfg": "ini",
+    ".prettierignore": "ignore",
+    ".eslintignore": "ignore",
+    ".npmignore": "ignore"
   }
 }

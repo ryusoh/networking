@@ -29,6 +29,12 @@ networking / browser tooling subprojects.
   pytest (source modules only; test files/`__init__.py` omitted via the
   `[tool.coverage.run]` section in `pyproject.toml`).
   Neither enforces a threshold — they report, they don't gate.
+- **`make precommit` runs `fmt-check` (`prettier --check .`) first, and it scans the
+  whole tree.** Generated output dirs are excluded via `.prettierignore` (`coverage/`,
+  `.pytest_cache/`, `nas_proxy/out/`). If you add a reporter that writes files to disk
+  (e.g. an html/lcov coverage reporter) or any new generated dir, add it to
+  `.prettierignore` or the gate fails on a non-source file — a confusing
+  `fmt-check Error 1` that looks like a formatting bug but isn't.
 
 ### System dependencies
 

@@ -1,0 +1,7 @@
+# Generated / cache output. `make precommit` runs `fmt-check` (prettier --check .)
+# FIRST and scans the whole tree, so anything written here would otherwise fail
+# the gate on a non-source file (e.g. pytest's .pytest_cache/README.md, or an
+# html/lcov coverage reporter). Add new generated output dirs here.
+coverage/
+.pytest_cache/
+nas_proxy/out/
