@@ -7,7 +7,8 @@
     "lint:fix": "eslint . --fix",
     "fmt": "prettier --write .",
     "fmt:check": "prettier --check .",
-    "test": "jest"
+    "test": "jest",
+    "test:coverage": "jest --coverage"
   },
   "devDependencies": {
     "eslint": "^8.57.0",
@@ -19,6 +20,13 @@
     "testEnvironment": "jsdom",
     "setupFiles": [
       "<rootDir>/jest.setup.js"
+    ],
+    "collectCoverageFrom": [
+      "clean_adblock/*.js"
+    ],
+    "coverageReporters": [
+      "text",
+      "text-summary"
     ]
   }
 }

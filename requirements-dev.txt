@@ -1,0 +1,3 @@
+# Python dev/test dependencies (used by `make test-py` and CI).
+pytest>=8,<9
+pytest-cov>=6,<7

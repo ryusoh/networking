@@ -33,6 +33,7 @@ nas_proxy/out/
 __pycache__/
 */__pycache__/*
 *.pyc
+.pytest_cache/
 .coverage
 coverage/
 *.gcov

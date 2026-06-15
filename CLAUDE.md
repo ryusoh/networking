@@ -15,9 +15,20 @@ networking / browser tooling subprojects.
 
 ## Commands
 
-- `make precommit-fix` — fmt (Prettier write) + lint-fix (ESLint) + Jest + eBPF + NAS C tests.
+- `make precommit-fix` — fmt (Prettier write) + lint-fix (ESLint) + Jest + Python + eBPF + NAS C tests.
 - `make precommit` — same but check-only (`fmt:check`, no writes). Use before committing.
-- `npm test` — Jest only. `npm run lint` / `npm run fmt:check` — JS lint/format.
+- `npm test` — Jest only (no coverage). `npm run test:coverage` — Jest with the
+  per-file coverage report (`text` + `text-summary`); this is what `make test` runs.
+- `make test-py` — pytest + coverage (`--cov-report=term-missing`) for the Python
+  packages. `npm run lint` / `npm run fmt:check` — JS lint/format.
+
+### Coverage reports
+
+- Both `make precommit` and `precommit-fix` print a coverage table after the tests:
+  Jest (`clean_adblock/*.js`, scoped via `collectCoverageFrom` in `package.json`) and
+  pytest (source modules only; test files/`__init__.py` omitted via the
+  `[tool.coverage.run]` section in `pyproject.toml`).
+  Neither enforces a threshold — they report, they don't gate.
 
 ### System dependencies
 
@@ -31,12 +42,16 @@ networking / browser tooling subprojects.
 - `.github/workflows/ci.yml` runs on push/PR to `main` and is just `make precommit`
   (check-only) on `ubuntu-latest` — **the Makefile is the single source of truth**, so
   add new checks to the `precommit`/`precommit-fix` targets, not to the workflow.
-- CI installs `libcurl4-openssl-dev` (see above); gcc/make come with the runner.
+- CI installs `libcurl4-openssl-dev` (see above) plus Python deps from
+  `requirements-dev.txt` (pytest + pytest-cov); gcc/make come with the runner.
 - The eBPF step is a no-op in CI (no `ebpf-builder` Docker image) and stays green
   because the Makefile ignores it (`-@`, see below).
-- **Not covered by CI/precommit:** the `*.py` test suites (`nas_proxy`, `retriever`,
-  `vps_kernel_proxy`, `nas_tools`) aren't wired into any `make` target. If you add a
-  `test-py` target, hang it off `precommit` so CI picks it up automatically.
+- **Python tests:** `make test-py` runs `nas_proxy`, `retriever`, and
+  `vps_kernel_proxy` (clean, fast unit suites). `nas_tools` is **deliberately
+  excluded** — even though `test_tools.py` now parses, its tests shell out to compiled
+  binaries (`wol`, `netmon`, `lan_scanner`, `speedtest`) and need raw sockets / a real
+  network interface (`eth0`), so they don't belong in a fast unit gate. To add it,
+  build those binaries first and guard the socket/interface tests so they skip in CI.
 
 ### Reading `make precommit-fix` output (important)
 

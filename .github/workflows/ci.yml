@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NODE_VERSION: '24'
+      PYTHON_VERSION: '3.13'
       RUN_PRECOMMIT: 'true'
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -29,6 +30,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
       # NAS C tests (make -C nas_proxy test) link against libcurl.
       - name: Install system dependencies (NAS C tests)
         run: |
@@ -39,12 +45,19 @@ jobs:
         run: |
           node -v
           npm -v
+          python -V
           gcc --version
           make --version
 
       - name: Install Node dependencies
         if: ${{ hashFiles('package.json') != '' }}
         run: npm ci
+
+      # Python test/coverage deps for `make test-py` (pytest + pytest-cov).
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
 
       # Single source of truth: Makefile precommit target (check-only).
       # Any new checks added locally must be added to 'make precommit'.

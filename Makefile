@@ -1,5 +1,5 @@
 # Usage: make pull ID=<extension_id>
-.PHONY: pull precommit precommit-fix fmt fmt-check lint lint-fix install-dev test tm-repair
+.PHONY: pull precommit precommit-fix fmt fmt-check lint lint-fix install-dev test test-py tm-repair
 
 tm-repair:
 	@./bin/tm-repair
@@ -10,9 +10,9 @@ pull:
 install-dev:
 	@npm install
 
-precommit: fmt-check lint test test-ebpf test-nas
+precommit: fmt-check lint test test-py test-ebpf test-nas
 
-precommit-fix: fmt lint-fix test test-ebpf test-nas
+precommit-fix: fmt lint-fix test test-py test-ebpf test-nas
 
 fmt:
 	@npm run fmt
@@ -27,7 +27,19 @@ lint-fix:
 	@npm run lint:fix
 
 test:
-	@npm test
+	@npm run test:coverage
+
+# Python unit tests + coverage (term-missing), mirroring the Jest coverage report.
+# Scoped to the three importable packages with clean unit suites. nas_tools is
+# deliberately excluded: its tests shell out to compiled binaries and need raw
+# sockets / a real interface, and test_tools.py currently has a syntax error.
+PY ?= python3
+test-py:
+	@echo "Running Python Tests (pytest + coverage)..."
+	@$(PY) -m pytest nas_proxy retriever vps_kernel_proxy \
+		-p no:cacheprovider \
+		--cov=nas_proxy --cov=retriever --cov=vps_kernel_proxy \
+		--cov-report=term-missing
 
 test-ebpf:
 	@echo "Running eBPF Kernel Tests (via Docker)..."

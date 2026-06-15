@@ -1,0 +1,7 @@
+# Python tooling config. Coverage settings live here (read automatically by
+# coverage.py / pytest-cov) so `make test-py` reports source modules only.
+[tool.coverage.run]
+omit = [
+    "*/__tests__/*",
+    "*/__init__.py",
+]
