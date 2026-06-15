@@ -115,6 +115,23 @@ top-level observer, add the same guard.
 ### Tests
 
 - jsdom environment (configured in `package.json` jest config + `jest.setup.js`).
-- Tests load scripts via `require('../<script>.js')` or `eval(fs.readFileSync(...))`
+- Tests load scripts via `require('../<script>.js')` or by `eval`-ing the source
   inside `jest.isolateModules` / `jest.resetModules`. Each load creates a fresh
   observer that is never disconnected — hence the teardown guard above matters.
+- **Coverage for `eval`'d scripts:** plain `eval(fs.readFileSync(...))` runs
+  uninstrumented, so those files report **0%** even though the test exercises them
+  (Jest only instruments code that goes through its `require`/transform pipeline).
+  To get real numbers, instrument first:
+
+  ```js
+  const { instrumentFile } = require('./helpers/instrument');
+  const code = instrumentFile(require('path').join(__dirname, '..', 'foo.js'));
+  eval(code); // keep the eval in the test so the jsdom scope is unchanged
+  ```
+
+  `instrumentFile` (in `clean_adblock/__tests__/helpers/instrument.js`) instruments
+  with the same `__coverage__` global Jest's `babel` provider collects. Pass an
+  **absolute** path so the key matches `collectCoverageFrom`. Don't use it on a file
+  that's also `require`d elsewhere (double instrumentation). The `helpers/` dir is
+  excluded from test discovery via `testPathIgnorePatterns` and gets CommonJS globals
+  via an `eslint.config.cjs` override.

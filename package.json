@@ -21,6 +21,10 @@
     "setupFiles": [
       "<rootDir>/jest.setup.js"
     ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/__tests__/helpers/"
+    ],
     "collectCoverageFrom": [
       "clean_adblock/*.js"
     ],

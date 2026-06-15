@@ -5,6 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { instrumentFile } = require('./helpers/instrument');
 
 describe('Cookie Banner Blocker - Popup Blocking', () => {
   let originalOpen;
@@ -83,7 +84,7 @@ describe('Cookie Banner Blocker - Direct CMP Auto-Dismiss', () => {
   });
 
   function loadScript() {
-    const code = fs.readFileSync(path.resolve(__dirname, '../cookie-banner-blocker.js'), 'utf8');
+    const code = instrumentFile(path.resolve(__dirname, '../cookie-banner-blocker.js'));
     eval(code);
   }
 
@@ -208,7 +209,7 @@ describe('Cookie Banner Blocker - Gravity UI / Custom CMP consent popups', () =>
   });
 
   function loadScript() {
-    const code = fs.readFileSync(path.resolve(__dirname, '../cookie-banner-blocker.js'), 'utf8');
+    const code = instrumentFile(path.resolve(__dirname, '../cookie-banner-blocker.js'));
     eval(code);
   }
 

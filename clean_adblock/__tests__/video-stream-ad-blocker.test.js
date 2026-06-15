@@ -16,9 +16,9 @@ describe('video-stream-ad-blocker.js', () => {
   });
 
   it('loads without crashing', () => {
-    const code = require('fs').readFileSync(
-      require('path').join(__dirname, '..', 'video-stream-ad-blocker.js'),
-      'utf8'
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(
+      require('path').join(__dirname, '..', 'video-stream-ad-blocker.js')
     );
     eval(code);
   });

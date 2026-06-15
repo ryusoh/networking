@@ -1,8 +1,8 @@
-const fs = require('fs');
 const path = require('path');
+const { instrumentFile } = require('./helpers/instrument');
 
 function loadScript() {
-  const code = fs.readFileSync(path.join(__dirname, '..', 'gurufocus-unlocked.js'), 'utf8');
+  const code = instrumentFile(path.join(__dirname, '..', 'gurufocus-unlocked.js'));
   eval(code);
 }
 

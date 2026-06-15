@@ -16,10 +16,8 @@ describe('nytimes-unlocked.js', () => {
   });
 
   it('loads without crashing', () => {
-    const code = require('fs').readFileSync(
-      require('path').join(__dirname, '..', 'nytimes-unlocked.js'),
-      'utf8'
-    );
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'nytimes-unlocked.js'));
     eval(code);
   });
 });

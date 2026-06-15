@@ -1,5 +1,5 @@
-const fs = require('fs');
 const path = require('path');
+const { instrumentFile } = require('./helpers/instrument');
 
 describe('Clean AdBlock Content Script', () => {
   const contentScriptPath = path.resolve(__dirname, '../content.js');
@@ -12,7 +12,7 @@ describe('Clean AdBlock Content Script', () => {
   });
 
   function loadContentScript() {
-    const code = fs.readFileSync(contentScriptPath, 'utf8');
+    const code = instrumentFile(contentScriptPath);
     eval(code);
   }
 

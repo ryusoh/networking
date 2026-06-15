@@ -94,5 +94,16 @@ module.exports = [
     rules: {
       'no-undef': 'error'
     }
+  },
+  {
+    // CommonJS test-support modules (not test files themselves).
+    files: ['**/__tests__/helpers/**/*.js'],
+    languageOptions: {
+      globals: {
+        require: 'readonly',
+        module: 'readonly',
+        __dirname: 'readonly'
+      }
+    }
   }
 ];

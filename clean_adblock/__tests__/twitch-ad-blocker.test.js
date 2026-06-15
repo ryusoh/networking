@@ -16,10 +16,8 @@ describe('twitch-ad-blocker.js', () => {
   });
 
   it('loads without crashing', () => {
-    const code = require('fs').readFileSync(
-      require('path').join(__dirname, '..', 'twitch-ad-blocker.js'),
-      'utf8'
-    );
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'twitch-ad-blocker.js'));
     eval(code);
   });
 });
