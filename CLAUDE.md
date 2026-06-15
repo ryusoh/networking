@@ -60,6 +60,13 @@ networking / browser tooling subprojects.
   `test_lan_scanner_run` needs an `eth0` interface. They run on Linux/CI and skip on
   macOS (no `eth0`) without failing the suite. If you add another binary that needs
   raw sockets or a specific interface, guard it the same way rather than excluding it.
+- **`vps_kernel_proxy` eBPF compile test self-skips** too: `test_ebpf.py`'s
+  `test_compilation_success` only `make`s the `.bpf.o` objects when a real BPF
+  toolchain is present (Linux + `clang` + libbpf's `<bpf/bpf_helpers.h>`). A bare
+  `ubuntu-latest` runner has clang but **not** libbpf-dev, so it skips there rather
+  than failing — matching the "eBPF is Docker-only / intentionally ignored" stance.
+  Don't "fix" it by apt-installing a BPF toolchain in CI; the map-content tests
+  (which just read the `.bpf.c` source) still run everywhere.
 
 ### Reading `make precommit-fix` output (important)
 

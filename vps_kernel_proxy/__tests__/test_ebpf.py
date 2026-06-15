@@ -4,11 +4,32 @@ import os
 import sys
 from unittest.mock import patch, MagicMock
 
+
+def _bpf_toolchain_available():
+    """The .bpf.o objects need clang + libbpf headers (<bpf/bpf_helpers.h>).
+    A bare Linux runner (GitHub Actions) has clang but not libbpf-dev, so probe
+    for the header and skip the compile check when it's missing — matching the
+    project's 'eBPF is Docker-only / intentionally ignored' stance. The Docker
+    ebpf-builder image (or a box with libbpf-dev) has it, and the test runs there."""
+    clang = os.environ.get("CLANG", "clang")
+    try:
+        probe = subprocess.run(
+            [clang, "-target", "bpf", "-fsyntax-only", "-x", "c", "-"],
+            input="#include <bpf/bpf_helpers.h>\n",
+            capture_output=True,
+            text=True,
+        )
+        return probe.returncode == 0
+    except (FileNotFoundError, OSError):
+        return False
+
+
 class TestEBPFPrograms(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # We only compile if we are on Linux (e.g. inside Docker or a Linux runner)
-        cls.can_compile = sys.platform.startswith("linux")
+        # Compile only where the BPF toolchain actually exists: Linux + clang +
+        # libbpf headers (e.g. inside Docker ebpf-builder or a libbpf-dev box).
+        cls.can_compile = sys.platform.startswith("linux") and _bpf_toolchain_available()
         if cls.can_compile:
             cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             subprocess.run(["make", "clean"], capture_output=True, cwd=cwd)
@@ -19,7 +40,7 @@ class TestEBPFPrograms(unittest.TestCase):
     def test_compilation_success(self):
         """Verify that all programs compiled without errors."""
         if not self.can_compile:
-            self.skipTest("Skipping compilation check on non-Linux platform")
+            self.skipTest("BPF toolchain unavailable (need Linux + clang + libbpf headers)")
         self.assertEqual(self.make_result.returncode, 0, f"Compilation failed:\n{self.make_result.stderr}")
         
         expected_files = [
