@@ -1,6 +1,6 @@
 ---
 description: Ship a branch — fix quality failures, merge to main, and delete the branch
-argument-hint: "<branch_name>"
+argument-hint: '<branch_name>'
 ---
 
 You are tasked with shipping the branch: **$ARGUMENTS**.
