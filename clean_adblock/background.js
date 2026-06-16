@@ -425,7 +425,7 @@ if (typeof chrome !== 'undefined' && chrome.cookies && chrome.cookies.onChanged)
         expirationDate: futureDate
       });
       console.log(`[SessionKeeper] Real-time extended XHS cookie: ${cookie.name}`);
-    } catch (e) {
+    } catch {
       // Ignore httpOnly or permission failures
     }
   });

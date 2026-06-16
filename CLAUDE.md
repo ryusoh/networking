@@ -3,6 +3,8 @@
 Guidance for working in this repo (net-tools): a collection of independent
 networking / browser tooling subprojects.
 
+**See GEMINI.md for AI-specific workflows, dependency constraints (Jest pin), and multi-PR shipping strategies.**
+
 ## Layout
 
 - `clean_adblock/` — Chrome extension (Manifest V3). Per-site content scripts +

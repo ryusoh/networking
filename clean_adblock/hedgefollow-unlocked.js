@@ -46,7 +46,7 @@
       set() {},
       configurable: true
     });
-  } catch (e) {
+  } catch {
     /* already defined */
   }
 

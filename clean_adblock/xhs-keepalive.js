@@ -36,7 +36,7 @@ function sendHeartbeat() {
     }, 15000); // 15s fallback timeout
 
     document.body.appendChild(iframe);
-  } catch (e) {
+  } catch {
     // Suppress synchronous errors to protect vibe
   }
 }
