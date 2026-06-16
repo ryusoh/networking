@@ -1,7 +1,8 @@
 describe('hedgefollow-unlocked.js', () => {
   let originalWindowLocation;
   beforeEach(() => {
-    document.documentElement.innerHTML = '<html><head></head><body class="modal-open" style="overflow: hidden;"></body></html>';
+    document.documentElement.innerHTML =
+      '<html><head></head><body class="modal-open" style="overflow: hidden;"></body></html>';
 
     // Save original location
     originalWindowLocation = window.location;

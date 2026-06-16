@@ -29,12 +29,14 @@ describe('video-stream-ad-blocker.js', () => {
 
   it('runs and intercepts requests when on a video domain', () => {
     // Add offsetParent mocking
-    Object.defineProperty(HTMLElement.prototype, 'offsetParent', {
-      get() { return this.parentNode; }
+    Object.defineProperty(window.HTMLElement.prototype, 'offsetParent', {
+      get() {
+        return this.parentNode;
+      }
     });
 
     // Mock video.pause
-    HTMLVideoElement.prototype.pause = jest.fn();
+    window.HTMLVideoElement.prototype.pause = jest.fn();
 
     document.body.innerHTML = `
       <div class="ad-container"></div>
@@ -65,7 +67,9 @@ describe('video-stream-ad-blocker.js', () => {
     window.XMLHttpRequest.prototype = xhrMock;
 
     const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'video-stream-ad-blocker.js'));
+    const code = instrumentFile(
+      require('path').join(__dirname, '..', 'video-stream-ad-blocker.js')
+    );
     eval(code);
 
     document.dispatchEvent(new Event('DOMContentLoaded'));
@@ -84,7 +88,9 @@ describe('video-stream-ad-blocker.js', () => {
 
     // Test fetch interception
     window.fetch('https://doubleclick.net/ad');
-    expect(window.VideoStreamAdBlocker.blockedRequests.has('https://doubleclick.net/ad')).toBe(true);
+    expect(window.VideoStreamAdBlocker.blockedRequests.has('https://doubleclick.net/ad')).toBe(
+      true
+    );
 
     // Testing duplicate call returns false
     window.VideoStreamAdBlocker.blockAdRequest('https://doubleclick.net/ad');
@@ -115,13 +121,15 @@ describe('video-stream-ad-blocker.js', () => {
     newDiv.className = 'ad-container';
     document.body.appendChild(newDiv);
 
-    return new Promise(resolve => setTimeout(resolve, 100));
+    return new Promise((resolve) => setTimeout(resolve, 100));
   });
 
   it('does not run on non-video domains', () => {
     window.location.hostname = 'example.com';
     const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'video-stream-ad-blocker.js'));
+    const code = instrumentFile(
+      require('path').join(__dirname, '..', 'video-stream-ad-blocker.js')
+    );
     eval(code);
     expect(window.VideoStreamAdBlocker).toBeUndefined(); // Should return early
   });

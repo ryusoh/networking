@@ -21,8 +21,8 @@ describe('xhs-keepalive.js', () => {
     // An iframe should have been created
     const iframe = document.querySelector('iframe');
     if (iframe) {
-       // It might be cleaned up, but at least code ran without crash
-       iframe.onload && iframe.onload();
+      // It might be cleaned up, but at least code ran without crash
+      iframe.onload && iframe.onload();
     }
   });
 });

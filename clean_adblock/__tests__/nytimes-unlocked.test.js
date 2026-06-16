@@ -48,18 +48,26 @@ describe('nytimes-unlocked.js', () => {
       initialData: {
         data: {
           article: {
-             sprinkledBody: {
-               content: [
-                 {
-                   __typename: 'ParagraphBlock',
-                   content: [
-                     { __typename: 'TextInline', text: 'New content 1' },
-                     { __typename: 'TextInline', text: 'bold', formats: [{__typename: 'BoldFormat'}] },
-                     { __typename: 'TextInline', text: 'italic', formats: [{__typename: 'ItalicFormat'}] }
-                   ]
-                 }
-               ]
-             }
+            sprinkledBody: {
+              content: [
+                {
+                  __typename: 'ParagraphBlock',
+                  content: [
+                    { __typename: 'TextInline', text: 'New content 1' },
+                    {
+                      __typename: 'TextInline',
+                      text: 'bold',
+                      formats: [{ __typename: 'BoldFormat' }]
+                    },
+                    {
+                      __typename: 'TextInline',
+                      text: 'italic',
+                      formats: [{ __typename: 'ItalicFormat' }]
+                    }
+                  ]
+                }
+              ]
+            }
           }
         }
       }
@@ -75,12 +83,12 @@ describe('nytimes-unlocked.js', () => {
     expect(document.querySelector('article').hasAttribute('inert')).toBeFalsy();
 
     // Trigger scroll wheel
-    const event = new WheelEvent('wheel');
+    const event = new Event('wheel');
     window.dispatchEvent(event);
     window.scrollTo(0, 0); // test the intercept
-    window.scrollTo({top: 0, left: 0}); // test the intercept
+    window.scrollTo({ top: 0, left: 0 }); // test the intercept
 
     // Add wait to allow observer to detach/complete
-    return new Promise(resolve => setTimeout(resolve, 100));
+    return new Promise((resolve) => setTimeout(resolve, 100));
   });
 });
