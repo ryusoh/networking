@@ -11,7 +11,7 @@
     "test:coverage": "jest --coverage"
   },
   "devDependencies": {
-    "eslint": "^8.57.0",
+    "eslint": "^10.5.0",
     "jest": "^30.4.2",
     "jest-environment-jsdom": "^30.4.1",
     "prettier": "^3.8.4"
