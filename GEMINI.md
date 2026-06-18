@@ -46,3 +46,22 @@ beforeEach(() => {
 ```
 
 Avoid creating external helpers for this unless they are tested against the specific jsdom version constraints.
+
+## Agent Customizations vs. CLI Commands
+
+This workspace uses two separate systems for custom commands and agent behavior:
+
+1. **Gemini CLI Custom Slash Commands:**
+   - TOML files placed in `.gemini/commands/` (e.g., `retro.toml`, `ship.toml`) are automatically loaded by the Gemini CLI as interactive slash commands (e.g., `/retro`, `/ship`).
+   - **Do not** add `plugin.json` to `.gemini/` — it is not needed and will cause the CLI configuration directory to be mistakenly loaded as an agent plugin.
+2. **Agent Skills (Workspace Customizations):**
+   - If you want the AI agent (me) to be able to execute these workflows during a chat session, define them as **Skills** under the workspace customizations directory: `.agents/skills/<skill_name>/SKILL.md`.
+   - Each skill requires a `SKILL.md` file with a YAML frontmatter declaring `name` and `description` (used for triggering) and instructions in the markdown body.
+
+## Python Test Environment Setup
+
+- If python tests (`make test-py`) fail because of unrecognized coverage arguments (e.g., `--cov`), install the required development dependencies (pytest and pytest-cov):
+
+  ```bash
+  python3 -m pip install -r requirements-dev.txt --break-system-packages
+  ```
