@@ -13,7 +13,7 @@ Work through these steps:
    If the user passed a focus area, concentrate the retro on it.
 
 2. **Map each friction point to a durable fix.** For every item, decide where the knowledge belongs so it never has to be rediscovered:
-   - `GEMINI.md` (create one at repo root if it doesn't exist yet) for conventions, gotchas, how to run tests/lint/format, project layout, and per-subproject notes (this repo has many: clean_adblock, nas_proxy, retriever, vps_*, etc.).
+   - `GEMINI.md` (create one at repo root if it doesn't exist yet) for conventions, gotchas, how to run tests/lint/format, project layout, and per-subproject notes (this repo has many: clean*adblock, nas_proxy, retriever, vps*\*, etc.).
    - A new or updated `.gemini/commands/<name>.toml` for any multi-step prompt worth replaying on demand.
    - The relevant `docs/*.md` for domain/architecture knowledge.
    - Test fixtures, helpers, or `jest.setup.js` for repeated test scaffolding.
