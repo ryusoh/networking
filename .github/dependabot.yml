@@ -12,6 +12,11 @@ updates:
         update-types:
           - 'minor'
           - 'patch'
+    ignore:
+      - dependency-name: 'jest'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'jest-environment-jsdom'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: 'pip'
     directory: '/'
