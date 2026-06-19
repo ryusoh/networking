@@ -40,3 +40,4 @@ coverage/
 *.gcda
 *.gcno
 coverage.info
+venv/
