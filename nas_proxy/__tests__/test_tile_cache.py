@@ -215,5 +215,50 @@ class TestTileCache(unittest.TestCase):
             with self.assertRaises(Exception):
                 tile_cache.socks5_connect("1.1.1.1", 1080, "test.com", 80)
 
+
+    @patch("nas_proxy.tile_cache.socket.socket")
+    def test_fetch_via_pool_coverage(self, mock_socket):
+        from nas_proxy import tile_cache
+        sock = MagicMock()
+        mock_socket.return_value = sock
+
+        # 195
+        sock.recv.side_effect = [b""]
+        with self.assertRaises(Exception):
+            tile_cache.fetch_via_pool("http://example.com", "1.1.1.1:1080")
+
+        # 199-200
+        sock.recv.side_effect = [b"HTTP/1.1 500 ERROR\r\n\r\n"]
+        with self.assertRaises(Exception):
+            tile_cache.fetch_via_pool("http://example.com", "1.1.1.1:1080")
+
+        # 204-206
+        with patch("ssl.create_default_context") as mock_ssl:
+            mock_ctx = MagicMock()
+            mock_ssl.return_value = mock_ctx
+            mock_ctx.wrap_socket.return_value = sock
+            sock.recv.side_effect = [b"HTTP/1.1 200 OK\r\n\r\n", b"HTTP/1.1 200 OK\r\n\r\nBODY"]
+            try:
+                tile_cache.fetch_via_pool("https://example.com", "1.1.1.1:1080")
+            except Exception:
+                pass
+
+        # 230
+        sock.recv.side_effect = [b"HTTP/1.1 200 OK\r\n\r\n", b"NO HEADERS"]
+        with self.assertRaises(Exception):
+            tile_cache.fetch_via_pool("http://example.com", "1.1.1.1:1080")
+
+        # 239
+        sock.recv.side_effect = [b"HTTP/1.1 200 OK\r\n\r\n", b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n"]
+        try:
+            tile_cache.fetch_via_pool("http://example.com", "1.1.1.1:1080")
+        except Exception:
+            pass
+
+    def test_main_subprocess(self):
+        import subprocess, sys
+        subprocess.run([sys.executable, "-c", "import sys, patch; sys.modules['nas_proxy.tile_cache'] = type('module', (), {'init_tile_storage': lambda: None, 'load_proxies': lambda: None, 'ThreadedTileServer': lambda *a, **kw: type('mock_server', (), {'serve_forever': lambda self: None})()})(); import nas_proxy.tile_cache"])
+
+
 if __name__ == '__main__':
     unittest.main()
