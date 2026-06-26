@@ -1,5 +1,5 @@
 # Usage: make pull ID=<extension_id>
-.PHONY: pull precommit precommit-fix fmt fmt-check lint lint-fix install-dev test test-py tm-repair
+.PHONY: pull precommit precommit-fix fmt fmt-check lint lint-fix install-dev test test-py type tm-repair
 
 tm-repair:
 	@./bin/tm-repair
@@ -10,9 +10,9 @@ pull:
 install-dev:
 	@npm install
 
-precommit: fmt-check lint test test-py test-ebpf test-nas
+precommit: fmt-check lint type test test-py test-ebpf test-nas
 
-precommit-fix: fmt lint-fix test test-py test-ebpf test-nas
+precommit-fix: fmt lint-fix type test test-py test-ebpf test-nas
 
 fmt:
 	@npm run fmt
@@ -25,6 +25,13 @@ lint:
 
 lint-fix:
 	@npm run lint:fix
+
+# JS strict-typing via JSDoc (Typist lane). Non-blocking: it reports type errors
+# but does not gate, so the backlog Typist burns down stays visible without
+# breaking CI. When zero strict errors remain, drop the `|| echo` to make it
+# blocking (see .jules/typist.md).
+type:
+	@npx tsc -p jsconfig.json --noEmit || echo "make type: non-blocking JS type errors remain (Typist lane)"
 
 test:
 	@npm run test:coverage
