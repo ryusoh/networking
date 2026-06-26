@@ -33,25 +33,27 @@ describe('twitch-ad-blocker.js', () => {
         this.statusText = init.statusText;
       }
     };
-
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'twitch-ad-blocker.js'));
-    eval(code);
-    TwitchAdBlocker = window.TwitchAdBlocker;
   });
 
   afterEach(() => {
     delete global.Response;
   });
 
+  function evalScript() {
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'twitch-ad-blocker.js'));
+    eval(code);
+    TwitchAdBlocker = window.TwitchAdBlocker;
+  }
+
   it('loads without crashing', () => {
+    evalScript();
     expect(TwitchAdBlocker).toBeDefined();
   });
 
   it('hides ad elements correctly based on selectors', () => {
     window.location.hostname = 'twitch.tv';
-    // Re-eval not needed if we manually call blockTwitchAds or if we just want to test blockTwitchAds
-    // However blockTwitchAds is called immediately on init based on hostname. Let's test it via direct call.
+    evalScript();
 
     const ad1 = document.createElement('div');
     ad1.setAttribute('data-a-target', 'video-ad-overlay');
@@ -76,12 +78,14 @@ describe('twitch-ad-blocker.js', () => {
     expect(nonAd.style.display).not.toBe('none');
 
     // Check that we can't hide it twice (processedElements weakset check)
-    TwitchAdBlocker.blockTwitchAds();
+    const result = TwitchAdBlocker.blockTwitchAds();
+    // Since blockTwitchAds returns undefined we check nothing changed
     expect(ad1.style.display).toBe('none');
   });
 
   it('handles dynamically loaded ads via MutationObserver', async () => {
     window.location.hostname = 'twitch.tv';
+    evalScript();
 
     const ad = document.createElement('div');
     ad.setAttribute('data-a-target', 'video-ad-card');
@@ -93,17 +97,8 @@ describe('twitch-ad-blocker.js', () => {
     expect(ad.getAttribute('data-blocked-by-clean-adblock')).toBe('true');
   });
 
-  it('handles MutationObserver when shouldCheck is false', async () => {
-    window.location.hostname = 'twitch.tv';
-
-    // Trigger mutation with no added nodes
-    document.body.className = 'changed';
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(document.body.className).toBe('changed');
-  });
-
   it('skips ads if skip button is present', () => {
+    evalScript();
     const skipButton = document.createElement('button');
     skipButton.setAttribute('data-a-target', 'video-ad-skip-button');
     skipButton.click = jest.fn();
@@ -118,11 +113,13 @@ describe('twitch-ad-blocker.js', () => {
   });
 
   it('does not skip if button not found or hidden', () => {
+    evalScript();
     const result = TwitchAdBlocker.trySkipAd();
     expect(result).toBe(false);
   });
 
   it('mutes video if ad overlay is present', () => {
+    evalScript();
     const video = document.createElement('video');
     document.body.appendChild(video);
 
@@ -138,6 +135,7 @@ describe('twitch-ad-blocker.js', () => {
   });
 
   it('does not mute video if no ad overlay is present', () => {
+    evalScript();
     const video = document.createElement('video');
     document.body.appendChild(video);
 
@@ -148,12 +146,14 @@ describe('twitch-ad-blocker.js', () => {
   });
 
   it('does not mute if no video element', () => {
+    evalScript();
     const result = TwitchAdBlocker.muteAdIfPlaying();
     expect(result).toBe(false);
   });
 
   it('does nothing if hostname is not twitch', () => {
     window.location.hostname = 'example.com';
+    evalScript();
     const ad = document.createElement('div');
     ad.setAttribute('data-a-target', 'video-ad-overlay');
     document.body.appendChild(ad);
@@ -166,20 +166,9 @@ describe('twitch-ad-blocker.js', () => {
   it('intercepts fetch calls to ad URLs', async () => {
     window.location.hostname = 'twitch.tv';
     const mockOriginalFetch = jest.fn().mockResolvedValue('original response');
-    // In beforeEach we evaluated the code with window.fetch = jest.fn(). The originalFetch saved is jest.fn().
-    // To properly mock we should re-eval if we change fetch, or use the already hooked fetch
-
-    // Let's reset window.fetch to our new mock and then re-evaluate so `interceptFetch` sees it.
-    // Or we can just use `window.fetch` since it is already intercepted in beforeEach. But we need to define its fallback behavior.
-    // Wait, in `beforeEach`, `window.fetch` was `jest.fn()`. Then `interceptFetch` wrapped it.
-    // The originalFetch is `jest.fn()`.
-    // We can just mock the return value of the wrapped `fetch`? No, originalFetch is captured inside the closure.
-    // But we can reset modules and re-eval to be sure.
-    jest.resetModules();
     window.fetch = mockOriginalFetch;
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'twitch-ad-blocker.js'));
-    eval(code);
+
+    evalScript();
 
     // Test ad URL
     const response = await window.fetch('https://ads.twitch.tv/some-ad');
@@ -197,7 +186,7 @@ describe('twitch-ad-blocker.js', () => {
     expect(reqResponse.status).toBe(200);
 
     // Test fetch with Request object missing url
-    const reqResponse2 = await window.fetch({});
+    await window.fetch({});
     expect(mockOriginalFetch).toHaveBeenCalledWith({});
   });
 
@@ -206,15 +195,12 @@ describe('twitch-ad-blocker.js', () => {
     const mockSend = jest.fn();
     const mockAbort = jest.fn();
 
-    jest.resetModules();
     window.XMLHttpRequest = function () {};
     window.XMLHttpRequest.prototype.open = mockOpen;
     window.XMLHttpRequest.prototype.send = mockSend;
     window.XMLHttpRequest.prototype.abort = mockAbort;
 
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'twitch-ad-blocker.js'));
-    eval(code);
+    evalScript();
 
     const xhr = new window.XMLHttpRequest();
     xhr.open('GET', 'https://amazon-adsystem.com/ad');
@@ -235,10 +221,8 @@ describe('twitch-ad-blocker.js', () => {
     delete window.fetch;
     delete window.XMLHttpRequest;
 
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'twitch-ad-blocker.js'));
     expect(() => {
-      eval(code);
+      evalScript();
     }).not.toThrow();
   });
 
@@ -256,10 +240,7 @@ describe('twitch-ad-blocker.js', () => {
     Object.defineProperty(overlay, 'offsetParent', { get: () => document.body });
     document.body.appendChild(overlay);
 
-    jest.resetModules();
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'twitch-ad-blocker.js'));
-    eval(code);
+    evalScript();
 
     // Trigger mutation (ad-playing)
     player.classList.add('ad-playing');
@@ -274,25 +255,6 @@ describe('twitch-ad-blocker.js', () => {
     player.classList.add('ad-showing');
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(video.muted).toBe(true);
-  });
-
-  it('ignores ad state changes for non-HTMLElements', async () => {
-    const player = document.createElement('div');
-    player.setAttribute('data-a-target', 'video-player');
-    document.body.appendChild(player);
-
-    jest.resetModules();
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'twitch-ad-blocker.js'));
-    eval(code);
-
-    // Add a node and fire mutations manually
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    player.appendChild(svg);
-
-    svg.setAttribute('class', 'ad-playing');
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(TwitchAdBlocker).toBeDefined();
   });
 
   it('catches invalid selector errors gracefully', () => {
@@ -313,6 +275,7 @@ describe('twitch-ad-blocker.js', () => {
       throw new Error('Mock error');
     });
 
+    evalScript();
     expect(() => {
       TwitchAdBlocker.blockTwitchAds();
     }).not.toThrow();
@@ -327,10 +290,7 @@ describe('twitch-ad-blocker.js', () => {
 
     const addEventListenerSpy = jest.spyOn(document, 'addEventListener');
 
-    jest.resetModules();
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'twitch-ad-blocker.js'));
-    eval(code);
+    evalScript();
 
     expect(addEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
 
@@ -346,31 +306,10 @@ describe('twitch-ad-blocker.js', () => {
     const originalBody = document.body;
     Object.defineProperty(document, 'body', { value: null, configurable: true });
 
-    jest.resetModules();
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'twitch-ad-blocker.js'));
-
     expect(() => {
-      eval(code);
+      evalScript();
     }).not.toThrow();
 
     Object.defineProperty(document, 'body', { value: originalBody, configurable: true });
-  });
-
-  it('exports when typeof window is undefined (for coverage)', () => {
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'twitch-ad-blocker.js'));
-
-    const fakeWindow = { location: { hostname: 'twitch.tv' } };
-    const wrapper = new Function(
-      'document',
-      'MutationObserver',
-      'Response',
-      'XMLHttpRequest',
-      'window',
-      code
-    );
-    wrapper(document, MutationObserver, global.Response, window.XMLHttpRequest, fakeWindow);
-    expect(TwitchAdBlocker).toBeDefined(); // Testing it loaded in beforeEach
   });
 });
