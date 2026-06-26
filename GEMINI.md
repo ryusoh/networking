@@ -49,7 +49,7 @@ Avoid creating external helpers for this unless they are tested against the spec
 
 ## Agent Customizations vs. CLI Commands
 
-This workspace uses two separate systems for custom commands and agent behavior:
+This workspace uses three separate systems for custom commands and agent behavior:
 
 1. **Gemini CLI Custom Slash Commands:**
    - TOML files placed in `.gemini/commands/` (e.g., `retro.toml`, `ship.toml`) are automatically loaded by the Gemini CLI as interactive slash commands (e.g., `/retro`, `/ship`).
@@ -57,6 +57,9 @@ This workspace uses two separate systems for custom commands and agent behavior:
 2. **Agent Skills (Workspace Customizations):**
    - If you want the AI agent (me) to be able to execute these workflows during a chat session, define them as **Skills** under the workspace customizations directory: `.agents/skills/<skill_name>/SKILL.md`.
    - Each skill requires a `SKILL.md` file with a YAML frontmatter declaring `name` and `description` (used for triggering) and instructions in the markdown body.
+3. **Jules scheduled routines (unattended):**
+   - Separate from the two interactive systems above. These run unattended and open PRs; their shared contract is `AGENTS.md` (repo root) and their per-routine personas live in `.jules/<name>.md` (e.g. `testpilot`, `typist`).
+   - These persona files are **human-maintained, not logs** — the routines must never write to `.jules/`. See `CLAUDE.md` ("Automated agents") for the full picture.
 
 ## Python Test Environment Setup
 

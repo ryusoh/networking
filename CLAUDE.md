@@ -17,12 +17,16 @@ networking / browser tooling subprojects.
 
 ## Commands
 
-- `make precommit-fix` — fmt (Prettier write) + lint-fix (ESLint) + Jest + Python + eBPF + NAS C tests.
+- `make precommit-fix` — fmt (Prettier write) + lint-fix (ESLint) + type + Jest + Python + eBPF + NAS C tests.
 - `make precommit` — same but check-only (`fmt:check`, no writes). Use before committing.
 - `npm test` — Jest only (no coverage). `npm run test:coverage` — Jest with the
   per-file coverage report (`text` + `text-summary`); this is what `make test` runs.
 - `make test-py` — pytest + coverage (`--cov-report=term-missing`) for the Python
   packages. `npm run lint` / `npm run fmt:check` — JS lint/format.
+- `make type` — JS type-check of `clean_adblock/*.js` via JSDoc against
+  `jsconfig.json` (`checkJs`, `@types/chrome`). **Non-blocking** (`|| echo`), so it
+  reports type errors without gating; it's part of `make precommit`. This is the
+  Typist routine's harness — see "Automated agents" below.
 
 ### Coverage reports
 
@@ -137,3 +141,29 @@ top-level observer, add the same guard.
   that's also `require`d elsewhere (double instrumentation). The `helpers/` dir is
   excluded from test discovery via `testPathIgnorePatterns` and gets CommonJS globals
   via an `eslint.config.cjs` override.
+
+## Automated agents (Jules routines)
+
+This repo is also worked by **Jules scheduled routines** (the
+`google-labs-jules[bot]` author on coverage PRs). Their contract and personas are
+version-controlled:
+
+- **`AGENTS.md`** (repo root) — the shared operating contract: non-negotiables,
+  the per-subproject lane table, how to read the noisy gate output, and commit
+  conventions. Read it to understand what those automated PRs are held to.
+- **`.jules/<name>.md`** — one **persona definition** per routine (currently
+  `testpilot`, `typist`): identity, lane, constraints. These are
+  **human-maintained, not logs** — we edit them to tune a routine; the routines
+  themselves must never write to `.jules/` (`AGENTS.md` forbids it). They're
+  excluded from the Prettier gate (`.prettierignore`).
+- **Testpilot** ranks least-covered files with `python3 bin/coverage_rank.py`
+  (auto-detects Jest `coverage-summary.json` vs coverage.py JSON; tested in
+  `bin/__tests__/test_coverage_rank.py`, run by `make test-py`).
+- **Typist** drives `make type` toward zero errors via JSDoc on
+  `clean_adblock/*.js`. The harness — `typescript` + `@types/chrome` dev-deps and
+  `jsconfig.json` — is bootstrapped and non-blocking; when the backlog reaches
+  zero, the finalize step makes it gate (see `.jules/typist.md`).
+
+These are separate from the Gemini/Claude **slash commands and skills** described
+in `GEMINI.md` ("Agent Customizations vs. CLI Commands"); that interactive layer is
+unrelated to the unattended Jules routines.
