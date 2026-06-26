@@ -68,3 +68,19 @@ This workspace uses three separate systems for custom commands and agent behavio
   ```bash
   python3 -m pip install -r requirements-dev.txt --break-system-packages
   ```
+
+## JavaScript Type-Checking (`make type`) vs Linting (`npm run lint`)
+
+- **Separation of Concerns:** ESLint (`npm run lint`) and TypeScript (`make type`) are distinct verification gates. ESLint checks syntax, styles, and defined globals. `make type` runs type-checking over `clean_adblock/*.js` utilizing JSDoc annotations and the TypeScript compiler (configured via `jsconfig.json`).
+- **Developer Error Context:** When asked to "fix lint errors", developers or tools may refer to either ESLint output or the TypeScript compilation errors. Verify both gates are green.
+- **ESLint Undefined Globals (HTMLElement, HTMLLinkElement, etc.):**
+  `eslint.config.cjs` defines a limited subset of browser globals. When performing type checks using JSDoc type-guards (such as `instanceof HTMLLinkElement`), ESLint will raise `no-undef` warnings if the constructor is not in the config globals. To resolve this:
+  - Reference the constructor via `window` (e.g., `link instanceof window.HTMLLinkElement`), or
+  - Add inline `/* global ... */` declarations at the top of the file.
+- **Dynamic Globals and Element Access:**
+  Bracket notation (e.g., `window['__NUXT__']`, `this['_url']`) should be preferred over dot notation when assigning or retrieving dynamic, un-typed properties. This satisfies both ESLint and `make type` without requiring verbose casting.
+
+## Automated Commit Message Squash Merges
+
+- **Single-Commit PR Caveat:** When a Pull Request contains exactly one commit, GitHub defaults squash merges to the first commit's message (subject + body) instead of the PR title.
+- **No Conversational Wrappers:** Ensure all commits and final agent outputs contain no conversational greetings, sign-offs, or friendly wrappers (like "Hello! Jules here" or "Let me know if you need anything else"). The final response must start directly with the Conventional Commit subject line and proceed to the structured markdown summary.
