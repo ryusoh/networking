@@ -50,6 +50,9 @@
         return null;
       }
     }
-    return _open.apply(this, arguments);
+    return _open.apply(
+      this,
+      /** @type {Parameters<typeof window.open>} */ (/** @type {unknown} */ (arguments))
+    );
   };
 })();
