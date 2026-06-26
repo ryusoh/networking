@@ -101,6 +101,8 @@ a threshold). This is on your honour:
 Use **Conventional Commits**. The squash-merge uses the PR title as the commit
 subject, so the **PR title must be a valid Conventional Commit subject**.
 
+- **Single-Commit Squash Merge Caveat**: If a PR contains exactly one commit, GitHub defaults the squash-merge commit message to that single commit's message (ignoring the PR title). Therefore, your commit message must be strictly formatted as a Conventional Commit.
+- **No Conversational Wrappers**: The commit message and final output must contain no greetings (e.g., "Hello! Jules here"), no conversational sign-offs (e.g., "Let me know if you need anything else"), and no conversational preambles/suffixes. Start directly with the commit title and proceed directly to the structured body.
 - Format: `type(scope): summary` — type ∈ `feat`, `fix`, `refactor`, `perf`,
   `test`, `docs`, `chore`, `build`, `ci`; scope is the subproject or area
   (`clean_adblock`, `nas_proxy`, `retriever`, `vps_kernel_proxy`, `nas_tools`,
