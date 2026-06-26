@@ -39,7 +39,7 @@ test-py:
 	@echo "Building nas_tools binaries (needed by its tests)..."
 	@$(MAKE) -C nas_tools all
 	@echo "Running Python Tests (pytest + coverage)..."
-	@$(PY) -m pytest nas_proxy retriever vps_kernel_proxy nas_tools \
+	@$(PY) -m pytest nas_proxy retriever vps_kernel_proxy nas_tools bin \
 		-p no:cacheprovider \
 		--cov=nas_proxy --cov=retriever --cov=vps_kernel_proxy \
 		--cov-report=term-missing
