@@ -98,7 +98,7 @@
     const skipButton = document.querySelector(
       '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, button.ytp-ad-skip-button'
     );
-    if (skipButton && skipButton.offsetParent !== null) {
+    if (skipButton instanceof HTMLElement && skipButton.offsetParent !== null) {
       skipButton.click();
       return true;
     }
@@ -180,7 +180,7 @@
     for (const mutation of mutations) {
       if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
         const target = mutation.target;
-        if (target.classList.contains('ad-showing')) {
+        if (target instanceof HTMLElement && target.classList.contains('ad-showing')) {
           muteAdIfPlaying();
           skipAdIfPlaying();
         }
@@ -199,7 +199,7 @@
 
   // Export for testing
   if (typeof window !== 'undefined') {
-    window.YouTubeAdBlocker = {
+    window['YouTubeAdBlocker'] = {
       blockYouTubeAds,
       skipAdIfPlaying,
       muteAdIfPlaying,

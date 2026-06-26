@@ -129,10 +129,12 @@
       const safeUrl = getDestinationForCard(card);
       if (safeUrl) {
         premiumLinks.forEach((link) => {
-          link.href = safeUrl;
-          link.setAttribute('data-cleaned', 'true');
-          link.removeAttribute('data-tracking-control-name');
-          link.removeAttribute('data-tracking-will-navigate');
+          if (link instanceof HTMLAnchorElement) {
+            link.href = safeUrl;
+            link.setAttribute('data-cleaned', 'true');
+            link.removeAttribute('data-tracking-control-name');
+            link.removeAttribute('data-tracking-will-navigate');
+          }
         });
       }
     });

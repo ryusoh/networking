@@ -6,24 +6,24 @@ document.addEventListener('DOMContentLoaded', () => {
   if (typeof chrome === 'undefined' || !chrome.storage) {
     return;
   }
-  const enabledToggle = document.getElementById('enabled');
-  const modeSelect = document.getElementById('mode');
+  const enabledToggle = /** @type {HTMLInputElement} */ (document.getElementById('enabled'));
+  const modeSelect = /** @type {HTMLSelectElement} */ (document.getElementById('mode'));
   const scanBtn = document.getElementById('scan');
   const pickerBtn = document.getElementById('picker');
 
   // Feature toggles
   const featureToggles = {
-    cookieBanner: document.getElementById('feature-cookieBanner'),
-    socialMedia: document.getElementById('feature-socialMedia'),
-    youtube: document.getElementById('feature-youtube'),
-    videoStream: document.getElementById('feature-videoStream'),
-    twitch: document.getElementById('feature-twitch'),
-    forum: document.getElementById('feature-forum')
+    cookieBanner: /** @type {HTMLInputElement} */ (document.getElementById('feature-cookieBanner')),
+    socialMedia: /** @type {HTMLInputElement} */ (document.getElementById('feature-socialMedia')),
+    youtube: /** @type {HTMLInputElement} */ (document.getElementById('feature-youtube')),
+    videoStream: /** @type {HTMLInputElement} */ (document.getElementById('feature-videoStream')),
+    twitch: /** @type {HTMLInputElement} */ (document.getElementById('feature-twitch')),
+    forum: /** @type {HTMLInputElement} */ (document.getElementById('feature-forum'))
   };
 
   // Load current settings
   try {
-    chrome.storage.sync.get(['enabled', 'mode', 'features'], (prefs) => {
+    chrome.storage.sync.get(['enabled', 'mode', 'features'], (/** @type {any} */ prefs) => {
       if (
         typeof chrome === 'undefined' ||
         !chrome.storage ||
@@ -82,10 +82,10 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   Object.entries(featureToggles).forEach(([key, toggle]) => {
-    if (toggle) {
+    if (toggle instanceof HTMLInputElement) {
       toggle.addEventListener('change', () => {
         try {
-          chrome.storage.sync.get(['features'], (result) => {
+          chrome.storage.sync.get(['features'], (/** @type {any} */ result) => {
             const features = result.features || {
               cookieBannerBlocker: true,
               socialMediaBlocker: true,
@@ -128,22 +128,25 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        chrome.storage.sync.get(['whitelist', 'blacklist', 'jsBlocked'], (result) => {
-          if (
-            typeof chrome === 'undefined' ||
-            !chrome.storage ||
-            (chrome.runtime && chrome.runtime.lastError)
-          ) {
-            return;
-          }
-          const isWhitelisted = (result.whitelist || []).includes(host);
-          const isBlacklisted = (result.blacklist || []).includes(host);
-          const isJsBlocked = (result.jsBlocked || []).includes(host);
+        chrome.storage.sync.get(
+          ['whitelist', 'blacklist', 'jsBlocked'],
+          (/** @type {any} */ result) => {
+            if (
+              typeof chrome === 'undefined' ||
+              !chrome.storage ||
+              (chrome.runtime && chrome.runtime.lastError)
+            ) {
+              return;
+            }
+            const isWhitelisted = (result.whitelist || []).includes(host);
+            const isBlacklisted = (result.blacklist || []).includes(host);
+            const isJsBlocked = (result.jsBlocked || []).includes(host);
 
-          addWhitelistBtn.textContent = isWhitelisted ? 'Un-Whitelist' : 'Whitelist';
-          addBlacklistBtn.textContent = isBlacklisted ? 'Un-Blacklist' : 'Blacklist';
-          addJsBlockBtn.textContent = isJsBlocked ? 'Un-Block JS' : 'Block JS';
-        });
+            addWhitelistBtn.textContent = isWhitelisted ? 'Un-Whitelist' : 'Whitelist';
+            addBlacklistBtn.textContent = isBlacklisted ? 'Un-Blacklist' : 'Blacklist';
+            addJsBlockBtn.textContent = isJsBlocked ? 'Un-Block JS' : 'Block JS';
+          }
+        );
       });
     } catch (e) {
       console.error('Popup tab query failed:', e);
@@ -169,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        chrome.storage.sync.get([listKey], (result) => {
+        chrome.storage.sync.get([listKey], (/** @type {any} */ result) => {
           if (
             typeof chrome === 'undefined' ||
             !chrome.storage ||

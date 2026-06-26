@@ -115,7 +115,7 @@
       try {
         const elements = document.querySelectorAll(selector);
         for (const el of elements) {
-          if (el.offsetParent !== null) {
+          if (el instanceof HTMLElement && el.offsetParent !== null) {
             el.style.display = 'none';
             el.setAttribute('data-blocked-by-clean-adblock', 'true');
             adContainersHidden++;
@@ -157,7 +157,7 @@
 
     const originalFetch = window.fetch;
     window.fetch = function (...args) {
-      const url = typeof args[0] === 'string' ? args[0] : args[0]?.url;
+      const url = typeof args[0] === 'string' ? args[0] : /** @type {any} */ (args[0])?.url;
 
       if (url && isAdRequest(url)) {
         blockAdRequest(url);
@@ -183,13 +183,13 @@
     const originalSend = XMLHttpRequest.prototype.send;
 
     XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-      this._url = url;
+      this['_url'] = url;
       return originalOpen.apply(this, [method, url, ...rest]);
     };
 
     XMLHttpRequest.prototype.send = function (...args) {
-      if (this._url && isAdRequest(this._url)) {
-        blockAdRequest(this._url);
+      if (this['_url'] && isAdRequest(this['_url'])) {
+        blockAdRequest(this['_url']);
         // Abort ad request
         this.abort();
         return;
@@ -257,7 +257,7 @@
 
   // Export for testing
   if (typeof window !== 'undefined') {
-    window.VideoStreamAdBlocker = {
+    window['VideoStreamAdBlocker'] = {
       isAdRequest,
       blockAdRequest,
       hideAdContainers,

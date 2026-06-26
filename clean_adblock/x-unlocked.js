@@ -15,7 +15,9 @@
   const syncStorage = typeof chrome !== 'undefined' ? chrome?.storage?.sync : null;
   if (syncStorage) {
     syncStorage.get({ preferredTab: 'finance' }, (items) => {
-      preferredTab = items.preferredTab.toLowerCase();
+      if (items && typeof items.preferredTab === 'string') {
+        preferredTab = items.preferredTab.toLowerCase();
+      }
       init();
     });
   } else {
@@ -87,18 +89,21 @@
       return;
     }
 
+    /** @type {HTMLElement | null} */
     let targetTab = null;
     tabs.forEach((tab) => {
-      const text = (tab.innerText || '').trim().toLowerCase();
-      // Hide "For you" tab on home page only
-      if (text.includes('for you') || text.includes('おすすめ')) {
-        tab.style.setProperty('display', 'none', 'important');
-        if (tab.parentElement && tab.parentElement.getAttribute('role') === 'presentation') {
-          tab.parentElement.style.setProperty('display', 'none', 'important');
+      if (tab instanceof HTMLElement) {
+        const text = (tab.innerText || '').trim().toLowerCase();
+        // Hide "For you" tab on home page only
+        if (text.includes('for you') || text.includes('おすすめ')) {
+          tab.style.setProperty('display', 'none', 'important');
+          if (tab.parentElement && tab.parentElement.getAttribute('role') === 'presentation') {
+            tab.parentElement.style.setProperty('display', 'none', 'important');
+          }
         }
-      }
-      if (text.includes(preferredTab)) {
-        targetTab = tab;
+        if (text.includes(preferredTab)) {
+          targetTab = tab;
+        }
       }
     });
 

@@ -6,10 +6,10 @@
   if (typeof chrome === 'undefined' || !chrome.storage) {
     return;
   }
-  if (window.__bypassPickerActive) {
+  if (window['__bypassPickerActive']) {
     return;
   }
-  window.__bypassPickerActive = true;
+  window['__bypassPickerActive'] = true;
 
   const overlay = document.createElement('div');
   overlay.style.cssText = `
@@ -51,7 +51,7 @@
     e.stopPropagation();
 
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (!el || el === overlay || el === highlight) {
+    if (!(el instanceof HTMLElement) || el === overlay || el === highlight) {
       return;
     }
 
@@ -115,7 +115,7 @@
   }
 
   function cleanup() {
-    window.__bypassPickerActive = false;
+    window['__bypassPickerActive'] = false;
     overlay.remove();
     highlight.remove();
     document.removeEventListener('mousemove', handleMouseMove);

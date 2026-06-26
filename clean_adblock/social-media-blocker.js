@@ -98,11 +98,13 @@
 
       let current;
       while ((current = walker.nextNode())) {
-        // Walk up to the nearest post/article container rather than hiding just the label
-        const post = current.closest('article, [role="article"], [data-testid]') || current;
-        if (!processedElements.has(post)) {
-          results.push(post);
-          processedElements.add(post);
+        if (current instanceof Element) {
+          // Walk up to the nearest post/article container rather than hiding just the label
+          const post = current.closest('article, [role="article"], [data-testid]') || current;
+          if (!processedElements.has(post)) {
+            results.push(post);
+            processedElements.add(post);
+          }
         }
       }
     }
@@ -164,7 +166,7 @@
 
   // Export for testing
   if (typeof window !== 'undefined') {
-    window.SocialMediaBlocker = {
+    window['SocialMediaBlocker'] = {
       detectPlatform,
       findSponsoredContent,
       hideElement,

@@ -41,7 +41,12 @@ module.exports = [
         PointerEvent: 'readonly',
         CustomEvent: 'readonly',
         Event: 'readonly',
-        DOMParser: 'readonly'
+        DOMParser: 'readonly',
+        Element: 'readonly',
+        HTMLElement: 'readonly',
+        HTMLImageElement: 'readonly',
+        HTMLAnchorElement: 'readonly',
+        HTMLInputElement: 'readonly'
       }
     },
     rules: {

@@ -59,7 +59,7 @@
     let replaced = false;
 
     iconLinks.forEach((link) => {
-      if (!link.href.includes('twitter.png')) {
+      if (link instanceof window.HTMLLinkElement && !link.href.includes('twitter.png')) {
         link.href = chrome.runtime.getURL('assets/twitter.png');
         replaced = true;
       }

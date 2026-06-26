@@ -61,7 +61,9 @@
     ];
     for (const sel of selectors) {
       document.querySelectorAll(sel).forEach((el) => {
-        el.style.setProperty('display', 'none', 'important');
+        if (el instanceof HTMLElement) {
+          el.style.setProperty('display', 'none', 'important');
+        }
       });
     }
 
@@ -104,11 +106,11 @@
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
-          if (node.nodeType !== 1) {
+          if (!(node instanceof HTMLElement)) {
             continue;
           }
           const id = node.id || '';
-          const cls = typeof node.className === 'string' ? node.className : '';
+          const cls = node.className || '';
           if (
             id === 'loginModal' ||
             id === 'simplemodal-overlay' ||

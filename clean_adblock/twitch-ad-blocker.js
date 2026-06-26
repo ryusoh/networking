@@ -84,7 +84,7 @@
     const adOverlay = document.querySelector(
       '[data-a-target="video-ad-overlay"], [data-a-target="video-ad-card"]'
     );
-    if (adOverlay && adOverlay.offsetParent !== null) {
+    if (adOverlay instanceof HTMLElement && adOverlay.offsetParent !== null) {
       video.muted = true;
       return true;
     }
@@ -96,7 +96,7 @@
     const skipButton = document.querySelector(
       '[data-a-target="video-ad-skip-button"], button[class*="ad-skip"]'
     );
-    if (skipButton && skipButton.offsetParent !== null) {
+    if (skipButton instanceof HTMLElement && skipButton.offsetParent !== null) {
       skipButton.click();
       return true;
     }
@@ -135,7 +135,7 @@
 
     const originalFetch = window.fetch;
     window.fetch = function (...args) {
-      const url = typeof args[0] === 'string' ? args[0] : args[0]?.url;
+      const url = typeof args[0] === 'string' ? args[0] : /** @type {any} */ (args[0])?.url;
 
       if (url && isAdUrl(url)) {
         adsBlocked++;
@@ -161,12 +161,12 @@
     const originalSend = XMLHttpRequest.prototype.send;
 
     XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-      this._url = url;
+      this['_url'] = url;
       return originalOpen.apply(this, [method, url, ...rest]);
     };
 
     XMLHttpRequest.prototype.send = function (...args) {
-      if (this._url && isAdUrl(this._url)) {
+      if (this['_url'] && isAdUrl(this['_url'])) {
         adsBlocked++;
         this.abort();
         return;
@@ -221,7 +221,10 @@
     for (const mutation of mutations) {
       if (mutation.type === 'attributes') {
         const target = mutation.target;
-        if (target.classList?.contains('ad-playing') || target.classList?.contains('ad-showing')) {
+        if (
+          target instanceof HTMLElement &&
+          (target.classList?.contains('ad-playing') || target.classList?.contains('ad-showing'))
+        ) {
           muteAdIfPlaying();
           trySkipAd();
         }
@@ -240,7 +243,7 @@
 
   // Export for testing
   if (typeof window !== 'undefined') {
-    window.TwitchAdBlocker = {
+    window['TwitchAdBlocker'] = {
       blockTwitchAds,
       trySkipAd,
       muteAdIfPlaying,

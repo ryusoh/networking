@@ -97,6 +97,7 @@ async function setupAdNetworkBlocking() {
     // Use IDs 9000+ to avoid conflicts with jsBlocked rules
     const adRuleIds = existingRules.filter((r) => r.id >= 9000).map((r) => r.id);
 
+    /** @type {chrome.declarativeNetRequest.Rule[]} */
     const addRules = AD_NETWORK_DOMAINS.map((domain, i) => ({
       id: 9000 + i,
       priority: 2,
@@ -508,7 +509,7 @@ function redirectFromPremium(tabId) {
       return;
     }
     const url = result.linkedinPendingProfile;
-    if (url) {
+    if (typeof url === 'string') {
       console.log('[LinkedIn Fix] Redirect (session): premium ->', url);
       chrome.tabs.update(tabId, { url });
       chrome.storage.session.remove('linkedinPendingProfile');

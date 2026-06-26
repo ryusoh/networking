@@ -89,11 +89,11 @@
    * @param {Function} callback - Function called for each element found.
    */
   function scanDOM(root, callback) {
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null, false);
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
     let node;
     while ((node = walker.nextNode())) {
       callback(node);
-      if (node.shadowRoot) {
+      if (node instanceof Element && node.shadowRoot) {
         scanDOM(node.shadowRoot, callback);
       }
     }
@@ -180,7 +180,7 @@
       parent = parent.parentElement;
     }
 
-    if (target.style.display !== 'none') {
+    if (target instanceof HTMLElement && target.style.display !== 'none') {
       log('Hiding element:', target);
       target.style.setProperty('display', 'none', 'important');
       restoreScrolling();
@@ -260,7 +260,7 @@
       log('Running YouTube module');
       // Placeholder for YT specific dismiss logic
       const dismiss = document.querySelector('ytd-enforcement-message-view-model button');
-      if (dismiss) {
+      if (dismiss instanceof HTMLElement) {
         dismiss.click();
       }
     },
@@ -402,7 +402,7 @@
         best = container;
       }
 
-      if (best !== link) {
+      if (best instanceof HTMLElement && best !== link) {
         log('Hiding Admiral overlay container');
         best.style.setProperty('display', 'none', 'important');
         restoreScrolling();
@@ -440,7 +440,11 @@
           const host = window.location.hostname;
 
           // 1. Check Whitelist (highest priority)
-          if (prefs?.whitelist && prefs.whitelist.some((s) => host.includes(s))) {
+          if (
+            prefs &&
+            Array.isArray(prefs.whitelist) &&
+            prefs.whitelist.some((s) => host.includes(s))
+          ) {
             log('Site is whitelisted, skipping.');
             return;
           }
@@ -464,7 +468,10 @@
 
           // 3. Check Execution Mode
           if (prefs?.mode === 'selective') {
-            const inBlacklist = prefs?.blacklist && prefs.blacklist.some((s) => host.includes(s));
+            const inBlacklist =
+              prefs &&
+              Array.isArray(prefs.blacklist) &&
+              prefs.blacklist.some((s) => host.includes(s));
             if (!inBlacklist) {
               log('Selective mode active and site not in blacklist, skipping.');
               return;
@@ -500,7 +507,10 @@
           for (const sel of ADBLOCK_POPUP_SELECTORS) {
             try {
               document.querySelectorAll(sel).forEach((el) => {
-                if (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none') {
+                if (
+                  el instanceof HTMLElement &&
+                  (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none')
+                ) {
                   log('Hiding adblock popup by selector:', sel);
                   hideDetector(el);
                 }
@@ -564,6 +574,7 @@
   run();
 
   // Observe for dynamic changes
+  let runThrottled = false;
   const observer = new MutationObserver((mutations) => {
     if (!isContextValid()) {
       observer.disconnect();
@@ -578,10 +589,10 @@
     if (shouldRun) {
       dismissAdmiral();
       // Throttle run() to avoid hammering chrome.storage on dynamic SPAs
-      if (!run._throttled) {
-        run._throttled = true;
+      if (!runThrottled) {
+        runThrottled = true;
         setTimeout(() => {
-          run._throttled = false;
+          runThrottled = false;
           run();
         }, 500);
       }

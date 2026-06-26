@@ -153,7 +153,7 @@
   function dismissKnownCMP() {
     for (const cmp of KNOWN_CMPS) {
       const banner = document.querySelector(cmp.banner);
-      if (!banner) {
+      if (!(banner instanceof HTMLElement)) {
         continue;
       }
       const bannerId = cmp.banner;
@@ -163,7 +163,7 @@
 
       for (const btnSelector of cmp.buttons) {
         const btn = banner.querySelector(btnSelector) || document.querySelector(btnSelector);
-        if (btn) {
+        if (btn instanceof HTMLElement) {
           btn.click();
           processedBanners.add(bannerId);
           return true;
@@ -218,6 +218,9 @@
   function dismissConsentDialog() {
     const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
     for (const dialog of dialogs) {
+      if (!(dialog instanceof HTMLElement)) {
+        continue;
+      }
       if (!isConsentDialog(dialog)) {
         continue;
       }
@@ -227,13 +230,13 @@
       }
 
       const rejectBtn = findButtonByText(dialog, REJECT_TEXT);
-      if (rejectBtn) {
+      if (rejectBtn instanceof HTMLElement) {
         rejectBtn.click();
         processedBanners.add(dialogId);
         return true;
       }
       const acceptBtn = findButtonByText(dialog, ACCEPT_TEXT);
-      if (acceptBtn) {
+      if (acceptBtn instanceof HTMLElement) {
         acceptBtn.click();
         processedBanners.add(dialogId);
         return true;
@@ -379,14 +382,18 @@
   // Check whitelist before running
   const syncStorage = typeof chrome !== 'undefined' ? chrome?.storage?.sync : null;
   if (syncStorage) {
-    syncStorage.get(['whitelist', 'features'], (prefs) => {
+    syncStorage.get(['whitelist', 'features'], (/** @type {any} */ prefs) => {
       if (chrome?.runtime?.lastError) {
         return;
       }
       if (prefs?.features?.cookieBannerBlocker === false) {
         return;
       }
-      if (prefs?.whitelist && prefs.whitelist.some((s) => host.includes(s))) {
+      if (
+        prefs &&
+        Array.isArray(prefs.whitelist) &&
+        prefs.whitelist.some((s) => host.includes(s))
+      ) {
         return;
       }
       start();
@@ -397,7 +404,7 @@
 
   // Export for testing
   if (typeof window !== 'undefined') {
-    window.CookieBannerBlocker = {
+    window['CookieBannerBlocker'] = {
       findCookieBanner,
       dismissBanner,
       dismissKnownCMP,

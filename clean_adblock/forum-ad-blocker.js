@@ -479,7 +479,7 @@
 
   function removeAdScripts() {
     document.querySelectorAll('script[src]').forEach((script) => {
-      if (shouldBlockScript(script.src)) {
+      if (script instanceof HTMLScriptElement && shouldBlockScript(script.src)) {
         script.remove();
       }
     });
@@ -662,6 +662,6 @@
 
   // Export for testing
   if (typeof window !== 'undefined') {
-    window.ForumAdBlocker = { blockForumAds, hideAd };
+    window['ForumAdBlocker'] = { blockForumAds, hideAd };
   }
 })();

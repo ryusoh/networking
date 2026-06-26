@@ -47,7 +47,7 @@
       allElements.forEach((el) => {
         if (el.children.length === 0 && el.textContent.trim() === 'Promoted') {
           const card = el.closest('.artdeco-card') || el.closest('aside') || el.closest('div');
-          if (card && card !== sidebar) {
+          if (card instanceof HTMLElement && card !== sidebar) {
             card.style.setProperty('display', 'none', 'important');
           }
         }

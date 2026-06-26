@@ -90,18 +90,24 @@
     document
       .querySelectorAll('#gateway-content, [data-testid="onsite-messaging-unit-gateway"]')
       .forEach((el) => {
-        el.style.setProperty('display', 'none', 'important');
+        if (el instanceof HTMLElement) {
+          el.style.setProperty('display', 'none', 'important');
+        }
       });
     // vi-gateway-container: wraps the page as position:fixed — unfix to allow scroll
     document.querySelectorAll('.vi-gateway-container').forEach((el) => {
-      el.style.setProperty('position', 'static', 'important');
-      el.style.setProperty('overflow', 'visible', 'important');
-      el.style.setProperty('width', 'auto', 'important');
-      el.style.setProperty('height', 'auto', 'important');
+      if (el instanceof HTMLElement) {
+        el.style.setProperty('position', 'static', 'important');
+        el.style.setProperty('overflow', 'visible', 'important');
+        el.style.setProperty('width', 'auto', 'important');
+        el.style.setProperty('height', 'auto', 'important');
+      }
     });
     // Scrim div
     document.querySelectorAll('.css-gx5sib').forEach((el) => {
-      el.style.setProperty('display', 'none', 'important');
+      if (el instanceof HTMLElement) {
+        el.style.setProperty('display', 'none', 'important');
+      }
     });
 
     // Regiwall iframes — hide and disable
@@ -130,7 +136,10 @@
 
     // Subscribe CTA
     document.querySelectorAll('p[role="note"]').forEach((p) => {
-      if (p.querySelector('a[href*="subscription"]') || p.querySelector('a[href*="campaignId"]')) {
+      if (
+        p instanceof HTMLElement &&
+        (p.querySelector('a[href*="subscription"]') || p.querySelector('a[href*="campaignId"]'))
+      ) {
         p.style.setProperty('display', 'none', 'important');
       }
     });
@@ -157,7 +166,7 @@
     if (restored) {
       return;
     }
-    const data = window.__preloadedData;
+    const data = window['__preloadedData'];
     if (!data || !data.initialData || !data.initialData.data) {
       return;
     }

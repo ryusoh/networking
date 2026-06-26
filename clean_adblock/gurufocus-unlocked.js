@@ -41,6 +41,9 @@
   }
 
   function unblur(el) {
+    if (!(el instanceof HTMLElement)) {
+      return;
+    }
     if (el.classList.contains('blur')) {
       el.classList.remove('blur');
     }
@@ -61,21 +64,23 @@
       const m = mutations[i];
       if (m.type === 'attributes') {
         const el = m.target;
-        if (el.classList && el.classList.contains('blur')) {
-          unblur(el);
-        }
-        if (el.style && el.style.filter && el.style.filter.indexOf('blur') !== -1) {
-          unblur(el);
+        if (el instanceof HTMLElement) {
+          if (el.classList && el.classList.contains('blur')) {
+            unblur(el);
+          }
+          if (el.style && el.style.filter && el.style.filter.indexOf('blur') !== -1) {
+            unblur(el);
+          }
         }
       }
       if (m.type === 'childList') {
         for (let j = 0; j < m.addedNodes.length; j++) {
           const node = m.addedNodes[j];
-          if (node.nodeType !== 1) {
+          if (!(node instanceof HTMLElement)) {
             continue;
           }
           // Remove blur overlay images
-          if (node.tagName === 'IMG' && node.src && node.src.indexOf('blur') !== -1) {
+          if (node instanceof HTMLImageElement && node.src && node.src.indexOf('blur') !== -1) {
             node.remove();
             continue;
           }
@@ -85,14 +90,14 @@
           ) {
             unblur(node);
           }
-          const blurred = node.querySelectorAll
-            ? node.querySelectorAll('.blur, [style*="blur"]')
-            : [];
+          /** @type {NodeListOf<HTMLElement>} */
+          const blurred = node.querySelectorAll('.blur, [style*="blur"]');
           for (let k = 0; k < blurred.length; k++) {
             unblur(blurred[k]);
           }
           // Remove blur images inside added subtrees
-          const blurImgs = node.querySelectorAll ? node.querySelectorAll('img[src*="blur"]') : [];
+          /** @type {NodeListOf<HTMLImageElement>} */
+          const blurImgs = node.querySelectorAll('img[src*="blur"]');
           for (let l = 0; l < blurImgs.length; l++) {
             blurImgs[l].remove();
           }
@@ -117,10 +122,10 @@
     }
 
     const vueEl = document.querySelector('[data-v-5ccaf75f]');
-    if (!vueEl || !vueEl.__vue__) {
+    if (!vueEl || !vueEl['__vue__']) {
       return false;
     }
-    const vm = vueEl.__vue__;
+    const vm = vueEl['__vue__'];
     if (vm.loading || vm.noData) {
       return false;
     }
@@ -133,10 +138,11 @@
 
     const currentPrice =
       priceData && priceData.length ? parseFloat(priceData[priceData.length - 1][1]) : null;
+    const isPositive = currentPrice ? est.mean >= currentPrice : false;
     const upside = currentPrice
       ? (((est.mean - currentPrice) / currentPrice) * 100).toFixed(2)
       : null;
-    const upsideColor = upside >= 0 ? '#67c23a' : '#f56c6c';
+    const upsideColor = isPositive ? '#67c23a' : '#f56c6c';
 
     const html =
       '<div class="gf-u-forecast" style="padding:16px;margin:12px 0;background:#fff;border:1px solid #eee;border-radius:8px;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">' +
@@ -153,7 +159,7 @@
         ? '<div style="font-size:14px;color:' +
           upsideColor +
           ';">(' +
-          (upside >= 0 ? '+' : '') +
+          (isPositive ? '+' : '') +
           upside +
           '% Upside)</div>'
         : '') +
@@ -187,7 +193,7 @@
     const blurImgParents = document.querySelectorAll('[data-v-5ccaf75f]');
     for (let i = 0; i < blurImgParents.length; i++) {
       const parent = blurImgParents[i];
-      if (parent.__vue__ && parent.__vue__.estimateData && !inserted) {
+      if (parent['__vue__'] && parent['__vue__'].estimateData && !inserted) {
         const wrap = document.createElement('div');
         wrap.innerHTML = html;
         parent.parentElement.insertBefore(wrap.firstChild, parent);
@@ -280,10 +286,10 @@
   function fillOriginalForecastTables() {
     // Find parent component with estimate.estimate_current
     const el = document.querySelector('.m-t-md.border.p-md');
-    if (!el || !el.__vue__) {
+    if (!el || !el['__vue__']) {
       return false;
     }
-    let vm = el.__vue__;
+    let vm = el['__vue__'];
     while (vm && !(vm.estimate && vm.estimate.estimate_current)) {
       vm = vm.$parent;
     }
@@ -292,6 +298,7 @@
     }
 
     const est = vm.estimate.estimate_current;
+    /** @type {NodeListOf<HTMLElement>} */
     const sections = document.querySelectorAll('.m-t-md.border.p-md');
     let filledAny = false;
     let totalEmptyExpected = 0;
@@ -309,7 +316,9 @@
         vm.estimate.long_term_growth &&
         vm.estimate.past_term_growth
       ) {
+        /** @type {NodeListOf<HTMLElement>} */
         const gTds = table.querySelectorAll('tbody td');
+        /** @type {NodeListOf<HTMLElement>} */
         const gThs = table.querySelectorAll('thead th');
         for (let c = 0; c < gThs.length; c++) {
           const hText = gThs[c].innerText.toLowerCase();
@@ -348,6 +357,7 @@
       }
 
       let dateRow = null;
+      /** @type {NodeListOf<HTMLElement>} */
       const trs = table.querySelectorAll('tr');
       for (let j = 0; j < trs.length; j++) {
         if (trs[j].innerText.match(/\d{4}-\d{2}/)) {
@@ -358,6 +368,7 @@
         continue;
       }
 
+      /** @type {NodeListOf<HTMLElement>} */
       const ths = dateRow.querySelectorAll('th, td');
       const colMap = {};
       for (let c = 0; c < ths.length; c++) {
@@ -369,11 +380,13 @@
 
       let lastMKey = null;
       for (let r = 0; r < trs.length; r++) {
+        /** @type {NodeListOf<HTMLElement>} */
         const tds = trs[r].querySelectorAll('td');
         if (!tds.length) {
           continue;
         }
 
+        /** @type {HTMLElement} */
         const labelNode = tds[0].querySelector('.el-tooltip') || tds[0];
         const label = labelNode.innerText.trim().toLowerCase();
 
@@ -524,7 +537,7 @@
       return true;
     }
 
-    const nuxt = window.__NUXT__;
+    const nuxt = window['__NUXT__'];
     if (!nuxt || !nuxt.state || !nuxt.state.stock_summary_financial) {
       return false;
     }
@@ -590,11 +603,15 @@
 
     wrap.addEventListener('click', function (e) {
       const tab = e.target;
+      if (!(tab instanceof HTMLElement)) {
+        return;
+      }
       if (!tab.classList.contains('gf-u-tab')) {
         return;
       }
       const id = tab.getAttribute('data-gfu');
       const allTabs = wrap.querySelectorAll('.gf-u-tab');
+      /** @type {NodeListOf<HTMLElement>} */
       const allPanels = wrap.querySelectorAll('.gf-u-panel');
       for (let i = 0; i < allTabs.length; i++) {
         allTabs[i].classList.remove('active');
@@ -604,7 +621,7 @@
       }
       tab.classList.add('active');
       const target = wrap.querySelector('.gf-u-panel[data-gfu="' + id + '"]');
-      if (target) {
+      if (target instanceof HTMLElement) {
         target.style.display = 'block';
       }
     });
