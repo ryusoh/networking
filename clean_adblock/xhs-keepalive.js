@@ -1,6 +1,11 @@
 // xhs-keepalive.js
 // Silent randomized heartbeat to keep Xiaohongshu session alive.
 
+/**
+ * @param {number} minMins
+ * @param {number} maxMins
+ * @returns {number}
+ */
 function getRandomInterval(minMins, maxMins) {
   const minMs = minMins * 60 * 1000;
   const maxMs = maxMins * 60 * 1000;
