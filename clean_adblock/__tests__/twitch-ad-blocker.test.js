@@ -78,7 +78,7 @@ describe('twitch-ad-blocker.js', () => {
     expect(nonAd.style.display).not.toBe('none');
 
     // Check that we can't hide it twice (processedElements weakset check)
-    const result = TwitchAdBlocker.blockTwitchAds();
+    TwitchAdBlocker.blockTwitchAds();
     // Since blockTwitchAds returns undefined we check nothing changed
     expect(ad1.style.display).toBe('none');
   });

@@ -118,7 +118,7 @@ describe('Clean AdBlock Content Script - blobgame.io', () => {
     delete window.location;
     window.location = new URL('https://blobgame.io');
 
-    document.body.innerHTML = `<div></div>`;
+    document.body.innerHTML = '<div></div>';
 
     global.chrome = {
       runtime: {
@@ -342,7 +342,7 @@ describe('Clean AdBlock Content Script - storage and messages', () => {
   test('should handle message listener', () => {
     delete window.location;
     window.location = new URL('https://example.com');
-    document.body.innerHTML = `<div></div>`;
+    document.body.innerHTML = '<div></div>';
 
     let messageListener;
     global.chrome = {
@@ -376,7 +376,7 @@ describe('Clean AdBlock Content Script - storage and messages', () => {
   test('mutation observer triggers run', () => {
     delete window.location;
     window.location = new URL('https://example.com');
-    document.body.innerHTML = `<div></div>`;
+    document.body.innerHTML = '<div></div>';
 
     const syncGetMock = jest.fn((keys, cb) => cb({ enabled: true, mode: 'all' }));
 

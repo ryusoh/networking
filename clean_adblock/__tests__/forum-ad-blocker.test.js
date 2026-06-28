@@ -120,11 +120,10 @@ describe('forum-ad-blocker.js', () => {
     expect(admaruDiv.style.display).toBe('none');
 
     // DoubleClick hidden
-    const doubleclickLink = document.querySelector('a[href*="doubleclick"]');
+
     const bsaZone1 = document.querySelector('.bsa-zone');
     expect(bsaZone1.style.display).toBe('none');
 
-    const doubleclickImg = document.querySelector('img[src*="2mdn.net"]');
     const bsaZone2 = document.getElementById('bsa-zone-123');
     expect(bsaZone2.style.display).toBe('none');
   });
