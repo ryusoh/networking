@@ -84,3 +84,7 @@ This workspace uses three separate systems for custom commands and agent behavio
 
 - **Single-Commit PR Caveat:** When a Pull Request contains exactly one commit, GitHub defaults squash merges to the first commit's message (subject + body) instead of the PR title.
 - **No Conversational Wrappers:** Ensure all commits and final agent outputs contain no conversational greetings, sign-offs, or friendly wrappers (like "Hello! Jules here" or "Let me know if you need anything else"). The final response must start directly with the Conventional Commit subject line and proceed to the structured markdown summary.
+
+### Preventing Accidental Log Check-ins
+
+- **GitIgnore Rules for Output Logs:** Any command output logs (e.g. \`jest_coverage_output.txt\`, \`precommit_output.txt\`) MUST be either explicitly removed before committing, or placed within the \`.gitignore\`'d \`coverage/\` directory. Do not commit command logs to the repository!
