@@ -18,36 +18,36 @@ All matched files use Prettier code style!
 > net-tools@1.0.0 test:coverage
 > jest --coverage
 
-(node:20058) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(node:27614) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:20059) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(node:27615) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:20057) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(node:27613) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-PASS clean_adblock/__tests__/social-media-blocker.test.js
-PASS clean_adblock/__tests__/twitch-ad-blocker.test.js
+PASS clean_adblock/__tests__/social-media-blocker.test.js (6.555 s)
+PASS clean_adblock/__tests__/twitch-ad-blocker.test.js (6.592 s)
 PASS clean_adblock/__tests__/cookie-banner-blocker.test.js
-PASS clean_adblock/__tests__/background.test.js
 PASS clean_adblock/__tests__/content.test.js
+PASS clean_adblock/__tests__/background.test.js
 PASS clean_adblock/__tests__/youtube-ad-blocker.test.js
 PASS clean_adblock/__tests__/video-stream-ad-blocker.test.js
 PASS clean_adblock/__tests__/nytimes-unlocked.test.js
 PASS clean_adblock/__tests__/popup.test.js
-PASS clean_adblock/__tests__/forum-ad-blocker.test.js
-PASS clean_adblock/__tests__/hedgefollow-unlocked.test.js
 PASS clean_adblock/__tests__/linkedin-unlocked.test.js
-PASS clean_adblock/__tests__/picker.test.js
-PASS clean_adblock/__tests__/wsj-unlocked.test.js
-PASS clean_adblock/__tests__/linkedin-hide-promoted.test.js
-PASS clean_adblock/__tests__/x-twitter-bird.test.js
+PASS clean_adblock/__tests__/forum-ad-blocker.test.js
 PASS clean_adblock/__tests__/xhs-keepalive.test.js
-PASS tianditu_bypass/__tests__/tianditu-defaults.test.js
-PASS tianditu_bypass/__tests__/tile-cache-interceptor.test.js
-PASS clean_adblock/__tests__/features.test.js
-PASS tianditu_bypass/__tests__/tile-cache-page.test.js
-PASS clean_adblock/__tests__/x-unlocked.test.js
+PASS clean_adblock/__tests__/hedgefollow-unlocked.test.js
+PASS clean_adblock/__tests__/wsj-unlocked.test.js
+PASS clean_adblock/__tests__/picker.test.js
 PASS clean_adblock/__tests__/cookie-popup-blocker-main.test.js
-PASS clean_adblock/__tests__/gurufocus-unlocked.test.js (17.771 s)
+PASS clean_adblock/__tests__/features.test.js
+PASS clean_adblock/__tests__/x-twitter-bird.test.js
+PASS tianditu_bypass/__tests__/tile-cache-page.test.js
+PASS clean_adblock/__tests__/linkedin-hide-promoted.test.js
+PASS clean_adblock/__tests__/x-unlocked.test.js
+PASS tianditu_bypass/__tests__/tile-cache-interceptor.test.js
+PASS tianditu_bypass/__tests__/tianditu-defaults.test.js
+PASS clean_adblock/__tests__/gurufocus-unlocked.test.js (18.798 s)
 ------------------------------|---------|----------|---------|---------|--------------------------------------------------------------------------------------------------------------------------------
 File                          | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
 ------------------------------|---------|----------|---------|---------|--------------------------------------------------------------------------------------------------------------------------------
@@ -84,7 +84,7 @@ Lines        : 69.48% ( 1380/1986 )
 Test Suites: 24 passed, 24 total
 Tests:       394 passed, 394 total
 Snapshots:   0 total
-Time:        18.616 s
+Time:        19.945 s
 Ran all test suites.
 Building nas_tools binaries (needed by its tests)...
 make[1]: Entering directory '/app/nas_tools'
@@ -120,7 +120,7 @@ retriever/pull.py                67      0   100%
 vps_kernel_proxy/monitor.py      84      0   100%
 -----------------------------------------------------------
 TOTAL                           641     28    96%
-======================== 86 passed, 2 skipped in 6.44s =========================
+======================== 86 passed, 2 skipped in 7.85s =========================
 Running eBPF Kernel Tests (via Docker)...
 Unable to find image 'ebpf-builder:latest' locally
 docker: Error response from daemon: pull access denied for ebpf-builder, repository does not exist or may require 'docker login'
@@ -129,7 +129,6 @@ Run 'docker run --help' for more information
 make: [Makefile:56: test-ebpf] Error 125 (ignored)
 Running C-based NAS Tool Tests...
 make[1]: Entering directory '/app/nas_proxy'
-gcc -O3 -Wall -fPIC -DTEST_MAIN -o tests tests.c tile_storage.c tile_fetcher.c -lcurl
 curl_easy_perform() failed: Unsupported protocol
 --- [ STARTING C-BASED UNIT TESTS ] ---
 [*] Testing Tile Storage...
