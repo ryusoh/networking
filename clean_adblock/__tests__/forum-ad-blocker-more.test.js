@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const { instrumentFile } = require('./helpers/instrument');
 
@@ -75,6 +76,7 @@ describe('Forum Ad Blocker - DoubleClick and Erebor', () => {
 
     loadScript();
 
+    // Check if the ad containers were hidden (display: none)
     expect(document.getElementById('bsa-zone-123').style.display).toBe('none');
     expect(document.querySelector('.ad-container').style.display).toBe('none');
     expect(document.getElementById('div-gpt-ad-12345').style.display).toBe('none');
@@ -83,7 +85,9 @@ describe('Forum Ad Blocker - DoubleClick and Erebor', () => {
     expect(document.getElementById('buysellads-container').style.display).toBe('none');
     expect(document.querySelector('.some-bsa-class').style.display).toBe('none');
 
+    // For the deep one, it crawls up to 10 parents, and since none match the criteria, it just hides the 10th parent (or similar)
     const deepLink = document.querySelector('a[href*="deep"]');
+    // We just verify it doesn't crash and hides something in the hierarchy
     let hiddenNode = false;
     let node = deepLink;
     while (node && node !== document.body) {

@@ -88,3 +88,7 @@ This workspace uses three separate systems for custom commands and agent behavio
 ### Preventing Accidental Log Check-ins
 
 - **GitIgnore Rules for Output Logs:** Any command output logs (e.g. \`jest_coverage_output.txt\`, \`precommit_output.txt\`) MUST be either explicitly removed before committing, or placed within the \`.gitignore\`'d \`coverage/\` directory. Do not commit command logs to the repository!
+## Jest Teardown Errors and jsdom document.body cleanup
+- Some code under test modifies the DOM or keeps references causing Jest/jsdom side-effects on subsequent tests (like unhandled timer/MutationObserver updates).
+- Best practice for such tests, especially for modules like `xhs-keepalive.js` and `cookie-banner-blocker.js`: always manually clear `document.body.innerHTML` in `beforeEach` or properly clean up inserted nodes when faking timers.
+- Example: `document.body.innerHTML = '';` in `beforeEach`.
