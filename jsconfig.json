@@ -3,7 +3,7 @@
     "checkJs": true,
     "allowJs": true,
     "noEmit": true,
-    "strict": false,
+    "strict": true,
     "target": "es2021",
     "module": "node16",
     "lib": ["dom", "dom.iterable", "es2021"],
