@@ -21,6 +21,27 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+describe('GuruFocus Unlocked - early return on other sites', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    document.head.innerHTML = '';
+    document.body.innerHTML = '';
+    delete window.__NUXT__;
+    delete window.location;
+    window.location = {
+      hostname: 'www.example.com',
+      pathname: '/'
+    };
+  });
+  afterEach(() => jest.useRealTimers());
+
+  test('does not execute if hostname is not gurufocus.com', () => {
+    loadScript();
+    jest.advanceTimersByTime(2000);
+    expect(document.head.innerHTML).toBe('');
+  });
+});
+
 describe('GuruFocus Unlocked - blur removal', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -279,6 +300,77 @@ describe('GuruFocus Unlocked - paywall overlay removal', () => {
   });
 });
 
+describe('GuruFocus Unlocked - financials injection', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    document.head.innerHTML = '';
+    document.body.innerHTML = '';
+    delete window.__NUXT__;
+    setupLocation();
+  });
+  afterEach(() => jest.useRealTimers());
+
+  test('injects financial data from window.__NUXT__ into DOM', () => {
+    window.__NUXT__ = {
+      state: {
+        stock_summary_financial: {
+          financials: {
+            annual: [{ date: '2023-12', revenue: 1234567890, net_income: 987654321 }],
+            quarter: [{ date: '2023-Q4', revenue: 300000000, net_income: 200000000 }],
+            ttm: [{ date: '2024-03', revenue: 1300000000, net_income: 1000000000 }]
+          }
+        }
+      }
+    };
+
+    // Set up a target for injection
+    const target = document.createElement('div');
+    target.className = 'w-full m-t-md p-t-sm';
+    const main = document.createElement('div');
+    main.className = 'el-main';
+    main.appendChild(target);
+    document.body.appendChild(main);
+
+    loadScript();
+    jest.advanceTimersByTime(2000);
+
+    const wrap = document.querySelector('.gf-u-wrap');
+    expect(wrap).not.toBeNull();
+
+    // Check tabs
+    const tabs = document.querySelectorAll('.gf-u-tab');
+    expect(tabs.length).toBe(3);
+    expect(tabs[0].textContent).toBe('Annual');
+    expect(tabs[1].textContent).toBe('Quarterly');
+    expect(tabs[2].textContent).toBe('TTM');
+
+    // Check active tab switching
+    tabs[1].click();
+    expect(tabs[0].classList.contains('active')).toBe(false);
+    expect(tabs[1].classList.contains('active')).toBe(true);
+
+    // Check panels and table data formatting
+    const panels = document.querySelectorAll('.gf-u-panel');
+    expect(panels.length).toBe(3);
+
+    const annualTable = panels[0].querySelector('table');
+    expect(annualTable.innerHTML).toContain('Revenue');
+    expect(annualTable.innerHTML).toContain('1.23B');
+
+    // Avoid double injection
+    jest.advanceTimersByTime(2000);
+    const wraps = document.querySelectorAll('.gf-u-wrap');
+    expect(wraps.length).toBe(1);
+  });
+
+  test('does not inject financials if __NUXT__ data is missing', () => {
+    window.__NUXT__ = { state: {} };
+    loadScript();
+    jest.advanceTimersByTime(2000);
+    expect(document.querySelector('.gf-u-wrap')).toBeNull();
+  });
+});
+
 describe('GuruFocus Unlocked - forecast data from Vue components', () => {
   beforeEach(() => {
     document.head.innerHTML = '';
@@ -448,6 +540,108 @@ describe('GuruFocus Unlocked - forecast data from Vue components', () => {
     expect(card.textContent).toContain('200.00');
     expect(card.textContent).not.toContain('Current Price');
     expect(card.textContent).not.toContain('Upside');
+  });
+});
+
+describe('GuruFocus Unlocked - original forecast tables filling', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    document.head.innerHTML = '';
+    document.body.innerHTML = '';
+    delete window.__NUXT__;
+    setupLocation();
+  });
+  afterEach(() => jest.useRealTimers());
+
+  test('fills empty table cells with data from __vue__ estimate', () => {
+    const parent = document.createElement('div');
+    parent.className = 'm-t-md border p-md';
+    Object.defineProperty(parent, 'innerText', { value: 'Container\nOther lines...' });
+    parent.__vue__ = {
+      estimate: {
+        estimate_current: {
+          annual: {
+            revenue_estimate: {
+              202412: { mean: 5000000000, num: 12 },
+              202512: { mean: 6000000000, num: 10 }
+            }
+          }
+        },
+        long_term_growth: {
+          future_revenue_estimate_growth: 15.5
+        },
+        past_term_growth: {
+          revenue_estimate_growth: 12.3
+        }
+      }
+    };
+
+    document.body.appendChild(parent);
+
+    // In jsdom, textContent behaves somewhat like innerText, but innerText isn't fully supported
+    // The source code uses innerText.split('\n')[0]. We must override innerText for the mock sections.
+
+    // Growth table section
+    const growthSection = document.createElement('div');
+    growthSection.className = 'm-t-md border p-md';
+    growthSection.innerHTML = `
+        <table>
+          <thead>
+            <tr><th>Future 3-5Y Total Revenue</th><th>Past 3-Year Total Revenue</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>-</td><td>-</td></tr>
+          </tbody>
+        </table>
+    `;
+    Object.defineProperty(growthSection, 'innerText', { value: 'Growth Forecast\nOther lines...' });
+    parent.appendChild(growthSection);
+
+    // Estimate table section
+    const estSection = document.createElement('div');
+    estSection.className = 'm-t-md border p-md';
+    estSection.innerHTML = `
+        <table>
+          <tbody>
+            <tr><th></th><th>2024-12</th><th>2025-12</th></tr>
+            <tr><td>Revenue</td><td>-</td><td>-</td></tr>
+            <tr><td>No. of Analysts</td><td>-</td><td>-</td></tr>
+          </tbody>
+        </table>
+    `;
+    Object.defineProperty(estSection, 'innerText', { value: 'Earnings Estimates\nOther lines...' });
+    parent.appendChild(estSection);
+
+    // Override innerText on table rows and cells because the code uses it heavily
+    const allRowsAndCells = parent.querySelectorAll('tr, td, th');
+    allRowsAndCells.forEach((el) => {
+      Object.defineProperty(el, 'innerText', {
+        get() {
+          return this.textContent || '';
+        },
+        set(val) {
+          this.textContent = val;
+        }
+      });
+    });
+
+    loadScript();
+    jest.advanceTimersByTime(2000);
+
+    // Verify growth table
+    const growthTds = parent.querySelectorAll('tbody td');
+    expect(growthTds[0].innerText).toBe('15.5%');
+    expect(growthTds[1].innerText).toBe('12.3%');
+
+    // Verify estimates table
+    const estTables = parent.querySelectorAll('table');
+    const estTds = estTables[1].querySelectorAll('tr td');
+    // First row: Revenue, -, -
+    expect(estTds[1].innerText).toBe('5.00B'); // 202412 revenue mean
+    expect(estTds[2].innerText).toBe('6.00B'); // 202512 revenue mean
+    // Second row: No. of Analysts, -, -
+    expect(estTds[4].innerText).toBe('12'); // 202412 revenue num
+    expect(estTds[5].innerText).toBe('10'); // 202512 revenue num
   });
 });
 
