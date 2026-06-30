@@ -45,6 +45,10 @@
   const processedElements = new WeakSet();
   let adBlockedCount = 0;
 
+  /**
+   * @param {HTMLElement} element
+   * @returns {boolean}
+   */
   function isAdElement(element) {
     // Check class names
     const className = element.className || '';
@@ -73,6 +77,10 @@
     return false;
   }
 
+  /**
+   * @param {HTMLElement} element
+   * @returns {boolean}
+   */
   function hideAd(element) {
     if (processedElements.has(element)) {
       return false;
@@ -85,7 +93,7 @@
 
     // Also remove parent ad containers if they exist
     const parentAd = element.closest('.ad-showing, .video-ads');
-    if (parentAd && !processedElements.has(parentAd)) {
+    if (parentAd instanceof HTMLElement && !processedElements.has(parentAd)) {
       parentAd.style.display = 'none';
       processedElements.add(parentAd);
     }
@@ -126,7 +134,9 @@
       try {
         const elements = document.querySelectorAll(selector);
         for (const el of elements) {
-          hideAd(el);
+          if (el instanceof HTMLElement) {
+            hideAd(el);
+          }
         }
       } catch {
         // Invalid selector
@@ -156,7 +166,7 @@
     for (const mutation of mutations) {
       if (mutation.addedNodes.length > 0) {
         for (const node of mutation.addedNodes) {
-          if (node.nodeType === 1 && isAdElement(node)) {
+          if (node instanceof HTMLElement && isAdElement(node)) {
             hideAd(node);
           }
         }
@@ -199,7 +209,7 @@
 
   // Export for testing
   if (typeof window !== 'undefined') {
-    window['YouTubeAdBlocker'] = {
+    /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))['YouTubeAdBlocker'] = {
       blockYouTubeAds,
       skipAdIfPlaying,
       muteAdIfPlaying,
