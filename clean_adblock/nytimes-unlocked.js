@@ -65,17 +65,32 @@
     { passive: true, once: true }
   );
 
-  window.scrollTo = function (...args) {
-    // Allow scrollTo(0, 0) only before user interacts; block regiwall scroll resets
-    if (userHasScrolled) {
-      const x = typeof args[0] === 'object' ? args[0].left || 0 : args[0] || 0;
-      const y = typeof args[0] === 'object' ? args[0].top || 0 : args[1] || 0;
-      if (x === 0 && y === 0) {
-        return;
-      } // Block scroll-to-top resets
+  window.scrollTo = /** @type {typeof window.scrollTo} */ (
+    function () {
+      // Allow scrollTo(0, 0) only before user interacts; block regiwall scroll resets
+      if (userHasScrolled) {
+        const args = arguments;
+        const a0 = args[0];
+        const a1 = args[1];
+        const x =
+          typeof a0 === 'object' && a0 !== null
+            ? /** @type {ScrollToOptions} */ (a0).left || 0
+            : typeof a0 === 'number'
+              ? a0
+              : 0;
+        const y =
+          typeof a0 === 'object' && a0 !== null
+            ? /** @type {ScrollToOptions} */ (a0).top || 0
+            : typeof a1 === 'number'
+              ? a1
+              : 0;
+        if (x === 0 && y === 0) {
+          return;
+        } // Block scroll-to-top resets
+      }
+      return Reflect.apply(origScrollTo, window, arguments);
     }
-    return origScrollTo(...args);
-  };
+  );
   window.scroll = window.scrollTo;
 
   function removeInert() {
@@ -166,7 +181,9 @@
     if (restored) {
       return;
     }
-    const data = window['__preloadedData'];
+    const data = /** @type {Record<string, import("./types/nytimes").NYTData | undefined>} */ (
+      /** @type {unknown} */ (window)
+    )['__preloadedData'];
     if (!data || !data.initialData || !data.initialData.data) {
       return;
     }

@@ -1,12 +1,26 @@
-/**
- * @typedef {Object} NYTWindowPreloadedData
- * @property {Object} [initialData]
- * @property {Object} [initialData.data]
- * @property {Object} [initialData.data.article]
- * @property {Object} [initialData.data.article.sprinkledBody]
- * @property {Array<Object>} [initialData.data.article.sprinkledBody.content]
- */
+export interface NYTFormat {
+  __typename: string;
+}
 
-/**
- * @typedef {Window & { __preloadedData?: NYTWindowPreloadedData }} NYTWindow
- */
+export interface NYTInline {
+  __typename: string;
+  text?: string;
+  formats?: NYTFormat[];
+}
+
+export interface NYTBlock {
+  __typename: string;
+  content?: NYTInline[];
+}
+
+export interface NYTData {
+  initialData?: {
+    data?: {
+      article?: {
+        sprinkledBody?: {
+          content?: NYTBlock[];
+        };
+      };
+    };
+  };
+}
