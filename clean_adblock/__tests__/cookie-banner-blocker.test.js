@@ -358,3 +358,52 @@ describe('Cookie Banner Blocker - shouldCloseTab patterns (background.js)', () =
     expect(shouldCloseTab('https://www.swatch.com/en-us/royal-pop.html')).toBe(false);
   });
 });
+
+describe('Cookie Banner Blocker - Additional Tests', () => {
+  let originalWindowLocation;
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    originalWindowLocation = window.location;
+    delete window.location;
+    window.location = { hostname: 'example.com' };
+    global.chrome = undefined;
+    window.open = jest.fn();
+  });
+
+  afterEach(() => {
+    window.location = originalWindowLocation;
+  });
+
+  function loadScript() {
+    const code = instrumentFile(path.resolve(__dirname, '../cookie-banner-blocker.js'));
+    eval(code);
+  }
+
+  test('dismissConsentDialog should hide banner if no buttons are found', () => {
+    document.body.innerHTML = `
+      <div role="dialog" aria-modal="true" class="privacy-popup">
+        <p>cookie consent required for privacy tracking analytics</p>
+      </div>
+    `;
+
+    loadScript();
+
+    const banner = document.querySelector('.privacy-popup');
+    expect(banner.style.display).toBe('none');
+  });
+
+  test('dismissBanner should hide banner if no buttons are found', () => {
+    document.body.innerHTML = `
+      <div class="cookie-notice" style="height: 150px;">
+        <p>cookie consent required for privacy tracking analytics</p>
+      </div>
+    `;
+    // We mock element.offsetHeight to be > 100 for jsdom since it doesn't compute it
+    const banner = document.querySelector('.cookie-notice');
+    Object.defineProperty(banner, 'offsetHeight', { value: 150 });
+
+    loadScript();
+
+    expect(banner.style.display).toBe('none');
+  });
+});
