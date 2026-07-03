@@ -107,8 +107,9 @@
       }
     });
 
-    if (targetTab && targetTab.getAttribute('aria-selected') !== 'true') {
-      targetTab.click();
+    const finalTab = /** @type {HTMLElement | null} */ (targetTab);
+    if (finalTab && finalTab.getAttribute('aria-selected') !== 'true') {
+      finalTab.click();
       tabSwitched = true;
     }
   }
@@ -118,6 +119,7 @@
     tryTabSwitch();
 
     // Throttled observer to avoid excessive DOM queries on X's SPA
+    /** @type {number | null} */
     let throttleTimer = null;
     const observer = new MutationObserver(() => {
       const path = window.location.pathname;
