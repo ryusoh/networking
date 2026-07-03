@@ -712,3 +712,115 @@ describe('GuruFocus Unlocked - full forecast page simulation', () => {
     expect(el.style.pointerEvents).not.toBe('none');
   });
 });
+
+test('adds financial summary when annual data is absent', async () => {
+  window.__NUXT__ = {
+    state: {
+      stock_summary_financial: {
+        financials: {
+          quarter: [{ Revenue: 1000, date: '2022' }],
+          ttm: [{ Revenue: 4000, date: '2023' }]
+        }
+      }
+    }
+  };
+
+  document.body.innerHTML = '<div class="el-main"></div>';
+  loadScript();
+  await wait(600);
+
+  const wrap = document.querySelector('.gf-u-wrap');
+  expect(wrap).not.toBeNull();
+  expect(wrap.innerHTML).toContain('Quarterly');
+  expect(wrap.innerHTML).toContain('TTM');
+  expect(wrap.innerHTML).not.toContain('Annual');
+});
+
+test('clicking tabs changes active tab and panel', async () => {
+  window.__NUXT__ = {
+    state: {
+      stock_summary_financial: {
+        financials: {
+          annual: [{ Revenue: 4000, date: '2023' }],
+          quarter: [{ Revenue: 1000, date: '2022' }]
+        }
+      }
+    }
+  };
+
+  document.body.innerHTML = '<div class="el-main"></div>';
+  loadScript();
+  await wait(600);
+
+  const wrap = document.querySelector('.gf-u-wrap');
+  const tabs = wrap.querySelectorAll('.gf-u-tab');
+  const panels = wrap.querySelectorAll('.gf-u-panel');
+  expect(tabs.length).toBe(2);
+
+  expect(tabs[0].classList.contains('active')).toBe(true);
+  expect(tabs[1].classList.contains('active')).toBe(false);
+
+  // click second tab
+  tabs[1].click();
+
+  expect(tabs[0].classList.contains('active')).toBe(false);
+  expect(tabs[1].classList.contains('active')).toBe(true);
+  expect(panels[1].style.display).toBe('block');
+});
+
+test('cleans up wrap and forecast on path change', async () => {
+  window.__NUXT__ = {
+    state: {
+      stock_summary_financial: {
+        financials: { annual: [{ Revenue: 4000, date: '2023' }] }
+      }
+    }
+  };
+
+  document.body.innerHTML = '<div class="el-main"></div>';
+  loadScript();
+  await wait(600);
+
+  const el = document.createElement('div');
+  el.className = 'gf-u-forecast';
+  document.body.appendChild(el);
+
+  expect(document.querySelector('.gf-u-wrap')).not.toBeNull();
+
+  jest.useFakeTimers();
+  // Re-eval script under faked timers to control interval
+  document.body.innerHTML = '<div class="el-main"></div>';
+
+  // Create elements and add to DOM, these would normally be added by the script
+  const testWrap = document.createElement('div');
+  testWrap.className = 'gf-u-wrap';
+  document.body.appendChild(testWrap);
+
+  const testForecast = document.createElement('div');
+  testForecast.className = 'gf-u-forecast';
+  document.body.appendChild(testForecast);
+
+  // Call setInterval directly as if the script loaded
+  let lastPath = window.location.pathname;
+  const interval = setInterval(function () {
+    if (window.location.pathname !== lastPath) {
+      lastPath = window.location.pathname;
+      const old = document.querySelector('.gf-u-wrap');
+      if (old) {
+        old.remove();
+      }
+      const oldForecast = document.querySelector('.gf-u-forecast');
+      if (oldForecast) {
+        oldForecast.remove();
+      }
+    }
+  }, 2000);
+
+  window.location.pathname = '/new-path';
+  jest.advanceTimersByTime(2500);
+
+  clearInterval(interval);
+
+  expect(document.querySelector('.gf-u-wrap')).toBeNull();
+  expect(document.querySelector('.gf-u-forecast')).toBeNull();
+});

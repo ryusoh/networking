@@ -203,4 +203,61 @@ describe('nytimes-unlocked.js additional tests', () => {
     const code = instrumentFile(require('path').join(__dirname, '..', 'nytimes-unlocked.js'));
     expect(() => eval(code)).not.toThrow();
   });
+
+  it('hides gateway iframes and unsupported overlay formats', () => {
+    jest.useFakeTimers();
+
+    document.body.innerHTML = `
+      <div class="css-gx5sib"></div>
+      <div style="position: absolute; display: block;">
+        <iframe src="gateway"></iframe>
+      </div>
+      <p role="note"><a href="campaignId">Subscribe</a></p>
+      <section name="articleBody">
+         <div data-testid="companionColumn-0"><div></div></div>
+      </section>
+    `;
+    window.__preloadedData = {
+      initialData: {
+        data: {
+          article: {
+            sprinkledBody: {
+              content: [
+                {
+                  __typename: 'ParagraphBlock',
+                  content: [{ __typename: 'TextInline', text: 'New content' }]
+                },
+                {
+                  __typename: 'OtherBlock'
+                }
+              ]
+            }
+          }
+        }
+      }
+    };
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'nytimes-unlocked.js'));
+    eval(code);
+
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    jest.advanceTimersByTime(3100);
+
+    // Scrim hidden
+    expect(document.querySelector('.css-gx5sib').style.display).toBe('none');
+
+    // Gateway iframe hidden via wrapper
+    const iframeWrap = document.querySelector('iframe[src="gateway"]').parentElement;
+    expect(iframeWrap.style.display).toBe('none');
+
+    // Campaign ID CTA hidden
+    expect(document.querySelector('p[role="note"]').style.display).toBe('none');
+
+    // Companion column received paragraph
+    const companion = document.querySelector('[data-testid="companionColumn-0"] > div');
+    expect(companion.innerHTML).toContain('New content');
+
+    jest.useRealTimers();
+  });
 });

@@ -166,4 +166,67 @@ describe('hedgefollow-unlocked.js additional tests', () => {
     jest.useRealTimers();
     clearIntervalSpy.mockRestore();
   });
+
+  it('runs script immediately when document.readyState is not loading', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+
+    Object.defineProperty(document, 'readyState', {
+      get() {
+        return 'complete';
+      },
+      configurable: true
+    });
+
+    document.body.innerHTML = '<div id="loginModal"></div>';
+
+    eval(code);
+
+    expect(document.getElementById('loginModal').style.display).toBe('none');
+  });
+
+  it('observer waits for document.body', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+
+    const origRAF = window.requestAnimationFrame;
+    let rafCalled = false;
+    window.requestAnimationFrame = (cb) => {
+      rafCalled = true;
+      origRAF(cb);
+    };
+
+    // Temporarily remove document.body
+    const body = document.body;
+    document.documentElement.removeChild(body);
+
+    try {
+      eval(code);
+      expect(rafCalled).toBe(true);
+    } finally {
+      // Restore
+      if (!document.body) {
+        document.documentElement.appendChild(body);
+      }
+      window.requestAnimationFrame = origRAF;
+    }
+  });
+
+  it('adds event listener when document.readyState is loading', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+
+    Object.defineProperty(document, 'readyState', {
+      get() {
+        return 'loading';
+      },
+      configurable: true
+    });
+
+    const addEventListenerSpy = jest.spyOn(document, 'addEventListener');
+
+    eval(code);
+
+    expect(addEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
+  });
 });
