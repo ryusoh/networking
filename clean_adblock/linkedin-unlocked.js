@@ -14,6 +14,10 @@
 (function () {
   'use strict';
 
+  /**
+   * @param {string | null | undefined} text
+   * @returns {string}
+   */
   function cleanLinkedInText(text) {
     if (!text) {
       return '';
@@ -39,6 +43,8 @@
   /**
    * Extract person's name + headline from a card and build a search URL.
    * Does NOT use a[href*="/in/"] — those can match the logged-in user's own profile.
+   * @param {Element} card
+   * @returns {string | null}
    */
   function getDestinationForCard(card) {
     const nameSelectors = [
@@ -55,7 +61,9 @@
     for (const selector of nameSelectors) {
       const el = card.querySelector(selector);
       if (el) {
-        const cleaned = cleanLinkedInText(el.innerText || el.textContent);
+        const cleaned = cleanLinkedInText(
+          /** @type {HTMLElement} */ (/** @type {unknown} */ (el)).innerText || el.textContent
+        );
         if (cleaned.length > 1) {
           // Skip button-like text
           if (/^(connect|follow|message|pending|more|dismiss)$/i.test(cleaned)) {
@@ -73,7 +81,9 @@
       )
     );
     for (const el of allText) {
-      const cleaned = cleanLinkedInText(el.innerText || el.textContent);
+      const cleaned = cleanLinkedInText(
+        /** @type {HTMLElement} */ (/** @type {unknown} */ (el)).innerText || el.textContent
+      );
       if (cleaned.length > 1 && cleaned !== name) {
         if (/^(connect|follow|message|pending|more|dismiss)$/i.test(cleaned)) {
           continue;
@@ -94,6 +104,7 @@
    * Store destination via both channels for race-condition-free failover:
    * 1. chrome.runtime.sendMessage → background in-memory variable (instant)
    * 2. chrome.storage.session → survives service worker restart
+   * @param {string | null} url
    */
   function storeDestination(url) {
     if (!url) {
@@ -146,15 +157,22 @@
 
   // --- Layer 2: Click Interception (kill event on entire card) ---
 
+  /**
+   * @param {Event} e
+   */
   function handleIntercept(e) {
     let target = e.target;
     if (!(target instanceof Element)) {
-      target = target.parentElement;
+      if (target && 'parentElement' in target && target.parentElement instanceof Element) {
+        target = target.parentElement;
+      } else {
+        return;
+      }
     }
     if (!target) {
       return;
     }
-    const card = target.closest(CARD_SELECTORS);
+    const card = /** @type {Element} */ (target).closest(CARD_SELECTORS);
     if (!card) {
       return;
     }
@@ -188,15 +206,22 @@
 
   // --- Layer 3: Hover pre-store for background failover ---
 
+  /**
+   * @param {Event} e
+   */
   function onHover(e) {
     let target = e.target;
     if (!(target instanceof Element)) {
-      target = target.parentElement;
+      if (target && 'parentElement' in target && target.parentElement instanceof Element) {
+        target = target.parentElement;
+      } else {
+        return;
+      }
     }
     if (!target) {
       return;
     }
-    const card = target.closest(CARD_SELECTORS);
+    const card = /** @type {Element} */ (target).closest(CARD_SELECTORS);
     if (!card) {
       return;
     }
