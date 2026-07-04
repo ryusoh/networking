@@ -27,6 +27,7 @@
   }
 
   const DEBUG = true;
+  /** @param {...unknown} args */
   const log = (...args) => DEBUG && console.log('[Bypass: AdBlock]', ...args);
 
   // Core keywords used to identify adblock detection messages across languages.
@@ -222,6 +223,7 @@
     }
 
     // 2. Clear restrictive inline event handlers
+    /** @param {Document | HTMLElement | null} el */
     const clearEvents = (el) => {
       if (!el) {
         return;
@@ -239,6 +241,7 @@
     clearEvents(document.documentElement);
 
     // 3. Hijack event listeners via Capture Phase
+    /** @param {Event} e */
     const stopPropagation = (e) => {
       e.stopPropagation();
       if (e.stopImmediatePropagation) {
@@ -254,6 +257,7 @@
 
   /**
    * Site-specific modules for complex platforms.
+   * @type {Record<string, () => void>}
    */
   const SITE_MODULES = {
     'youtube.com': () => {
@@ -506,15 +510,17 @@
 
           for (const sel of ADBLOCK_POPUP_SELECTORS) {
             try {
-              document.querySelectorAll(sel).forEach((el) => {
-                if (
-                  el instanceof HTMLElement &&
-                  (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none')
-                ) {
-                  log('Hiding adblock popup by selector:', sel);
-                  hideDetector(el);
+              document.querySelectorAll(sel).forEach(
+                /** @param {Element} el */ (el) => {
+                  if (
+                    el instanceof HTMLElement &&
+                    (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none')
+                  ) {
+                    log('Hiding adblock popup by selector:', sel);
+                    hideDetector(el);
+                  }
                 }
-              });
+              );
             } catch {
               /* invalid selector */
             }
@@ -524,11 +530,14 @@
           dismissAdmiral();
 
           // 6. Apply automatic text-based detection
-          scanDOM(document.body, (el) => {
-            if (scoreElement(el) > 0.6) {
-              hideDetector(el);
+          scanDOM(
+            document.body,
+            /** @param {Element} el */ (el) => {
+              if (scoreElement(el) > 0.6) {
+                hideDetector(el);
+              }
             }
-          });
+          );
 
           // 5. Apply custom user-defined selectors
           try {
@@ -537,27 +546,32 @@
               return;
             }
 
-            localStorage.get(['customSelectors'], (result) => {
-              try {
-                if (!isContextValid() || chrome?.runtime?.lastError) {
-                  return;
+            localStorage.get(
+              ['customSelectors'],
+              /** @param {{ customSelectors?: Record<string, string[]> }} result */ (result) => {
+                try {
+                  if (!isContextValid() || chrome?.runtime?.lastError) {
+                    return;
+                  }
+                  const selectors = result?.customSelectors ? result.customSelectors[host] : null;
+                  if (selectors && Array.isArray(selectors)) {
+                    selectors.forEach((selector) => {
+                      try {
+                        document.querySelectorAll(selector).forEach((el) => {
+                          if (el instanceof HTMLElement) {
+                            el.style.setProperty('display', 'none', 'important');
+                          }
+                        });
+                      } catch {
+                        log('Invalid custom selector:', selector);
+                      }
+                    });
+                  }
+                } catch (e) {
+                  log('Local storage callback failed:', e);
                 }
-                const selectors = result?.customSelectors ? result.customSelectors[host] : null;
-                if (selectors && Array.isArray(selectors)) {
-                  selectors.forEach((selector) => {
-                    try {
-                      document.querySelectorAll(selector).forEach((el) => {
-                        el.style.setProperty('display', 'none', 'important');
-                      });
-                    } catch {
-                      log('Invalid custom selector:', selector);
-                    }
-                  });
-                }
-              } catch (e) {
-                log('Local storage callback failed:', e);
               }
-            });
+            );
           } catch (e) {
             log('Local storage access failed:', e);
           }
