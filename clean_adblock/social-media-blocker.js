@@ -8,6 +8,14 @@
 (function () {
   'use strict';
 
+  /**
+   * @typedef {Object} PlatformConfig
+   * @property {string[]} domains
+   * @property {string[]} selectors
+   * @property {RegExp[]} textPatterns
+   */
+
+  /** @type {Object<string, PlatformConfig>} */
   const PLATFORM_CONFIG = {
     facebook: {
       domains: ['facebook.com', 'www.facebook.com', 'm.facebook.com'],
@@ -32,6 +40,7 @@
   };
 
   const processedElements = new WeakSet();
+  /** @type {string | null} */
   let currentPlatform = null;
 
   function detectPlatform() {
@@ -44,11 +53,20 @@
     return null;
   }
 
+  /**
+   * @param {{textContent: string | null} | Node} element
+   * @param {RegExp[]} patterns
+   * @returns {boolean}
+   */
   function matchesPattern(element, patterns) {
     const text = element.textContent || '';
     return patterns.some((pattern) => pattern.test(text));
   }
 
+  /**
+   * @param {Document | Element} root
+   * @returns {HTMLElement[]}
+   */
   function findSponsoredContent(root = document) {
     const platform = currentPlatform || detectPlatform();
     if (!platform) {
@@ -63,7 +81,7 @@
         const elements = root.querySelectorAll(selector);
         for (const el of elements) {
           if (!processedElements.has(el) && isVisible(el)) {
-            results.push(el);
+            results.push(/** @type {HTMLElement} */ (el));
             processedElements.add(el);
           }
         }
@@ -77,13 +95,13 @@
     if (config.textPatterns.length > 0) {
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
         acceptNode: (node) => {
-          if (processedElements.has(node) || !isVisible(node)) {
+          if (processedElements.has(node) || !isVisible(/** @type {Element} */ (node))) {
             return NodeFilter.FILTER_SKIP;
           }
           // Only match elements with short direct text (likely labels, not containers)
           const directText = Array.from(node.childNodes)
             .filter((n) => n.nodeType === Node.TEXT_NODE)
-            .map((n) => n.textContent.trim())
+            .map((n) => (n.textContent || '').trim())
             .join(' ');
           if (
             directText.length > 0 &&
@@ -100,9 +118,11 @@
       while ((current = walker.nextNode())) {
         if (current instanceof Element) {
           // Walk up to the nearest post/article container rather than hiding just the label
-          const post = current.closest('article, [role="article"], [data-testid]') || current;
+          const post =
+            /** @type {Element} */ (current).closest('article, [role="article"], [data-testid]') ||
+            current;
           if (!processedElements.has(post)) {
-            results.push(post);
+            results.push(/** @type {HTMLElement} */ (post));
             processedElements.add(post);
           }
         }
@@ -112,6 +132,10 @@
     return results;
   }
 
+  /**
+   * @param {Element | null} element
+   * @returns {boolean}
+   */
   function isVisible(element) {
     if (!element) {
       return false;
@@ -120,8 +144,11 @@
     return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
   }
 
+  /**
+   * @param {HTMLElement | Element} element
+   */
   function hideElement(element) {
-    element.style.display = 'none';
+    /** @type {HTMLElement} */ (element).style.display = 'none';
     element.setAttribute('data-blocked-by-clean-adblock', 'true');
   }
 
@@ -166,11 +193,12 @@
 
   // Export for testing
   if (typeof window !== 'undefined') {
-    window['SocialMediaBlocker'] = {
-      detectPlatform,
-      findSponsoredContent,
-      hideElement,
-      PLATFORM_CONFIG
-    };
+    /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))['SocialMediaBlocker'] =
+      {
+        detectPlatform,
+        findSponsoredContent,
+        hideElement,
+        PLATFORM_CONFIG
+      };
   }
 })();
