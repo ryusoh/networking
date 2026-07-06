@@ -172,4 +172,36 @@ describe('Auto Generated Coverage', () => {
 
     jest.useRealTimers();
   });
+
+  test('proxies document.createElement for scripts and intercepts ad attributes', () => {
+    loadContentScript();
+
+    // Valid script
+    const validScript = document.createElement('script');
+    validScript.setAttribute('src', 'https://example.com/safe.js');
+    expect(validScript.src).toBe('https://example.com/safe.js');
+
+    // Invalid script via setAttribute
+    const invalidScript = document.createElement('script');
+    invalidScript.setAttribute('src', 'https://adrecover.com/bad.js');
+    expect(invalidScript.getAttribute('src')).toBeNull();
+
+    // Invalid script via src setter
+    const invalidScript2 = document.createElement('script');
+    invalidScript2.src = 'https://adrecover.com/bad2.js';
+    expect(invalidScript2.src).toBe('');
+
+    // other element
+    const div = document.createElement('div');
+    div.setAttribute('src', 'https://adrecover.com/bad.js');
+    expect(div.getAttribute('src')).toBe('https://adrecover.com/bad.js');
+  });
+
+  test('handles script creation without src parameter gracefully', () => {
+    loadContentScript();
+
+    const script = document.createElement('script');
+    script.setAttribute('src', '');
+    expect(script.getAttribute('src')).toBe('');
+  });
 });

@@ -103,4 +103,59 @@ describe('Auto Generated Coverage', () => {
 
     jest.useRealTimers();
   });
+
+  test('throttles mutation observer callbacks and sets tabSwitched upon trusted click', () => {
+    jest.useFakeTimers();
+
+    document.body.innerHTML = `
+      <div role="presentation">
+        <div role="tab" aria-selected="false">For you</div>
+      </div>
+      <div role="tab" aria-selected="false">Finance</div>
+    `;
+
+    // Mock innerText
+    const tabs = document.querySelectorAll('[role="tab"]');
+    tabs[0].innerText = 'For you';
+    tabs[1].innerText = 'Finance';
+
+    tabs[1].click = jest.fn();
+
+    loadContentScript();
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    // simulate a few mutations to trigger the throttle
+    const mutEvent = document.createEvent('Event');
+    mutEvent.initEvent('DOMNodeInserted', true, true);
+    document.body.appendChild(document.createElement('div'));
+    document.body.appendChild(document.createElement('span'));
+
+    // Mock isTrusted property via event constructor / prototype trick,
+    // but in jsdom we can't redefine it. We instead overwrite it on the prototype temporarily
+    const originalIsTrusted = Object.getOwnPropertyDescriptor(Event.prototype, 'isTrusted');
+    Object.defineProperty(Event.prototype, 'isTrusted', {
+      get: function () {
+        return true;
+      },
+      configurable: true
+    });
+
+    const clickEvent = new Event('click', { bubbles: true, cancelable: true });
+    tabs[1].dispatchEvent(clickEvent);
+
+    jest.advanceTimersByTime(1000);
+
+    // restore
+    if (originalIsTrusted) {
+      Object.defineProperty(Event.prototype, 'isTrusted', originalIsTrusted);
+    }
+
+    // Verify click event triggered after observing dom mutations to switch to preferred tab
+    expect(tabs[1].click).toHaveBeenCalled();
+
+    jest.useRealTimers();
+  });
 });
