@@ -153,6 +153,109 @@ describe('Auto Generated Coverage', () => {
     window.location = originalWindowLocation;
   });
 
+  test('coverage unhandled branches 2', () => {
+    // we must not replace document.body globally to avoid messing with other tests
+
+    // We can test 600 (document loading), 645-646 (document.body missing) and 659 (clearInterval)
+    jest.useFakeTimers();
+
+    document.body.innerHTML = '<html><head></head><body></body></html>';
+
+    // Mock document.readyState getter
+    const originalReadyState = Object.getOwnPropertyDescriptor(
+      window.Document.prototype,
+      'readyState'
+    );
+    Object.defineProperty(document, 'readyState', { value: 'loading', configurable: true });
+
+    // Mock document.body
+    const originalBody = Object.getOwnPropertyDescriptor(window.Document.prototype, 'body');
+    Object.defineProperty(document, 'body', { value: null, configurable: true });
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const sourceCode = instrumentFile(require('path').join(__dirname, '..', 'forum-ad-blocker.js'));
+    eval(sourceCode);
+
+    // Advance time slightly
+    jest.advanceTimersByTime(100);
+
+    // Restore body to let startObserver finish
+    if (originalBody) {
+      Object.defineProperty(document, 'body', originalBody);
+    } else {
+      delete document.body;
+    }
+
+    // Trigger DOMContentLoaded
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    // Restore readyState
+    if (originalReadyState) {
+      Object.defineProperty(document, 'readyState', originalReadyState);
+    } else {
+      delete document.readyState;
+    }
+
+    // Advance timers for scanCount to hit 20 (20 * 500 = 10000ms)
+    jest.advanceTimersByTime(11000);
+
+    // Also trigger mutation with text node to cover 612
+    const textNode = document.createTextNode('test');
+    document.body.appendChild(textNode);
+
+    // Also add an ad script to cover 628-629
+    const adScript = document.createElement('script');
+    adScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
+    document.body.appendChild(adScript);
+
+    jest.advanceTimersByTime(1000);
+
+    jest.useRealTimers();
+  });
+  test('coverage unhandled branches', async () => {
+    // line 556-557, 565-567: fetch interception error handling / missing text
+    // We can simulate an error during text() promise inside fetch
+
+    document.body.innerHTML = '<html><head></head><body></body></html>';
+    global.fetch = jest.fn((url) => {
+      if (url.includes('error-fetch')) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.reject(new Error('Fetch text failed'))
+        });
+      }
+      if (url.includes('missing-text')) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve('')
+        });
+      }
+      if (url.includes('not-ok')) {
+        return Promise.resolve({
+          ok: false,
+          status: 404
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve('<div class="forum-ad"></div>')
+      });
+    });
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const sourceCode = instrumentFile(require('path').join(__dirname, '..', 'forum-ad-blocker.js'));
+    eval(sourceCode);
+
+    // Call the global interceptFetch if it's there
+    // Actually the script immediately intercepts fetch and wraps it.
+
+    // Trigger the wrapped fetch
+    await window.fetch('https://example.com/error-fetch').catch(() => {});
+    await window.fetch('https://example.com/missing-text').catch(() => {});
+    await window.fetch('https://example.com/not-ok').catch(() => {});
+  });
   test('mutation observer handles dynamically added elements', () => {
     jest.useFakeTimers();
 
