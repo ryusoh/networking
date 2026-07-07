@@ -412,3 +412,108 @@ describe('Clean AdBlock Content Script - storage and messages', () => {
     jest.useRealTimers();
   });
 });
+
+describe('Clean AdBlock Content Script - Admiral', () => {
+  const contentScriptPath = require('path').resolve(__dirname, '../content.js');
+  const { instrumentFile } = require('./helpers/instrument');
+
+  function loadContentScript() {
+    const code = instrumentFile(contentScriptPath);
+    eval(code);
+  }
+
+  beforeEach(() => {
+    delete window.location;
+    window.location = new URL('https://example.com/test');
+    document.documentElement.innerHTML = '<head></head><body></body>';
+    jest.resetModules();
+    jest.clearAllMocks();
+    if (!global.chrome) {
+      global.chrome = {
+        storage: {
+          sync: { get: jest.fn((defaults, cb) => cb({ preferredTab: 'finance' })) },
+          local: { get: jest.fn((k, cb) => cb({ customSelectors: {} })) }
+        },
+        runtime: {
+          id: 'test-id',
+          onMessage: { addListener: jest.fn() },
+          sendMessage: jest.fn()
+        }
+      };
+    }
+  });
+
+  test('hides admiral overlay container when admiral link is found and ignores bad URIs', () => {
+    jest.useFakeTimers();
+
+    document.body.innerHTML = `
+      <div id="overlay-container">
+        <div>
+          <div>
+            <a href="https://getadmiral.com/test">Admiral</a>
+            <a href="%E0%A4%A">Bad URI</a>
+            <a href="https://example.com">Normal</a>
+            <a href="https://investing.com/vanguard-500-index-admiral">Not Admiral</a>
+          </div>
+        </div>
+      </div>
+    `;
+
+    loadContentScript();
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    jest.advanceTimersByTime(1000);
+
+    const container = document.getElementById('overlay-container');
+    expect(container.style.getPropertyValue('display')).toBe('none');
+
+    jest.useRealTimers();
+  });
+
+  test('does not hide link if the overlay container is the body', () => {
+    jest.useFakeTimers();
+
+    document.body.innerHTML = `
+      <a href="https://getadmiral.com/test" id="admiral-link">Admiral</a>
+    `;
+
+    loadContentScript();
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    jest.advanceTimersByTime(1000);
+
+    const link = document.getElementById('admiral-link');
+    // since parent is body, it breaks loop and doesn't hide
+    expect(link.style.getPropertyValue('display')).not.toBe('none');
+
+    jest.useRealTimers();
+  });
+
+  test('exits early without hiding elements when hostname is an admiral domain', () => {
+    jest.useFakeTimers();
+    delete window.location;
+    window.location = new URL('https://example.admiral.mgr/test');
+    document.body.innerHTML = `
+      <a href="https://getadmiral.com/test" id="admiral-link">Admiral</a>
+    `;
+    loadContentScript();
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    jest.advanceTimersByTime(1000);
+
+    // Verify it returned early by ensuring the element was not hidden
+    const link = document.getElementById('admiral-link');
+    expect(link.style.getPropertyValue('display')).not.toBe('none');
+
+    jest.useRealTimers();
+  });
+});
