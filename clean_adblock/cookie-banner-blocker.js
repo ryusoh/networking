@@ -198,16 +198,27 @@
   ];
   const CONSENT_KEYWORDS = ['cookie', 'consent', 'privacy', 'tracking', 'analytics', 'gdpr'];
 
+  /**
+   * @param {HTMLElement} el
+   */
   function isConsentDialog(el) {
-    const text = el.textContent.toLowerCase();
+    const text = /** @type {string} */ (el.textContent).toLowerCase();
     return CONSENT_KEYWORDS.filter((k) => text.includes(k)).length >= 2;
   }
 
+  /**
+   * @param {HTMLElement} container
+   * @param {string[]} textPatterns
+   * @returns {HTMLElement | null}
+   */
   function findButtonByText(container, textPatterns) {
     const buttons = container.querySelectorAll('button, [role="button"], a.button, a.btn');
     for (const pattern of textPatterns) {
       for (const btn of buttons) {
-        if (btn.textContent.toLowerCase().trim().includes(pattern)) {
+        if (
+          btn instanceof HTMLElement &&
+          /** @type {string} */ (btn.textContent).toLowerCase().trim().includes(pattern)
+        ) {
           return btn;
         }
       }
@@ -254,7 +265,7 @@
       try {
         const elements = document.querySelectorAll(selector);
         for (const el of elements) {
-          if (isCookieBanner(el)) {
+          if (el instanceof HTMLElement && isCookieBanner(el)) {
             return el;
           }
         }
@@ -265,8 +276,11 @@
     return null;
   }
 
+  /**
+   * @param {HTMLElement} element
+   */
   function isCookieBanner(element) {
-    const text = element.textContent.toLowerCase();
+    const text = /** @type {string} */ (element.textContent).toLowerCase();
     const keywords = [
       'cookie',
       'consent',
@@ -283,12 +297,17 @@
     return matchCount >= 2 && element.offsetHeight > 100;
   }
 
+  /**
+   * @param {HTMLElement} container
+   * @param {string[]} buttonSelectors
+   * @returns {HTMLElement | null}
+   */
   function findButton(container, buttonSelectors) {
     for (const selector of buttonSelectors) {
       try {
         const buttons = container.querySelectorAll(selector);
         for (const btn of buttons) {
-          if (isVisible(btn)) {
+          if (btn instanceof HTMLElement && isVisible(btn)) {
             return btn;
           }
         }
@@ -299,6 +318,9 @@
     return null;
   }
 
+  /**
+   * @param {HTMLElement | null} element
+   */
   function isVisible(element) {
     if (!element) {
       return false;
@@ -313,6 +335,9 @@
     );
   }
 
+  /**
+   * @param {HTMLElement} banner
+   */
   function dismissBanner(banner) {
     const bannerId = banner.id || banner.className || 'unknown';
     if (processedBanners.has(bannerId)) {
@@ -392,7 +417,7 @@
       if (
         prefs &&
         Array.isArray(prefs.whitelist) &&
-        prefs.whitelist.some((s) => host.includes(s))
+        prefs.whitelist.some((/** @type {string} */ s) => host.includes(s))
       ) {
         return;
       }
@@ -404,7 +429,9 @@
 
   // Export for testing
   if (typeof window !== 'undefined') {
-    window['CookieBannerBlocker'] = {
+    /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))[
+      'CookieBannerBlocker'
+    ] = {
       findCookieBanner,
       dismissBanner,
       dismissKnownCMP,
