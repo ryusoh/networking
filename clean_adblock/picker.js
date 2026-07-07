@@ -6,10 +6,13 @@
   if (typeof chrome === 'undefined' || !chrome.storage) {
     return;
   }
-  if (window['__bypassPickerActive']) {
+  if (
+    /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))['__bypassPickerActive']
+  ) {
     return;
   }
-  window['__bypassPickerActive'] = true;
+  /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))['__bypassPickerActive'] =
+    true;
 
   const overlay = document.createElement('div');
   overlay.style.cssText = `
@@ -33,6 +36,7 @@
   `;
   document.documentElement.appendChild(highlight);
 
+  /** @param {MouseEvent} e */
   function handleMouseMove(e) {
     const el = document.elementFromPoint(e.clientX, e.clientY);
     if (!el || el === overlay || el === highlight) {
@@ -46,6 +50,7 @@
     highlight.style.height = rect.height + 'px';
   }
 
+  /** @param {MouseEvent} e */
   function handleClick(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -63,12 +68,14 @@
     cleanup();
   }
 
+  /** @param {KeyboardEvent} e */
   function handleKeydown(e) {
     if (e.key === 'Escape') {
       cleanup();
     }
   }
 
+  /** @param {Element} el */
   function generateSelector(el) {
     if (el.id) {
       return `#${CSS.escape(el.id)}`;
@@ -82,6 +89,7 @@
     return el.tagName.toLowerCase();
   }
 
+  /** @param {string} selector */
   function saveCustomSelector(selector) {
     if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
       return;
@@ -97,7 +105,8 @@
           ) {
             return;
           }
-          const selectors = result.customSelectors || {};
+          /** @type {Record<string, string[]>} */
+          const selectors = /** @type {Record<string, string[]>} */ (result.customSelectors || {});
           if (!selectors[host]) {
             selectors[host] = [];
           }
@@ -115,7 +124,9 @@
   }
 
   function cleanup() {
-    window['__bypassPickerActive'] = false;
+    /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))[
+      '__bypassPickerActive'
+    ] = false;
     overlay.remove();
     highlight.remove();
     document.removeEventListener('mousemove', handleMouseMove);
