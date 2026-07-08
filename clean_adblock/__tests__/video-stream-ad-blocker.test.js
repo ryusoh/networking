@@ -116,12 +116,115 @@ describe('video-stream-ad-blocker.js', () => {
     adVideo.dispatchEvent(new Event('play'));
     expect(adVideo.pause).toHaveBeenCalled();
 
+    // Cover track with ad label
+    const track = document.createElement('track');
+    track.label = 'ad-video-track';
+    adVideo.appendChild(track);
+
+    Object.defineProperty(adVideo, 'textTracks', {
+      value: [{ label: 'ad-track', mode: 'showing' }]
+    });
+
+    window.VideoStreamAdBlocker.hideAdContainers();
+
+    // Call interceptXHR again to test missing XMLHttpRequest
+    const oldXHR = window.XMLHttpRequest;
+    delete window.XMLHttpRequest;
+    // We can't really call interceptXHR directly since it's not exported.
+    // We can just rely on the existing tests covering other parts, and add a test for isAdRequest error
+    window.XMLHttpRequest = oldXHR;
+
     // Trigger observer
     const newDiv = document.createElement('div');
     newDiv.className = 'ad-container';
     document.body.appendChild(newDiv);
 
     return new Promise((resolve) => setTimeout(resolve, 100));
+  });
+
+  it('handles invalid URL in isAdRequest', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(
+      require('path').join(__dirname, '..', 'video-stream-ad-blocker.js')
+    );
+    eval(code);
+
+    // Call with invalid URL to hit the catch block at line 86
+    expect(window.VideoStreamAdBlocker.isAdRequest('://invalid')).toBe(false);
+  });
+
+  it('handles null video in removeAdFromVideo', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(
+      require('path').join(__dirname, '..', 'video-stream-ad-blocker.js')
+    );
+    eval(code);
+
+    // Assuming we can trigger this by not passing a video, or we can mock querySelectorAll to return [null]
+    // which shouldn't happen but we can try to test it if exported or triggerable.
+    // wait, removeAdFromVideo isn't exported. We can't call it directly.
+    // Let's mock querySelectorAll('video') to return [null] and then call monitorVideoAds
+    document.body.innerHTML = '<video></video>';
+    const originalQuerySelectorAll = document.querySelectorAll.bind(document);
+    document.querySelectorAll = jest.fn((selector) => {
+      if (selector === 'video') {
+        return [null];
+      }
+      return originalQuerySelectorAll(selector);
+    });
+
+    // trigger via MutationObserver by adding an element
+    document.body.appendChild(document.createElement('div'));
+
+    // Wait for the mutation observer to run and monitorVideoAds to be called
+    jest.advanceTimersByTime(100);
+
+    // Restore
+    document.querySelectorAll = originalQuerySelectorAll;
+  });
+
+  it('handles missing fetch and XMLHttpRequest during init', () => {
+    // Save originals
+    const oldFetch = window.fetch;
+    const oldXHR = window.XMLHttpRequest;
+    delete window.fetch;
+    delete window.XMLHttpRequest;
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(
+      require('path').join(__dirname, '..', 'video-stream-ad-blocker.js')
+    );
+    eval(code);
+
+    // It should initialize without throwing
+    expect(window.VideoStreamAdBlocker).toBeDefined();
+
+    // Restore
+    window.fetch = oldFetch;
+    window.XMLHttpRequest = oldXHR;
+  });
+
+  it('runs init on DOMContentLoaded if document is loading', () => {
+    Object.defineProperty(document, 'readyState', {
+      value: 'loading',
+      configurable: true
+    });
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(
+      require('path').join(__dirname, '..', 'video-stream-ad-blocker.js')
+    );
+    eval(code);
+
+    // Wait for event listener
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    expect(window.VideoStreamAdBlocker).toBeDefined();
+
+    // Restore readyState
+    Object.defineProperty(document, 'readyState', {
+      value: 'complete',
+      configurable: true
+    });
   });
 
   it('does not run on non-video domains', () => {

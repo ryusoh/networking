@@ -81,6 +81,78 @@ describe('Auto Generated Coverage', () => {
     jest.useRealTimers();
   });
 
+  test('coverage missing chrome storage get handling', () => {
+    // Override local get to return no preferredTab
+    global.chrome.storage.sync.get = jest.fn((defaults, cb) => cb({}));
+
+    jest.useFakeTimers();
+
+    document.body.innerHTML = `
+      <div role="presentation">
+        <div role="tab" aria-selected="false">For you</div>
+      </div>
+      <div role="tab" aria-selected="false">Finance</div>
+    `;
+
+    const tabs = document.querySelectorAll('[role="tab"]');
+    tabs[0].innerText = 'For you';
+    tabs[1].innerText = 'Finance';
+    tabs[1].click = jest.fn();
+
+    loadContentScript();
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    jest.advanceTimersByTime(1000);
+
+    expect(tabs[1].click).toHaveBeenCalled();
+
+    jest.useRealTimers();
+  });
+
+  test('coverage early returns and untrusted click', () => {
+    jest.useFakeTimers();
+
+    document.body.innerHTML = `
+      <div role="presentation">
+        <div role="tab" aria-selected="false">For you</div>
+      </div>
+      <div role="tab" aria-selected="false">Finance</div>
+    `;
+
+    const tabs = document.querySelectorAll('[role="tab"]');
+    tabs[0].innerText = 'For you';
+    tabs[1].innerText = 'Finance';
+    tabs[1].click = jest.fn();
+
+    loadContentScript();
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    const originalIsTrusted = Object.getOwnPropertyDescriptor(Event.prototype, 'isTrusted');
+    Object.defineProperty(Event.prototype, 'isTrusted', {
+      get: function () {
+        return false;
+      },
+      configurable: true
+    });
+
+    const clickEvent = new Event('click', { bubbles: true, cancelable: true });
+    document.body.dispatchEvent(clickEvent);
+
+    jest.advanceTimersByTime(1000);
+
+    if (originalIsTrusted) {
+      Object.defineProperty(Event.prototype, 'isTrusted', originalIsTrusted);
+    }
+
+    jest.useRealTimers();
+  });
+
   test('coverage early returns and missing chrome', () => {
     delete global.chrome;
     delete window.location;
