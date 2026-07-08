@@ -59,7 +59,9 @@ already strict and blocking, do nothing.
 
 - Scoped check on TARGET (`npx tsc -p jsconfig.json --noEmit 2>&1 | grep '^<TARGET>'`)
   → empty.
-- Total `make type` error count **strictly decreased** (record before → after).
+- Repo-wide `make type` error count **strictly decreased** — record the total error
+  count (count of `error TS` lines across the whole `make type` output, not just
+  TARGET) both before you start and after your fix, so the PR can report both.
 - `make precommit` green; no runtime behavior change.
 
 ## Commit and pull request
@@ -70,5 +72,6 @@ only.
 - Title / commit subject: `refactor(types): annotate <file> for type-checking`
   (or `build(types): make JS type-check blocking` on finalize). Imperative,
   lower-case, ≤ 72 chars, **no emoji, no `Typist:` prefix**.
-- Body: TARGET; error count N → M; any logic bug fixed and why; pasted verification
+- Body: TARGET; TARGET's own error count N → M; **repo-wide `make type` total error
+  count before → after this PR**; any logic bug fixed and why; pasted verification
   output; "no runtime behavior change."
