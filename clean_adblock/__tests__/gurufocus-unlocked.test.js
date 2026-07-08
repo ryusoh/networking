@@ -824,3 +824,81 @@ test('cleans up wrap and forecast on path change', async () => {
   expect(document.querySelector('.gf-u-wrap')).toBeNull();
   expect(document.querySelector('.gf-u-forecast')).toBeNull();
 });
+
+describe('GuruFocus Unlocked - injectFinancials fallbacks and document state', () => {
+  let originalWindowLocation;
+
+  beforeEach(() => {
+    document.head.innerHTML = '';
+    document.body.innerHTML = '';
+    originalWindowLocation = window.location;
+    delete window.location;
+    window.location = new URL('https://www.gurufocus.com/stock/ANET/forecast');
+
+    window.__NUXT__ = {
+      state: {
+        stock_summary_financial: {
+          financials: { annual: [{ Revenue: 4000, date: '2023' }] }
+        }
+      }
+    };
+  });
+
+  afterEach(() => {
+    window.location = originalWindowLocation;
+  });
+
+  test('injectFinancials fallback insertions and failure', () => {
+    jest.useFakeTimers();
+
+    // 1. Test built-in-stock-summary
+    document.body.innerHTML =
+      '<div class="built-in-stock-summary"></div><div class="el-main"></div>';
+    loadScript();
+    jest.advanceTimersByTime(600);
+    expect(document.querySelector('.built-in-stock-summary > .gf-u-wrap')).not.toBeNull();
+
+    // 2. Test stock-header parent fallback
+    document.body.innerHTML =
+      '<div><div class="stock-header"></div></div><div class="el-main"></div>';
+    loadScript();
+    jest.advanceTimersByTime(600);
+    expect(document.querySelector('.stock-header').nextSibling.className).toBe('gf-u-wrap');
+
+    // 3. Test failure (no containers)
+    document.body.innerHTML = '<div></div>';
+    loadScript();
+    jest.advanceTimersByTime(600);
+    expect(document.querySelector('.gf-u-wrap')).toBeNull();
+
+    jest.useRealTimers();
+  });
+
+  test('handles document loading state', () => {
+    jest.useFakeTimers();
+    let currentState = 'loading';
+    Object.defineProperty(document, 'readyState', {
+      get() {
+        return currentState;
+      },
+      configurable: true
+    });
+
+    document.body.innerHTML = '<div class="el-main"></div>';
+    loadScript();
+
+    expect(document.querySelector('.gf-u-wrap')).toBeNull();
+
+    currentState = 'interactive';
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    jest.advanceTimersByTime(600);
+
+    expect(document.querySelector('.gf-u-wrap')).not.toBeNull();
+
+    delete document.readyState;
+    jest.useRealTimers();
+  });
+});
