@@ -1,4 +1,3 @@
-const fs = require('fs');
 const path = require('path');
 const { instrumentFile } = require('./helpers/instrument');
 
@@ -82,8 +81,7 @@ describe('Cookie Banner Blocker - Hardcoded Skips & Fallbacks', () => {
     // Let's rely on the text matching heuristic in `dismissConsentDialog` or `dismissBanner`...
     // Actually, dismissBanner searches for ACCEPT_BUTTONS on the banner element.
     // Let's mock querySelectorAll to return our button for a known selector.
-    const originalQuery = banner.querySelectorAll.bind(banner);
-    jest.spyOn(banner, 'querySelectorAll').mockImplementation((sel) => {
+    jest.spyOn(banner, 'querySelectorAll').mockImplementation(() => {
       return [acceptBtn]; // return our button for ANY selector, so findButton finds it
     });
 
