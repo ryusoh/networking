@@ -1,6 +1,6 @@
 ---
 description: Investigate a question against primary sources and write a cited Markdown findings doc. Use when the user asks you to research, investigate, or gather authoritative background on a topic.
-argument-hint: "[question to investigate]"
+argument-hint: '[question to investigate]'
 ---
 
 # Research

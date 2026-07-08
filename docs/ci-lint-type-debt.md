@@ -28,9 +28,9 @@ separately wired with a shell `|| echo` fallback, so a non-zero `tsc` exit is
 swallowed and replaced with an always-succeeding `echo`, making the target exit 0
 regardless of how many type errors JSDoc-checking finds.
 
-The type backlog isn't being burned down blindly — it *is* being worked, just
+The type backlog isn't being burned down blindly — it _is_ being worked, just
 slowly and by design. `.jules/typist.md` defines Typist's mandate as exactly
-**one file per run**, selecting the `clean_adblock/*.js` file with the *fewest*
+**one file per run**, selecting the `clean_adblock/*.js` file with the _fewest_
 remaining errors each time, explicitly prohibited from batching or from touching
 `jsconfig.json`/the Makefile to flip the gate early — that only happens once the
 entire repo-wide backlog hits zero. Git history confirms Typist is real and
@@ -45,7 +45,7 @@ lowest-error-count-first, so these larger files are queued last by its own
 "fewest remaining errors" tie-break rule.
 
 The ESLint warnings, by contrast, are nobody's job. No Jules lane in `AGENTS.md`'s
-lane table owns "clean up lint warnings in test files" — Testpilot only *adds*
+lane table owns "clean up lint warnings in test files" — Testpilot only _adds_
 test coverage, Janitor owns dead code/stale deps but not lint warnings, and no
 routine is chartered to touch `.test.js` files for style reasons. `AGENTS.md`
 explicitly forbids routines from changing lint config, but nothing forbids fixing
@@ -104,7 +104,7 @@ lane's defined scope, so it sits untouched indefinitely.
 - Confirmed live: `npx tsc -p jsconfig.json --noEmit` run directly in the repo
   currently reports errors in exactly the six files named in the question:
   `gurufocus-unlocked.js` (19), `background.js` (17), `video-stream-ad-
-  blocker.js` (15), `twitch-ad-blocker.js` (13), `popup.js` (12),
+blocker.js` (15), `twitch-ad-blocker.js` (13), `popup.js` (12),
   `forum-ad-blocker.js` (12) — 88 total.
 
 ### 4. `jsconfig.json` has `strict: true`, consistent with TS7006-style errors
@@ -118,7 +118,7 @@ lane's defined scope, so it sits untouched indefinitely.
   produces TS7006 ("implicit any") errors — consistent with the question's
   description of the error style, and consistent with `.jules/typist.md:19`
   describing the remaining backlog as "genuine DOM typing gaps (mostly `Property …
-  does not exist on type 'Element'/'Node'`)".
+does not exist on type 'Element'/'Node'`)".
 
 ### 5. Typist's actual mandate: one file per run, ordered by fewest errors, gate flips only at zero backlog
 
@@ -142,13 +142,13 @@ lane's defined scope, so it sits untouched indefinitely.
 ### 6. Typist is active, not dormant — cadence confirmed via `git log`
 
 - Bootstrap: `2b209f6` (2026-06-26) `build(types): bootstrap JS type-check
-  harness and Typist persona`.
+harness and Typist persona`.
 - First real annotation: `301f924` (2026-06-26) `Hello! Jules here. I have
-  successfully annotated clean_adblock/cookie-popup-blocker-main.js for
-  type-checking.` (pre-dates the current commit-message conventions in
+successfully annotated clean_adblock/cookie-popup-blocker-main.js for
+type-checking.` (pre-dates the current commit-message conventions in
   `AGENTS.md`, hence the conversational text `AGENTS.md` now explicitly forbids).
 - Subsequent commits, in order, one file each: `6319477` (06-27, `xhs-
-  keepalive.js`), `72552ba` (06-28, `nytimes-unlocked.js`), `afea7fd` (06-30,
+keepalive.js`), `72552ba` (06-28, `nytimes-unlocked.js`), `afea7fd` (06-30,
   `youtube-ad-blocker.js`), `3bbb240` (07-02, `nytimes-unlocked.js` again),
   `cd7ad76` (07-03, `x-unlocked.js`), `4e6d232` (07-04, `linkedin-unlocked.js`),
   `03ea57b` (07-05, `content.js`), `096d0ff` (07-06, `social-media-blocker.js`),
@@ -164,7 +164,7 @@ lane's defined scope, so it sits untouched indefinitely.
 ## Open questions / what couldn't be verified
 
 - **Exact scheduling mechanism/cron for Typist is not in this repo.** `AGENTS.md`
-  and `.jules/typist.md` describe *behavior* but neither file, nor anything else
+  and `.jules/typist.md` describe _behavior_ but neither file, nor anything else
   in the checked-out tree, specifies a cron expression, GitHub Action, or external
   scheduler that triggers Jules runs. The near-daily cadence in git log is
   circumstantial evidence of an external (Google Labs Jules platform-side)
