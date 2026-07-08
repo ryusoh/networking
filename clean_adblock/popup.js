@@ -8,8 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   const enabledToggle = /** @type {HTMLInputElement} */ (document.getElementById('enabled'));
   const modeSelect = /** @type {HTMLSelectElement} */ (document.getElementById('mode'));
-  const scanBtn = document.getElementById('scan');
-  const pickerBtn = document.getElementById('picker');
+  const scanBtn = /** @type {HTMLButtonElement} */ (document.getElementById('scan'));
+  const pickerBtn = /** @type {HTMLButtonElement} */ (document.getElementById('picker'));
 
   // Feature toggles
   const featureToggles = {
@@ -72,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Feature toggle handlers
+  /** @type {Record<string, string>} */
   const featureKeys = {
     cookieBanner: 'cookieBannerBlocker',
     socialMedia: 'socialMediaBlocker',
@@ -105,9 +106,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Site list buttons
-  const addWhitelistBtn = document.getElementById('addWhitelist');
-  const addBlacklistBtn = document.getElementById('addBlacklist');
-  const addJsBlockBtn = document.getElementById('addJsBlock');
+  const addWhitelistBtn = /** @type {HTMLButtonElement} */ (
+    document.getElementById('addWhitelist')
+  );
+  const addBlacklistBtn = /** @type {HTMLButtonElement} */ (
+    document.getElementById('addBlacklist')
+  );
+  const addJsBlockBtn = /** @type {HTMLButtonElement} */ (document.getElementById('addJsBlock'));
 
   function updateButtonStates() {
     try {
@@ -153,6 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  /** @param {string} listKey */
   function toggleCurrentIn(listKey) {
     try {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -213,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Trigger manual scan
   scanBtn.addEventListener('click', () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'scan' }, () => {
+      chrome.tabs.sendMessage(/** @type {number} */ (tabs[0].id), { action: 'scan' }, () => {
         if (chrome.runtime.lastError) {
           alert('Error: Could not communicate with page. Please refresh.');
         } else {
@@ -227,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
   pickerBtn.addEventListener('click', () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       chrome.scripting.executeScript({
-        target: { tabId: tabs[0].id },
+        target: { tabId: /** @type {number} */ (tabs[0].id) },
         files: ['picker.js']
       });
       window.close();
