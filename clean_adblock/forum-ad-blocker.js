@@ -285,10 +285,19 @@
 
   // Block script injection via DOM
   const originalCreateElement = document.createElement.bind(document);
+  /**
+   * @param {string} tagName
+   * @param {ElementCreationOptions} [options]
+   * @returns {HTMLElement}
+   */
   document.createElement = function (tagName, options) {
     const el = originalCreateElement(tagName, options);
     if (tagName.toLowerCase() === 'script') {
       const origSetAttribute = el.setAttribute.bind(el);
+      /**
+       * @param {string} name
+       * @param {string} value
+       */
       el.setAttribute = function (name, value) {
         if (name === 'src' && shouldBlockScript(value)) {
           return;
@@ -300,14 +309,25 @@
       const descriptor = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
       if (descriptor) {
         Object.defineProperty(el, 'src', {
+          /**
+           * @this {HTMLScriptElement}
+           * @param {string} value
+           */
           set(value) {
             if (shouldBlockScript(value)) {
               return;
             }
-            descriptor.set.call(this, value);
+            /** @type {(this: HTMLScriptElement, v: string) => void} */ (descriptor.set).call(
+              this,
+              value
+            );
           },
+          /**
+           * @this {HTMLScriptElement}
+           * @returns {string}
+           */
           get() {
-            return descriptor.get.call(this);
+            return /** @type {(this: HTMLScriptElement) => string} */ (descriptor.get).call(this);
           },
           configurable: true
         });
@@ -316,6 +336,10 @@
     return el;
   };
 
+  /**
+   * @param {string | null} src
+   * @returns {boolean}
+   */
   function shouldBlockScript(src) {
     if (!src) {
       return false;
@@ -467,6 +491,10 @@
 
   const processedElements = new WeakSet();
 
+  /**
+   * @param {HTMLElement} element
+   * @returns {boolean | void}
+   */
   function hideAd(element) {
     if (processedElements.has(element)) {
       return false;
@@ -497,7 +525,11 @@
   function blockForumAds() {
     for (const selector of FORUM_AD_SELECTORS) {
       try {
-        document.querySelectorAll(selector).forEach((el) => hideAd(el));
+        document.querySelectorAll(selector).forEach((el) => {
+          if (el instanceof HTMLElement) {
+            hideAd(el);
+          }
+        });
       } catch {
         /* invalid selector */
       }
@@ -508,7 +540,7 @@
     // Hide Taboola ad containers (walk up from taboola links)
     document.querySelectorAll('a[href*="taboola.com"]').forEach((link) => {
       const container = link.closest('li, .hot-banner, .hot-content') || link.parentElement;
-      if (container) {
+      if (container instanceof HTMLElement) {
         hideAd(container);
       }
     });
@@ -517,8 +549,10 @@
     document.querySelectorAll('div').forEach((el) => {
       const txt = el.textContent || '';
       if (txt.includes('Admaru') && txt.length < 50) {
-        hideAd(el);
-        if (el.parentElement) {
+        if (el instanceof HTMLElement) {
+          hideAd(el);
+        }
+        if (el.parentElement instanceof HTMLElement) {
           hideAd(el.parentElement);
         }
       }
@@ -556,14 +590,16 @@
           target = parent;
           parent = parent.parentElement;
         }
-        hideAd(target);
+        if (target instanceof HTMLElement) {
+          hideAd(target);
+        }
       });
     }
 
     // Hide Douban erebor redirect ad containers
     document.querySelectorAll('a[href*="erebor.douban.com"]').forEach((link) => {
       const container = link.closest('.customize-slot, .article-card') || link.parentElement;
-      if (container) {
+      if (container instanceof HTMLElement) {
         hideAd(container);
       }
     });
@@ -577,7 +613,9 @@
       document
         .querySelectorAll('#gateway-content, [data-testid="onsite-messaging-unit-gateway"]')
         .forEach((el) => {
-          hideAd(el);
+          if (el instanceof HTMLElement) {
+            hideAd(el);
+          }
         });
     }
 
@@ -604,6 +642,9 @@
 
   // --- Phase 5: MutationObserver for dynamic ads ---
 
+  /**
+   * @param {MutationRecord[]} mutations
+   */
   function onMutation(mutations) {
     let needsFullScan = false;
     for (const mutation of mutations) {
@@ -615,7 +656,7 @@
         // Check if the added node itself is an ad
         for (const selector of FORUM_AD_SELECTORS) {
           try {
-            if (node.matches && node.matches(selector)) {
+            if (node instanceof HTMLElement && node.matches(selector)) {
               hideAd(node);
             }
           } catch {
@@ -624,13 +665,13 @@
         }
 
         // Check if it's an ad script
-        if (node.tagName === 'SCRIPT' && node.src && shouldBlockScript(node.src)) {
+        if (node instanceof HTMLScriptElement && node.src && shouldBlockScript(node.src)) {
           node.remove();
           continue;
         }
 
         // Check for ad elements inside the added node
-        if (node.querySelectorAll) {
+        if (node instanceof Element) {
           needsFullScan = true;
         }
       }
@@ -662,6 +703,9 @@
 
   // Export for testing
   if (typeof window !== 'undefined') {
-    window['ForumAdBlocker'] = { blockForumAds, hideAd };
+    /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))['ForumAdBlocker'] = {
+      blockForumAds,
+      hideAd
+    };
   }
 })();
