@@ -46,6 +46,10 @@
   const processedElements = new WeakSet();
   let adsBlocked = 0;
 
+  /**
+   * @param {Element} element
+   * @returns {boolean}
+   */
   function isAdElement(element) {
     for (const selector of AD_SELECTORS) {
       try {
@@ -59,10 +63,18 @@
     return false;
   }
 
+  /**
+   * @param {string} url
+   * @returns {boolean}
+   */
   function isAdUrl(url) {
     return AD_URL_PATTERNS.some((pattern) => pattern.test(url));
   }
 
+  /**
+   * @param {HTMLElement} element
+   * @returns {boolean}
+   */
   function hideAd(element) {
     if (processedElements.has(element)) {
       return false;
@@ -114,7 +126,9 @@
       try {
         const elements = document.querySelectorAll(selector);
         for (const el of elements) {
-          hideAd(el);
+          if (el instanceof HTMLElement) {
+            hideAd(el);
+          }
         }
       } catch {
         // Invalid selector
@@ -160,17 +174,29 @@
     const originalOpen = XMLHttpRequest.prototype.open;
     const originalSend = XMLHttpRequest.prototype.send;
 
+    /**
+     * @this {XMLHttpRequest & { _url?: string }}
+     * @param {string} method
+     * @param {string | URL} url
+     * @param {any[]} rest
+     */
     XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-      this['_url'] = url;
+      this['_url'] = url.toString();
+      // @ts-ignore
       return originalOpen.apply(this, [method, url, ...rest]);
     };
 
+    /**
+     * @this {XMLHttpRequest & { _url?: string }}
+     * @param {any[]} args
+     */
     XMLHttpRequest.prototype.send = function (...args) {
       if (this['_url'] && isAdUrl(this['_url'])) {
         adsBlocked++;
         this.abort();
         return;
       }
+      // @ts-ignore
       return originalSend.apply(this, args);
     };
   }
@@ -197,7 +223,7 @@
     for (const mutation of mutations) {
       if (mutation.addedNodes.length > 0) {
         for (const node of mutation.addedNodes) {
-          if (node.nodeType === 1 && isAdElement(node)) {
+          if (node.nodeType === 1 && node instanceof HTMLElement && isAdElement(node)) {
             hideAd(node);
           }
         }
@@ -243,7 +269,7 @@
 
   // Export for testing
   if (typeof window !== 'undefined') {
-    window['TwitchAdBlocker'] = {
+    /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))['TwitchAdBlocker'] = {
       blockTwitchAds,
       trySkipAd,
       muteAdIfPlaying,
