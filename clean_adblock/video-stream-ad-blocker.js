@@ -78,6 +78,9 @@
   const blockedRequests = new Set();
   let adContainersHidden = 0;
 
+  /**
+   * @param {string} url
+   */
   function isAdDomain(url) {
     try {
       const hostname = new URL(url).hostname;
@@ -87,6 +90,9 @@
     }
   }
 
+  /**
+   * @param {string} url
+   */
   function isAdRequest(url) {
     if (isAdDomain(url)) {
       return true;
@@ -101,6 +107,9 @@
     return false;
   }
 
+  /**
+   * @param {string} url
+   */
   function blockAdRequest(url) {
     if (blockedRequests.has(url)) {
       return false;
@@ -127,6 +136,9 @@
     }
   }
 
+  /**
+   * @param {HTMLVideoElement} video
+   */
   function removeAdFromVideo(video) {
     if (!video) {
       return;
@@ -145,7 +157,9 @@
     const overlays = video.parentElement?.querySelectorAll('.ad-overlay, .video-ad-overlay');
     if (overlays) {
       for (const overlay of overlays) {
-        overlay.style.display = 'none';
+        if (overlay instanceof HTMLElement) {
+          overlay.style.display = 'none';
+        }
       }
     }
   }
@@ -182,19 +196,43 @@
     const originalOpen = XMLHttpRequest.prototype.open;
     const originalSend = XMLHttpRequest.prototype.send;
 
-    XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-      this['_url'] = url;
-      return originalOpen.apply(this, [method, url, ...rest]);
+    /**
+     * @param {string} method
+     * @param {string | URL} url
+     * @param {boolean} [async]
+     * @param {string | null} [username]
+     * @param {string | null} [password]
+     */
+    XMLHttpRequest.prototype.open = function (method, url, async, username, password) {
+      /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (this))['_url'] = url;
+      // When calling open with less than 3 arguments, only method and url should be passed to originalOpen
+      if (arguments.length >= 3) {
+        return originalOpen.call(
+          this,
+          method,
+          url,
+          /** @type {boolean} */ (async),
+          username,
+          password
+        );
+      }
+      // Note: originalOpen is typed to expect at least 3 arguments when using `call`.
+      // We will cast it to any to bypass this limitation.
+      return /** @type {any} */ (originalOpen).call(this, method, url);
     };
 
-    XMLHttpRequest.prototype.send = function (...args) {
-      if (this['_url'] && isAdRequest(this['_url'])) {
-        blockAdRequest(this['_url']);
+    /**
+     * @param {Document | XMLHttpRequestBodyInit | null | undefined} [body]
+     */
+    XMLHttpRequest.prototype.send = function (body) {
+      const self = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (this));
+      if (typeof self['_url'] === 'string' && isAdRequest(self['_url'])) {
+        blockAdRequest(self['_url']);
         // Abort ad request
         this.abort();
         return;
       }
-      return originalSend.apply(this, args);
+      return originalSend.call(this, body);
     };
   }
 
@@ -257,7 +295,9 @@
 
   // Export for testing
   if (typeof window !== 'undefined') {
-    window['VideoStreamAdBlocker'] = {
+    /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))[
+      'VideoStreamAdBlocker'
+    ] = {
       isAdRequest,
       blockAdRequest,
       hideAdContainers,
