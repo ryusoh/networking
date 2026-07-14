@@ -17,6 +17,9 @@ const updateBadge = () => {
 };
 
 let isUpdatingRules = false;
+/**
+ * @param {string[]} hostnames
+ */
 const updateBlockingRules = async (hostnames) => {
   if (isUpdatingRules) {
     return;
@@ -26,6 +29,7 @@ const updateBlockingRules = async (hostnames) => {
     const uniqueHosts = Array.from(new Set(hostnames || [])).filter((h) => h && h.trim());
     const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
     const removeRuleIds = existingRules.map((r) => r.id);
+    /** @type {chrome.declarativeNetRequest.Rule[]} */
     const addRules = [];
 
     if (uniqueHosts.length > 0) {
@@ -151,7 +155,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
         updateBadge();
       }
       if (changes.jsBlocked) {
-        updateBlockingRules(changes.jsBlocked.newValue || []);
+        updateBlockingRules(/** @type {string[]} */ (changes.jsBlocked.newValue || []));
       }
     } catch (e) {
       console.error('Background storage onChanged handler failed:', e);
@@ -171,7 +175,7 @@ try {
     }
     updateBadge();
     if (prefs.jsBlocked) {
-      updateBlockingRules(prefs.jsBlocked);
+      updateBlockingRules(/** @type {string[]} */ (prefs.jsBlocked));
     }
   });
   setupAdNetworkBlocking();
@@ -209,6 +213,9 @@ const AUTH_COOKIE_PATTERNS = [
   'ticket'
 ];
 
+/**
+ * @param {string} name
+ */
 function isAuthCookie(name) {
   const lower = name.toLowerCase();
   return AUTH_COOKIE_PATTERNS.some((p) => lower.includes(p));
@@ -262,7 +269,7 @@ async function heartbeat() {
     });
     console.log(`[SessionKeeper] 1p3a heartbeat: HTTP ${resp.status}`);
   } catch (e) {
-    console.warn('[SessionKeeper] 1p3a heartbeat failed:', e.message);
+    console.warn('[SessionKeeper] 1p3a heartbeat failed:', /** @type {Error} */ (e).message);
   }
 }
 
@@ -279,7 +286,7 @@ async function sessionKeepAlive() {
     await heartbeat();
     console.log('[SessionKeeper] 1p3a session refreshed');
   } catch (e) {
-    console.warn('[SessionKeeper] Error:', e.message);
+    console.warn('[SessionKeeper] Error:', /** @type {Error} */ (e).message);
   }
 }
 
@@ -308,6 +315,9 @@ const XHS_DOMAINS = ['xiaohongshu.com', '.xiaohongshu.com'];
 const XHS_INTERVAL_MINS = 8;
 
 // We check if the user is actually logged in by looking for core session cookies
+/**
+ * @param {chrome.cookies.Cookie[]} cookies
+ */
 function hasXhsCoreAuth(cookies) {
   return cookies.some((c) => (c.name === 'web_session' || c.name === 'a1') && c.value);
 }
@@ -364,7 +374,7 @@ async function xhsHeartbeat() {
       console.log(`[SessionKeeper] XHS heartbeat (${url}): HTTP ${resp.status}`);
     }
   } catch (e) {
-    console.warn('[SessionKeeper] XHS heartbeat failed:', e.message);
+    console.warn('[SessionKeeper] XHS heartbeat failed:', /** @type {Error} */ (e).message);
   }
 }
 
@@ -379,7 +389,7 @@ async function xhsSessionKeepAlive() {
     await xhsHeartbeat();
     console.log('[SessionKeeper] XHS session refreshed');
   } catch (e) {
-    console.warn('[SessionKeeper] XHS error:', e.message);
+    console.warn('[SessionKeeper] XHS error:', /** @type {Error} */ (e).message);
   }
 }
 
@@ -448,6 +458,9 @@ const COOKIE_NOTICE_PATH_PATTERNS = [
   '/gdpr/cookie'
 ];
 
+/**
+ * @param {string | undefined} url
+ */
 function shouldCloseTab(url) {
   if (!url) {
     return false;
@@ -478,6 +491,7 @@ function shouldCloseTab(url) {
  * When premium navigation detected, redirect immediately using in-memory URL.
  */
 
+/** @type {string | null} */
 let linkedinPendingProfile = null;
 
 // Receive profile URL from content script — instant, synchronous delivery
@@ -488,6 +502,9 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
 });
 
+/**
+ * @param {string | undefined} url
+ */
 function isLinkedInPremium(url) {
   if (!url) {
     return false;
@@ -495,6 +512,9 @@ function isLinkedInPremium(url) {
   return url.includes('linkedin.com/premium');
 }
 
+/**
+ * @param {number} tabId
+ */
 function redirectFromPremium(tabId) {
   const dest = linkedinPendingProfile;
   if (dest) {
@@ -542,11 +562,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.tabs.onCreated.addListener((tab) => {
   const url = tab.pendingUrl || tab.url;
   if (url && shouldCloseTab(url)) {
-    chrome.tabs.remove(tab.id).catch(() => {});
+    if (tab.id !== undefined) {
+      chrome.tabs.remove(tab.id).catch(() => {});
+    }
     return;
   }
   if (url && isLinkedInPremium(url)) {
     console.log('[LinkedIn Fix] Premium URL in new tab:', url);
-    redirectFromPremium(tab.id);
+    if (tab.id !== undefined) {
+      redirectFromPremium(tab.id);
+    }
   }
 });
