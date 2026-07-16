@@ -40,6 +40,7 @@
     document.querySelectorAll('.blur, [style*="blur"]').forEach(unblur);
   }
 
+  /** @param {Element} el */
   function unblur(el) {
     if (!(el instanceof HTMLElement)) {
       return;
@@ -122,10 +123,16 @@
     }
 
     const vueEl = document.querySelector('[data-v-5ccaf75f]');
-    if (!vueEl || !vueEl['__vue__']) {
+    const vueObj = vueEl
+      ? /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (vueEl))['__vue__']
+      : null;
+    if (!vueEl || !vueObj) {
       return false;
     }
-    const vm = vueEl['__vue__'];
+    const vm =
+      /** @type {{ loading?: boolean, noData?: boolean, estimateData?: { mean: number, high: number, med: number, low: number, num: number, entry_date?: string }, priceData?: Array<Array<string>> }} */ (
+        vueObj
+      );
     if (vm.loading || vm.noData) {
       return false;
     }
@@ -193,10 +200,16 @@
     const blurImgParents = document.querySelectorAll('[data-v-5ccaf75f]');
     for (let i = 0; i < blurImgParents.length; i++) {
       const parent = blurImgParents[i];
-      if (parent['__vue__'] && parent['__vue__'].estimateData && !inserted) {
+      const parentVueObj = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (parent))[
+        '__vue__'
+      ];
+      const parentVm = /** @type {{ estimateData?: unknown } | undefined} */ (parentVueObj);
+      if (parentVm && parentVm.estimateData && !inserted) {
         const wrap = document.createElement('div');
         wrap.innerHTML = html;
-        parent.parentElement.insertBefore(wrap.firstChild, parent);
+        if (parent.parentElement && wrap.firstChild) {
+          parent.parentElement.insertBefore(wrap.firstChild, parent);
+        }
         inserted = true;
         break;
       }
@@ -206,7 +219,9 @@
       if (main) {
         const wrap = document.createElement('div');
         wrap.innerHTML = html;
-        main.insertBefore(wrap.firstChild, main.firstChild);
+        if (wrap.firstChild) {
+          main.insertBefore(wrap.firstChild, main.firstChild);
+        }
         inserted = true;
       }
     }
@@ -229,6 +244,7 @@
     '.gf-u-table tr:hover{background:#eef5ff}' +
     '</style>';
 
+  /** @type {Record<string, number>} */
   const SKIP = {
     '': 1,
     date: 1,
@@ -244,11 +260,12 @@
     restated_date: 1
   };
 
+  /** @param {number|string|null|undefined} v */
   function fmt(v) {
     if (v === null || v === undefined || v === '') {
       return '-';
     }
-    const n = parseFloat(v);
+    const n = typeof v === 'number' ? v : parseFloat(String(v));
     if (isNaN(n)) {
       return String(v);
     }
@@ -267,6 +284,7 @@
     return n.toFixed(2);
   }
 
+  /** @type {Record<string, string>} */
   const LABEL_TO_METRIC = {
     revenue: 'revenue_estimate',
     'eps without nri': 'eps_nri_estimate',
@@ -286,14 +304,23 @@
   function fillOriginalForecastTables() {
     // Find parent component with estimate.estimate_current
     const el = document.querySelector('.m-t-md.border.p-md');
-    if (!el || !el['__vue__']) {
+    const elVueObj = el
+      ? /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (el))['__vue__']
+      : null;
+    if (!el || !elVueObj) {
       return false;
     }
-    let vm = el['__vue__'];
+
+    /**
+     * @typedef {Object} VueComponent
+     * @property {VueComponent} [$parent]
+     * @property {{ estimate_current?: Record<string, unknown>, long_term_growth?: { future_revenue_estimate_growth?: number, future_eps_nri_estimate_growth?: number }, past_term_growth?: { revenue_estimate_growth?: number, eps_nri_estimate_growth?: number }, estimate_history?: Record<string, unknown>, estimate_trend?: Record<string, unknown>, estimate_revision?: Record<string, unknown> }} [estimate]
+     */
+    let vm = /** @type {VueComponent | null} */ (elVueObj);
     while (vm && !(vm.estimate && vm.estimate.estimate_current)) {
-      vm = vm.$parent;
+      vm = vm.$parent || null;
     }
-    if (!vm) {
+    if (!vm || !vm.estimate) {
       return false;
     }
 
@@ -347,13 +374,26 @@
         continue;
       }
 
-      let tableData = est;
+      /**
+       * @typedef {Record<string, Record<string, Record<string, number | null>>>} TableSubData
+       */
+      /**
+       * @typedef {{ annual?: TableSubData, quarterly?: TableSubData }} TableDataStructure
+       */
+      /** @type {TableDataStructure} */
+      let tableData = /** @type {TableDataStructure} */ (/** @type {unknown} */ (est));
       if (tableTitle.indexOf('surprise') !== -1) {
-        tableData = vm.estimate.estimate_history || {};
+        tableData = /** @type {TableDataStructure} */ (
+          /** @type {unknown} */ (vm.estimate.estimate_history || {})
+        );
       } else if (tableTitle.indexOf('trends') !== -1) {
-        tableData = vm.estimate.estimate_trend || {};
+        tableData = /** @type {TableDataStructure} */ (
+          /** @type {unknown} */ (vm.estimate.estimate_trend || {})
+        );
       } else if (tableTitle.indexOf('revisions') !== -1) {
-        tableData = vm.estimate.estimate_revision || {};
+        tableData = /** @type {TableDataStructure} */ (
+          /** @type {unknown} */ (vm.estimate.estimate_revision || {})
+        );
       }
 
       let dateRow = null;
@@ -370,6 +410,7 @@
 
       /** @type {NodeListOf<HTMLElement>} */
       const ths = dateRow.querySelectorAll('th, td');
+      /** @type {Record<number, string>} */
       const colMap = {};
       for (let c = 0; c < ths.length; c++) {
         const match = ths[c].innerText.trim().match(/^(\d{4})-(\d{2})/);
@@ -441,8 +482,9 @@
         }
 
         const offset = tds.length - ths.length;
-        for (const colIdx in colMap) {
-          const tdIndex = parseInt(colIdx) + offset;
+        for (const colIdxStr in colMap) {
+          const colIdx = parseInt(colIdxStr, 10);
+          const tdIndex = colIdx + offset;
           if (tdIndex > 0 && tdIndex < tds.length) {
             const cell = tds[tdIndex];
             const innerText = cell.innerText.trim();
@@ -468,7 +510,7 @@
 
               if (val != null) {
                 if (statKey === 'num' || statKey === 'up_num' || statKey === 'down_num') {
-                  cell.innerText = val;
+                  cell.innerText = String(val);
                 } else {
                   cell.innerText = fmt(val) + (statKey === 'surprise_pct' ? '%' : '');
                 }
@@ -488,6 +530,7 @@
     return filledAny || totalEmptyExpected === 0;
   }
 
+  /** @param {Array<Record<string, unknown>>} entries */
   function buildTable(entries) {
     if (!entries || !entries.length) {
       return '';
@@ -509,9 +552,14 @@
     }
     const sorted = entries
       .slice()
-      .sort(function (a, b) {
-        return String(b.date || '').localeCompare(String(a.date || ''));
-      })
+      .sort(
+        /** @param {Record<string, unknown>} a */ /** @param {Record<string, unknown>} b */ function (
+          a,
+          b
+        ) {
+          return String(b.date || '').localeCompare(String(a.date || ''));
+        }
+      )
       .slice(0, 10);
 
     let h = '<table class="gf-u-table"><tr><th>Metric</th>';
@@ -525,7 +573,8 @@
       });
       h += '<tr><td>' + label + '</td>';
       for (let c = 0; c < sorted.length; c++) {
-        h += '<td>' + fmt(sorted[c][metrics[m]]) + '</td>';
+        const cellValue = sorted[c][metrics[m]];
+        h += '<td>' + fmt(/** @type {number|string|null|undefined} */ (cellValue)) + '</td>';
       }
       h += '</tr>';
     }
@@ -537,7 +586,10 @@
       return true;
     }
 
-    const nuxt = window['__NUXT__'];
+    const nuxt =
+      /** @type {{ state?: { stock_summary_financial?: { financials?: { annual?: Array<Record<string, unknown>>, quarter?: Array<Record<string, unknown>>, ttm?: Array<Record<string, unknown>> } } } }} */ (
+        /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))['__NUXT__']
+      );
     if (!nuxt || !nuxt.state || !nuxt.state.stock_summary_financial) {
       return false;
     }
@@ -553,8 +605,10 @@
       return false;
     }
 
-    const tabs = [],
-      panels = [];
+    /** @type {string[]} */
+    const tabs = [];
+    /** @type {Array<{id: string, html: string}>} */
+    const panels = [];
     if (annual.length) {
       tabs.push('Annual');
       panels.push({ id: 'annual', html: buildTable(annual) });
