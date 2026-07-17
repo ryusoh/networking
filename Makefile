@@ -45,7 +45,7 @@ lint-fix:
 # breaking CI. When zero strict errors remain, drop the `|| echo` to make it
 # blocking (see .jules/typist.md).
 type:
-	@npx tsc -p jsconfig.json --noEmit || echo "make type: non-blocking JS type errors remain (Typist lane)"
+	@npx tsc -p jsconfig.json --noEmit
 
 test:
 	@npm run test:coverage
