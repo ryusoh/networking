@@ -364,7 +364,7 @@ logs to the repository.
 - **Jules scheduled routines (unattended)** are a separate system from the
   interactive skills above: their shared contract is this file and their
   per-routine personas live in `.jules/<name>.md` (currently `testpilot`,
-  `typist`).
+  `typist`, `janitor`, `architect`, `bolt`).
 
 ## Lanes (keep PRs disjoint to avoid collisions)
 
