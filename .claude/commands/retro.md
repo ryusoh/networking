@@ -3,44 +3,32 @@ description: Retrospective — turn this session's friction into durable repo im
 argument-hint: "[optional focus area, e.g. 'test setup' or 'ad-blocker rules']"
 ---
 
-You just finished a task. Run a **compounding-loop retrospective** so the next task
-in this repo is closer to one-shot. Be honest and concrete, and prefer patching the
-repo over re-explaining things in chat.
+# Retrospective
+
+You just finished a task. Run a **compounding-loop retrospective** so the next task in this repo is closer to one-shot. Be honest and concrete, and prefer patching the repo over re-explaining things in chat.
 
 Work through these steps:
 
-1. **Diagnose the friction.** Look back over this session and name what actually cost
-   time or tokens: things you had to discover by trial and error, ambiguous instructions,
-   missing context, repeated corrections, or commands that failed before they worked.
-   $ARGUMENTS — if provided, focus the retro on this area.
+1. **Diagnose the friction.** Look back over this session and name what actually cost time or tokens: things you had to discover by trial and error, ambiguous instructions, missing context, repeated corrections, or commands that failed before they worked.
+   If `$ARGUMENTS` is non-empty, focus the retrospective there.
 
-2. **Map each friction point to a durable fix.** For every item, decide where the
-   knowledge belongs so it never has to be rediscovered:
-   - A `CLAUDE.md` (create one at repo root if it doesn't exist yet) for conventions,
-     gotchas, how to run tests/lint/format, project layout, and per-subproject notes
-     (this repo has many: `clean_adblock`, `nas_proxy`, `retriever`, `vps_*`, etc.).
-   - A new or updated `.claude/commands/<name>.md` for any multi-step prompt worth
-     replaying on demand.
+2. **Map each friction point to a durable fix.** For every item, decide where the knowledge belongs so it never has to be rediscovered:
+   - `AGENTS.md` for conventions, gotchas, how to run tests/lint/format, project layout, and per-subproject notes (this repo has many: `clean_adblock`, `nas_proxy`, `retriever`, `vps_*`, etc.).
+   - A new or updated `.agents/skills/<name>/SKILL.md` for any multi-step prompt worth replaying on demand (`.claude/commands/` is generated from these by `tools/sync_commands.py` — don't edit it directly).
    - The relevant `docs/*.md` for domain/architecture knowledge.
    - Test fixtures, helpers, or `jest.setup.js` for repeated test scaffolding.
 
-3. **Check what already exists before adding.** Don't duplicate. Read the current
-   `CLAUDE.md`, `.claude/commands/`, `docs/`, and `package.json` scripts first and
-   extend them rather than creating parallel copies.
+3. **Check what already exists before adding.** Don't duplicate. Read the current `AGENTS.md`, `.agents/skills/`, `docs/`, and `package.json` scripts first and extend them rather than creating parallel copies.
 
-4. **Implement the safe, high-leverage fixes now.** Make the edits that are clearly
-   correct and low-risk (documentation, command files, small helpers). Keep changes
-   tight and in the style of the surrounding repo.
+4. **Implement the safe, high-leverage fixes now.** Make the edits that are clearly correct and low-risk (documentation, command files, small helpers). Keep changes tight and in the style of the surrounding repo.
 
-5. **Ask before anything heavy.** Pause and confirm before adding dependencies,
-   changing CI, restructuring directories, or anything hard to reverse.
+5. **Ask before anything heavy.** Pause and confirm before adding dependencies, changing CI, restructuring directories, or anything hard to reverse.
 
 6. **Verify.** Run the repo's own checks on whatever you touched so nothing trips CI:
    - `npm run fmt:check` (Prettier) and `npm run lint` (ESLint) for formatting/lint
    - `npm test` (Jest) if you changed test scaffolding or code
 
-7. **Report.** Summarize what you changed, where the knowledge now lives, and what
-   you deliberately left for the user to decide.
+7. **Report.** Summarize what you changed, where the knowledge now lives, and what you deliberately left for the user to decide.
 
 Guiding test: a correction you had to give today should be impossible to need next month.
 Nothing is committed by these edits — leave committing to the user.

@@ -1,18 +1,29 @@
 # AGENTS.md
 
-Shared operating contract for **automated agents** (Jules scheduled routines) on
-this repo. You run unattended and open PRs. A human only does a binary
-approve/close on the result — they will **not** leave review comments or iterate
-with you. So every PR must be self-evidently correct and approvable at a glance.
-Optimize for **approve rate**, not for volume.
+Single source of truth for agent guidance on this repo — **edit this file, not
+`CLAUDE.md`** (that is a stub that imports this one). Slash-command workflows
+live in `.agents/skills/<name>/SKILL.md` (canonical — the open Agent Skills
+format); `.claude/commands/` is generated from it by `tools/sync_commands.py`,
+and the gate drift-checks it via `make sync-check`.
+
+Two audiences:
+
+- **Unattended Jules routines** (`.jules/` personas): you run unattended and
+  open PRs. A human only does a binary approve/close on the result — they will
+  **not** leave review comments or iterate with you. So every PR must be
+  self-evidently correct and approvable at a glance. Optimize for **approve
+  rate**, not for volume. The sections from "Non-negotiables" through "Lanes"
+  are binding on you.
+- **Interactive agents** (Claude Code, Kimi, …): the whole guide applies to
+  you — commands, gotchas, and conventions below. The PR/lane contract applies
+  when you open PRs unattended.
 
 This repo (net-tools) is a collection of **independent networking and browser
 tooling subprojects** spanning several languages: a Chrome MV3 extension
 (`clean_adblock/`, JavaScript, Jest + jsdom), Python packages
-(`nas_proxy/`, `retriever/`, `vps_kernel_proxy/`, `nas_tools/`, pytest), C tooling
-(`nas_proxy/`, `nas_tools/`, `bin/*.c`, compiled with `-lcurl`), and eBPF
-(`vps_kernel_proxy/`, Docker-only). Human-facing detail lives in `CLAUDE.md` and
-`GEMINI.md`; read them before deep work.
+(`nas_proxy/`, `retriever/`, `vps_kernel_proxy/`, `nas_tools/`, pytest), C
+tooling (`nas_proxy/`, `nas_tools/`, `bin/*.c`, compiled with `-lcurl`), and
+eBPF (`vps_kernel_proxy/`, Docker-only).
 
 ## Non-negotiables (a PR that violates any of these will be closed)
 
@@ -29,8 +40,8 @@ tooling subprojects** spanning several languages: a Chrome MV3 extension
 4. **Don't commit to `main`.** Branch off `main`, open a PR.
 5. **Do not upgrade `jest` or `jest-environment-jsdom`.** They are pinned to v29
    on purpose; v30/v26 break the `window.location` mocking used across the
-   `clean_adblock` suite (see `GEMINI.md`). A dependency bump that touches these
-   will be closed.
+   `clean_adblock` suite (rationale in "Jest & jsdom version pin" below). A
+   dependency bump that touches these will be closed.
 6. **Don't add dependencies or change build/lint/test config** unless your lane
    explicitly allows it. No new npm or pip packages, no edits to `package.json`
    scripts, `eslint.config.cjs`, `pyproject.toml`, or the Makefile, except where a
@@ -45,13 +56,21 @@ tooling subprojects** spanning several languages: a Chrome MV3 extension
 
 `make precommit` and `precommit-fix` **exit 0 even when the log looks alarming.**
 Judge by the exit code and the summary lines, not by eyeballing the stream. Known
-expected noise (all documented in `CLAUDE.md`):
+expected noise:
 
 - **eBPF is intentionally ignored** (`-@docker ...` in the Makefile). Without
   Docker/Colima you will see `test-ebpf ... Error N (ignored)` — expected, not a
-  failure. Any `(ignored)` is fine.
+  failure. The exit code varies by cause (`Error 1` when the build fails,
+  `Error 125` when Docker itself is absent in CI); any `(ignored)` is fine.
+  Start Colima only if you specifically need the eBPF kernel tests.
 - **`curl_easy_perform() failed: Unsupported protocol`** in the nas_proxy run is a
   test deliberately exercising the error path (`invalid://schema`), not a failure.
+- **The nas_proxy C tests are smoke tests, not assertion suites.** `[PASS]` /
+  `ALL C TESTS PASSED` are `printf`'d after each `test_*()` returns, so "PASS"
+  mostly means "didn't crash." Only a few cases actually `assert` (e.g. the
+  `get_tile` round-trip in `test_tile_storage`); `test_tile_fetcher` asserts
+  nothing. When you touch nas_proxy logic, add real `assert(...)`s — a green line
+  alone won't catch a regression.
 - **`nas_tools` privileged tests (ICMP / `eth0`) and the `vps_kernel_proxy` eBPF
   compile test self-skip** when the host lacks prerequisites (e.g. macOS, bare CI
   runner). Do not "fix" a skip by apt-installing a BPF toolchain or removing a
@@ -114,20 +133,22 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 
 ## Command interface — prefer `make` (matches CI)
 
-| Need                                   | Command                                  |
-| -------------------------------------- | ---------------------------------------- |
-| Full gate, check-only (what CI runs)   | `make precommit`                         |
-| Full gate, auto-fixing format and lint | `make precommit-fix`                     |
-| JS lint / format                       | `make lint` / `make fmt-check`           |
-| Jest with coverage                     | `make test`                              |
-| Python tests + coverage (term-missing) | `make test-py`                           |
-| JS type-check (JSDoc, non-blocking)    | `make type`                              |
-| Rank least-covered files (Testpilot)   | `python3 bin/coverage_rank.py --limit 5` |
-| Scoped Jest while iterating            | `npx jest <path>`                        |
+| Need                                     | Command                                  |
+| ---------------------------------------- | ---------------------------------------- |
+| Full gate, check-only (what CI runs)     | `make precommit`                         |
+| Full gate, auto-fixing format and lint   | `make precommit-fix`                     |
+| JS lint / format                         | `make lint` / `make fmt-check`           |
+| Jest with coverage                       | `make test`                              |
+| Python tests + coverage (term-missing)   | `make test-py`                           |
+| JS type-check (JSDoc, non-blocking)      | `make type`                              |
+| Rank least-covered files (Testpilot)     | `python3 bin/coverage_rank.py --limit 5` |
+| Scoped Jest while iterating              | `npx jest <path>`                        |
+| Pull an extension (retriever)            | `make pull ID=<extension_id>`            |
+| Regenerate / drift-check Claude commands | `python3 tools/sync_commands.py`         |
 
 - **Jest is pinned to v29.** The established `window.location` mock is the
-  "delete and reassign in `beforeEach`" pattern (see `GEMINI.md`); do not port the
-  v30 pattern.
+  "delete and reassign in `beforeEach`" pattern (code in "Jest & jsdom version
+  pin" below); do not port the v30 pattern.
 - `make test-py` first builds the `nas_tools` C binaries the tests shell out to,
   then runs pytest. If `--cov` is unrecognized, install dev deps:
   `python3 -m pip install -r requirements-dev.txt --break-system-packages`.
@@ -138,10 +159,212 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   service worker; tests in `clean_adblock/__tests__/` (jsdom).
 - `nas_proxy/`, `nas_tools/` — C tooling (`make -C <dir> test`); `nas_tools` also
   has Python wrappers with privileged, self-skipping tests.
-- `retriever/` — the `pull` script. `vps_kernel_proxy/` — kernel/user proxy + eBPF.
+- `retriever/` — the `pull` script. `vps_kernel_proxy/` — kernel/user proxy +
+  eBPF. `vps_user_proxy/` — userspace proxy variant.
 - `tianditu_bypass/`, `vmware/`, `bin/` — misc tools and C build accelerators.
 - `docs/` — `EBPF_RESEARCH.md`, `NAS_STRATEGY.md`. `bin/coverage_rank.py` — the
   coverage ranking helper.
+
+## Repo conventions
+
+### Coverage reports and the fmt-check gotcha
+
+Both `make precommit` and `precommit-fix` print a coverage table after the tests:
+Jest (`clean_adblock/*.js`, scoped via `collectCoverageFrom` in `package.json`)
+and pytest (source modules only; test files/`__init__.py` omitted via the
+`[tool.coverage.run]` section in `pyproject.toml`).
+
+**`make precommit` runs `fmt-check` (`prettier --check .`) first, and it scans
+the whole tree.** Generated output dirs are excluded via `.prettierignore`
+(`coverage/`, `.pytest_cache/`, `nas_proxy/out/`, `.jules/`). If you add a
+reporter that writes files to disk (e.g. an html/lcov coverage reporter) or any
+new generated dir, add it to `.prettierignore` or the gate fails on a non-source
+file — a confusing `fmt-check Error 1` that looks like a formatting bug but
+isn't.
+
+### System dependencies and CI
+
+- `.github/workflows/ci.yml` runs on push/PR to `main` and is just
+  `make precommit` (check-only) on `ubuntu-latest` — add new checks to the
+  `precommit`/`precommit-fix` targets, not to the workflow.
+- CI installs `libcurl4-openssl-dev` (the NAS C tests and several `bin/*.c`
+  accelerators compile with `-lcurl`) plus Python deps from
+  `requirements-dev.txt` (pytest + pytest-cov); gcc/make come with the runner.
+- The eBPF step is a no-op in CI (no `ebpf-builder` Docker image) and stays green
+  because the Makefile ignores it (`-@`).
+- `make test-py` runs `nas_proxy`, `retriever`, `vps_kernel_proxy`, and
+  `nas_tools`. The target first runs `make -C nas_tools all` to build the C
+  binaries (`wol`, `netmon`, `lan_scanner`, `speedtest`) the tests shell out to.
+- **`nas_tools` privileged tests self-skip** via `skipUnless` guards in
+  `nas_tools/__tests__/test_tools.py`: `test_netmon_run` needs ICMP sockets
+  (unprivileged ICMP or root), `test_lan_scanner_run` needs an `eth0` interface.
+  They run on Linux/CI and skip on macOS without failing the suite. If you add
+  another binary that needs raw sockets or a specific interface, guard it the
+  same way rather than excluding it.
+- **`vps_kernel_proxy` eBPF compile test self-skips** too: `test_ebpf.py`'s
+  `test_compilation_success` only `make`s the `.bpf.o` objects when a real BPF
+  toolchain is present (Linux + `clang` + libbpf's `<bpf/bpf_helpers.h>`). A bare
+  `ubuntu-latest` runner has clang but **not** libbpf-dev, so it skips there
+  rather than failing. The map-content tests (which just read the `.bpf.c`
+  source) still run everywhere.
+
+### clean_adblock conventions
+
+#### MutationObserver callbacks must guard against a missing `document`
+
+Content scripts register `new MutationObserver(cb)` on `document.documentElement`
+and usually never disconnect it. The callback runs asynchronously as a microtask,
+so it can fire **after** the page (or the jsdom test environment) has torn down
+`document`. When the callback then calls `document.querySelectorAll(...)`, it
+throws `TypeError: Cannot read properties of undefined (reading 'querySelectorAll')`.
+
+Any observer callback that touches `document` directly must start with:
+
+```js
+if (typeof document === 'undefined' || !document) {
+  return;
+}
+```
+
+Already applied in `linkedin-unlocked.js` (`proactivelyCleanLinks`) and
+`linkedin-hide-promoted.js` (`hidePromoted`). If you add a new content script
+with a top-level observer, add the same guard.
+
+#### Tests and eval coverage
+
+- jsdom environment (configured in `package.json` jest config + `jest.setup.js`).
+- Tests load scripts via `require('../<script>.js')` or by `eval`-ing the source
+  inside `jest.isolateModules` / `jest.resetModules`. Each load creates a fresh
+  observer that is never disconnected — hence the teardown guard above matters.
+- **Coverage for `eval`'d scripts:** plain `eval(fs.readFileSync(...))` runs
+  uninstrumented, so those files report **0%** even though the test exercises
+  them (Jest only instruments code that goes through its `require`/transform
+  pipeline). To get real numbers, instrument first:
+
+  ```js
+  const { instrumentFile } = require('./helpers/instrument');
+  const code = instrumentFile(require('path').join(__dirname, '..', 'foo.js'));
+  eval(code); // keep the eval in the test so the jsdom scope is unchanged
+  ```
+
+  `instrumentFile` (in `clean_adblock/__tests__/helpers/instrument.js`)
+  instruments with the same `__coverage__` global Jest's `babel` provider
+  collects. Pass an **absolute** path so the key matches `collectCoverageFrom`.
+  Don't use it on a file that's also `require`d elsewhere (double
+  instrumentation). The `helpers/` dir is excluded from test discovery via
+  `testPathIgnorePatterns` and gets CommonJS globals via an `eslint.config.cjs`
+  override.
+
+### Jest & jsdom version pin (v29)
+
+- **Status:** pinned to `jest@29.7.0` and `jest-environment-jsdom@29.7.0`.
+- **Rationale:** upgrading to v30/v26 (jsdom) breaks existing `window.location`
+  mocking strategies used across the `clean_adblock` test suite. Newer jsdom
+  versions make `window.location` non-configurable/non-writable, triggering
+  "Not implemented: navigation" errors and preventing property deletion.
+- **Action:** do **not** upgrade these dependencies without a verified,
+  repo-wide migration of the location-mocking pattern.
+
+The established pattern (compatible with v29) is the "delete and assign"
+approach in `beforeEach`:
+
+```js
+beforeEach(() => {
+  delete window.location;
+  window.location = {
+    hostname: 'example.com',
+    pathname: '/test',
+    href: 'https://example.com/test',
+    // ... other properties
+    assign: jest.fn(),
+    replace: jest.fn(),
+    reload: jest.fn()
+  };
+});
+```
+
+Avoid creating external helpers for this unless they are tested against the
+specific jsdom version constraints.
+
+**Teardown hygiene:** some code under test modifies the DOM or keeps references,
+causing Jest/jsdom side effects on subsequent tests (unhandled
+timer/MutationObserver updates). Best practice for such tests, especially for
+modules like `xhs-keepalive.js` and `cookie-banner-blocker.js`: always manually
+clear `document.body.innerHTML` in `beforeEach` or properly clean up inserted
+nodes when faking timers.
+
+### Type-check (`make type`) vs lint (`npm run lint`)
+
+- **Separation of concerns:** ESLint (`npm run lint`) and TypeScript
+  (`make type`) are distinct verification gates. ESLint checks syntax, styles,
+  and defined globals. `make type` runs type-checking over `clean_adblock/*.js`
+  utilizing JSDoc annotations and the TypeScript compiler (configured via
+  `jsconfig.json`). When asked to "fix lint errors", developers or tools may
+  refer to either ESLint output or the TypeScript compilation errors — verify
+  both gates are green.
+- **ESLint undefined globals (`HTMLElement`, `HTMLLinkElement`, etc.):**
+  `eslint.config.cjs` defines a limited subset of browser globals. When
+  performing type checks using JSDoc type-guards (such as
+  `instanceof HTMLLinkElement`), ESLint will raise `no-undef` warnings if the
+  constructor is not in the config globals. To resolve this:
+  - Reference the constructor via `window` (e.g.,
+    `link instanceof window.HTMLLinkElement`), or
+  - Add inline `/* global ... */` declarations at the top of the file.
+- **Dynamic globals and element access:** bracket notation (e.g.,
+  `window['__NUXT__']`, `this['_url']`) should be preferred over dot notation
+  when assigning or retrieving dynamic, un-typed properties. This satisfies both
+  ESLint and `make type` without requiring verbose casting.
+
+### Jules routine harnesses
+
+- **Testpilot** ranks least-covered files with `python3 bin/coverage_rank.py`
+  (auto-detects Jest `coverage-summary.json` vs coverage.py JSON; tested in
+  `bin/__tests__/test_coverage_rank.py`, run by `make test-py`).
+- **Typist** drives `make type` toward zero errors via JSDoc on
+  `clean_adblock/*.js`. The harness — `typescript` + `@types/chrome` dev-deps
+  and `jsconfig.json` — is bootstrapped and non-blocking; when the backlog
+  reaches zero, the finalize step makes it gate (see `.jules/typist.md`).
+
+### Shipping multiple open PRs
+
+When tasked with "shipping all open PRs", follow this consolidation strategy to
+minimize conflicts:
+
+1. **Discovery:** identify all open PR branches (e.g.
+   `gh pr list --state open`).
+2. **Consolidation:**
+   - Create a temporary integration branch: `git checkout -b ship-all-prs`.
+   - Merge each PR branch into it one-by-one: `git merge <branch>`.
+3. **Conflict resolution (massive lockfile conflicts):**
+   - If `package-lock.json` has massive conflicts, do not resolve them manually.
+   - Manually edit `package.json` to include the target versions from all
+     branches.
+   - Run `npm install` to regenerate a clean lockfile.
+   - `git add package.json package-lock.json && git commit`.
+4. **Verification:** run `make precommit` on the integration branch.
+5. **Final merge:** merge the integration branch into `main` using `--no-ff`.
+
+### Output logs stay out of git
+
+Any command output logs (e.g. `jest_coverage_output.txt`,
+`precommit_output.txt`) MUST be either explicitly removed before committing, or
+placed within the `.gitignore`'d `coverage/` directory. Do not commit command
+logs to the repository.
+
+## Skills and slash commands
+
+- **`.agents/skills/<name>/SKILL.md` is canonical** — the open Agent Skills
+  format: YAML frontmatter declaring `name` and `description` (used for
+  triggering), instructions in the markdown body. Edit skills there.
+- **`.claude/commands/<name>.md` is generated** from the skills by
+  `tools/sync_commands.py` for Claude Code. Never edit the generated files by
+  hand — run `python3 tools/sync_commands.py` after editing a skill, and note
+  that `make sync-check` (wired into `make precommit`) fails if regeneration is
+  not a no-op.
+- **Jules scheduled routines (unattended)** are a separate system from the
+  interactive skills above: their shared contract is this file and their
+  per-routine personas live in `.jules/<name>.md` (currently `testpilot`,
+  `typist`).
 
 ## Lanes (keep PRs disjoint to avoid collisions)
 
@@ -168,4 +391,4 @@ The files in `.jules/<name>.md` are **persona definitions**: your identity, lane
 and constraints, read in at the start of a run. They are **not logs**. **Never
 append to, modify, or create files under `.jules/`.** A PR that changes a `.jules/`
 file is out of scope and will be closed — those files are edited by a human, not by
-routines. Capture durable learnings in `CLAUDE.md`/`GEMINI.md` or `docs/` instead.
+routines. Capture durable learnings in this file or `docs/` instead.

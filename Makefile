@@ -1,5 +1,5 @@
 # Usage: make pull ID=<extension_id>
-.PHONY: pull precommit precommit-fix fmt fmt-check lint lint-fix install-dev test test-py type tm-repair
+.PHONY: pull precommit precommit-fix fmt fmt-check lint lint-fix install-dev test test-py type tm-repair sync-check
 
 tm-repair:
 	@./bin/tm-repair
@@ -10,9 +10,23 @@ pull:
 install-dev:
 	@npm install
 
-precommit: fmt-check lint type test test-py test-ebpf test-nas
+precommit: fmt-check lint type test test-py test-ebpf test-nas sync-check
 
-precommit-fix: fmt lint-fix type test test-py test-ebpf test-nas
+precommit-fix: fmt lint-fix type test test-py test-ebpf test-nas sync-check
+
+# .claude/commands/ is generated from .agents/skills/ (the canonical source) by
+# tools/sync_commands.py. Fail if regeneration is not a no-op (content hash of
+# the tree before vs after), so the generated copy can never silently go stale.
+sync-check:
+	@before=$$(find .claude/commands -type f | LC_ALL=C sort | xargs shasum | shasum | cut -d' ' -f1); \
+	python3 tools/sync_commands.py >/dev/null; \
+	after=$$(find .claude/commands -type f | LC_ALL=C sort | xargs shasum | shasum | cut -d' ' -f1); \
+	if [ "$$before" = "$$after" ]; then \
+		echo "sync-check: .claude/commands is up to date"; \
+	else \
+		echo "sync-check FAIL: .claude/commands was stale and has been regenerated — commit the updated files (python3 tools/sync_commands.py)."; \
+		exit 1; \
+	fi
 
 fmt:
 	@npm run fmt

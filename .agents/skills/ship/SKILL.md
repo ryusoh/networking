@@ -1,6 +1,7 @@
 ---
 name: ship
 description: Ship a branch — check quality, merge to main, and clean up the branch
+argument-hint: '<branch_name>'
 ---
 
 # Ship Branch

@@ -1,4 +1,5 @@
 ---
+name: research
 description: Investigate a question against primary sources and write a cited Markdown findings doc. Use when the user asks you to research, investigate, or gather authoritative background on a topic.
 argument-hint: '[question to investigate]'
 ---
@@ -9,7 +10,7 @@ Investigate a question thoroughly against **primary sources** and capture the
 findings as a single cited Markdown file, so the answer is durable and
 re-checkable instead of living only in chat.
 
-$ARGUMENTS — the question to investigate.
+{{args}} — the question to investigate.
 
 ## Run it in the background
 

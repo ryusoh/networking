@@ -1,6 +1,7 @@
 ---
 name: retro
 description: Retrospective — turn this session's friction into durable repo improvements (the compounding loop)
+argument-hint: "[optional focus area, e.g. 'test setup' or 'ad-blocker rules']"
 ---
 
 # Retrospective
@@ -10,15 +11,15 @@ You just finished a task. Run a **compounding-loop retrospective** so the next t
 Work through these steps:
 
 1. **Diagnose the friction.** Look back over this session and name what actually cost time or tokens: things you had to discover by trial and error, ambiguous instructions, missing context, repeated corrections, or commands that failed before they worked.
-   If the user passed a focus area, concentrate the retro on it.
+   If `{{args}}` is non-empty, focus the retrospective there.
 
 2. **Map each friction point to a durable fix.** For every item, decide where the knowledge belongs so it never has to be rediscovered:
-   - `GEMINI.md` (create one at repo root if it doesn't exist yet) for conventions, gotchas, how to run tests/lint/format, project layout, and per-subproject notes (this repo has many: clean*adblock, nas_proxy, retriever, vps*\*, etc.).
-   - A new or updated `.gemini/commands/<name>.toml` for any multi-step prompt worth replaying on demand.
+   - `AGENTS.md` for conventions, gotchas, how to run tests/lint/format, project layout, and per-subproject notes (this repo has many: `clean_adblock`, `nas_proxy`, `retriever`, `vps_*`, etc.).
+   - A new or updated `.agents/skills/<name>/SKILL.md` for any multi-step prompt worth replaying on demand (`.claude/commands/` is generated from these by `tools/sync_commands.py` — don't edit it directly).
    - The relevant `docs/*.md` for domain/architecture knowledge.
    - Test fixtures, helpers, or `jest.setup.js` for repeated test scaffolding.
 
-3. **Check what already exists before adding.** Don't duplicate. Read the current `GEMINI.md` (and `CLAUDE.md` if present — keep them consistent), `.gemini/commands/`, `docs/`, and `package.json` scripts first and extend them rather than creating parallel copies.
+3. **Check what already exists before adding.** Don't duplicate. Read the current `AGENTS.md`, `.agents/skills/`, `docs/`, and `package.json` scripts first and extend them rather than creating parallel copies.
 
 4. **Implement the safe, high-leverage fixes now.** Make the edits that are clearly correct and low-risk (documentation, command files, small helpers). Keep changes tight and in the style of the surrounding repo.
 
