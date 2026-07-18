@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# diagnose-host — basic remote-host reachability triage.
+# Usage: diagnose-host <ip|hostname> [vultr-instance-id]
+#
+# If VULTR_API_KEY is exported, the optional instance ID will also query
+# Vultr's API for power/firmware/console state.
+
+set -uo pipefail
+
+HOST="${1:-}"
+INSTANCE_ID="${2:-}"
+LOG_DIR="${DIAGNOSE_LOG_DIR:-$HOME/.local/share/diagnose-host}"
+
+if [[ -z "$HOST" ]]; then
+    echo "Usage: $0 <ip|hostname> [vultr-instance-id]" >&2
+    echo "Set VULTR_API_KEY to also fetch Vultr instance status." >&2
+    exit 1
+fi
+
+mkdir -p "$LOG_DIR"
+TS=$(date +%Y%m%d-%H%M%S)
+LOG="$LOG_DIR/${HOST//\//_}-${TS}.log"
+
+run() {
+    echo "\$ $*" | tee -a "$LOG"
+    "$@" 2>&1 | tee -a "$LOG"
+    echo | tee -a "$LOG"
+}
+
+section() {
+    echo "== $* ==" | tee -a "$LOG"
+}
+
+# ---------------------------------------------------------------------------
+section "basic info"
+run date
+run uname -a
+run printf "%s\n" "target=$HOST"
+
+# ---------------------------------------------------------------------------
+section "local routing / dns"
+# What OS thinks the next hop is.
+if command -v ip >/dev/null 2>&1; then
+    run ip route get "$HOST" || true
+elif command -v route >/dev/null 2>&1; then
+    run route get "$HOST" || true
+fi
+
+# Reverse DNS helps confirm whose address this is.
+if command -v dig >/dev/null 2>&1; then
+    run dig +short -x "$HOST" || true
+elif command -v host >/dev/null 2>&1; then
+    run host "$HOST" || true
+fi
+
+# ---------------------------------------------------------------------------
+section "icmp (ping)"
+PING_ARGS=(-c 10 -i 0.2 -W 2 "$HOST")
+if [[ "$OSTYPE" == darwin* ]]; then
+    PING_ARGS=(-c 10 -i 0.2 -W 2000 "$HOST")
+fi
+run ping "${PING_ARGS[@]}" || true
+
+# ---------------------------------------------------------------------------
+section "path (mtr / traceroute)"
+if command -v mtr >/dev/null 2>&1; then
+    run mtr --report --report-cycles 10 "$HOST" || true
+elif [[ "$OSTYPE" == darwin* ]]; then
+    run traceroute -I -q 1 -w 2 "$HOST" || true
+else
+    run traceroute -I -q 1 -w 2 "$HOST" || true
+fi
+
+# ---------------------------------------------------------------------------
+section "tcp ports"
+# Common ports for a generic Linux/VPS box. Adjust as needed.
+PORTS=(22 80 443 3389 8080 8443)
+for port in "${PORTS[@]}"; do
+    if command -v nc >/dev/null 2>&1; then
+        run nc -vz -G 5 -w 5 "$HOST" "$port" || true
+    elif command -v nmap >/dev/null 2>&1; then
+        run nmap -Pn -p "$port" --max-retries 1 "$HOST" || true
+    else
+        # Fallback: bash can open a TCP connection if /dev/tcp exists.
+        timeout 5 bash -c "echo >/dev/tcp/$HOST/$port" 2>&1 \
+            && run echo "port $port open" \
+            || run echo "port $port closed/filtered"
+    fi
+done
+
+# ---------------------------------------------------------------------------
+section "http / https probes"
+for proto in http https; do
+    if command -v curl >/dev/null 2>&1; then
+        run curl -sS --max-time 10 -o /dev/null -w "%{http_code} %{remote_ip}:%{remote_port} %{time_total}s\n" "${proto}://$HOST" || true
+    fi
+done
+
+# ---------------------------------------------------------------------------
+section "vultr api (optional)"
+if [[ -n "${VULTR_API_KEY:-}" && -n "$INSTANCE_ID" ]]; then
+    run curl -sS --max-time 15 \
+        -H "Authorization: Bearer $VULTR_API_KEY" \
+        "https://api.vultr.com/v2/instances/$INSTANCE_ID" || true
+    echo | tee -a "$LOG"
+else
+    echo "skipped (set VULTR_API_KEY and pass instance id)" | tee -a "$LOG"
+fi
+
+# ---------------------------------------------------------------------------
+section "summary"
+{
+    echo "Log written to: $LOG"
+    echo "Interpretation hints:"
+    echo "  - ping replies but tcp ports closed/filtered: host is up; firewall or service is down."
+    echo "  - ping fails, traceroute stops inside vultr/upstream: routing/network issue or host powered off."
+    echo "  - ping fails, traceroute stops at last-hop: likely host down / firewall dropping all / hypervisor issue."
+    echo "  - http code returned: web service is at least listening; check the code (4xx/5xx = app layer)."
+} | tee -a "$LOG"
