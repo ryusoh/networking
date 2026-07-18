@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# check-ss — Shadowsocks / proxy / system-VPN health check.
+# Usage: check-ss [proxy-spec]
+#   proxy-spec: socks5h://127.0.0.1:1080, or just a port number.
+#   If omitted, the script also looks for active macOS VPNs (Shadowrocket, etc.)
+#   and tests through the default interface.
+
+set -uo pipefail
+
+PROBE_URL="https://ipinfo.io"
+TIMEOUT=10
+
+parse_proxy() {
+    local spec="${1:-}"
+    if [[ -z "$spec" ]]; then
+        echo ""
+        return
+    fi
+    if [[ "$spec" =~ ^[0-9]+$ ]]; then
+        echo "socks5h://127.0.0.1:$spec"
+    else
+        echo "$spec"
+    fi
+}
+
+extract_host_port() {
+    local url="$1"
+    echo "$url" | sed -E 's#^[a-z][a-z0-9+.-]*://##; s#/.*##'
+}
+
+# ---------------------------------------------------------------------------
+# 1. Detect active macOS system VPNs.
+echo "== active vpn / proxy detection =="
+if command -v scutil >/dev/null 2>&1; then
+    ACTIVE_VPN=$(scutil --nc list | awk '/^\*.*Connected/ {$1=""; $2=""; print}' | sed 's/^  //')
+    if [[ -n "$ACTIVE_VPN" ]]; then
+        echo "active system VPN(s):"
+        echo "$ACTIVE_VPN" | while read -r line; do
+            echo "  - $line"
+        done
+    else
+        echo "no active system VPN detected"
+    fi
+else
+    echo "scutil not available (not macOS?)"
+fi
+echo
+
+# ---------------------------------------------------------------------------
+# 2. Check local SOCKS/HTTP proxy port if requested.
+PROXY=$(parse_proxy "${1:-}")
+if [[ -n "$PROXY" ]]; then
+    PROXY_HOST_PORT=$(extract_host_port "$PROXY")
+    PROXY_HOST=${PROXY_HOST_PORT%:*}
+    PROXY_PORT=${PROXY_HOST_PORT##*:}
+
+    echo "== local proxy check ($PROXY) =="
+    if nc -vz -G 3 -w 3 "$PROXY_HOST" "$PROXY_PORT" >/dev/null 2>&1; then
+        echo "local proxy port is listening"
+    else
+        echo "local proxy port is NOT reachable"
+        echo "(Shadowrocket and similar apps often do not expose a localhost SOCKS port.)"
+    fi
+    echo
+fi
+
+# ---------------------------------------------------------------------------
+# 3. Direct probe. On macOS with an active system VPN this goes through the VPN.
+echo "== probe through default route =="
+echo -n "$PROBE_URL -> "
+DIRECT_OUT=$(curl -sS --max-time "$TIMEOUT" "$PROBE_URL" 2>/dev/null) || DIRECT_OUT=""
+if [[ -n "$DIRECT_OUT" ]]; then
+    DIRECT_IP=$(echo "$DIRECT_OUT" | grep -oE '"ip"[[:space:]]*:[[:space:]]*"[^"]+"' | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
+    if [[ -z "$DIRECT_IP" ]]; then
+        DIRECT_IP=$(echo "$DIRECT_OUT" | head -c 80)
+    fi
+    echo "OK, public ip = ${DIRECT_IP:-unknown}"
+else
+    echo "FAILED"
+    echo "  curl could not complete the request through the current default route."
+    echo "  If a VPN is active, the VPN tunnel is up but cannot reach the internet."
+    DIRECT_IP=""
+fi
+echo
+
+# ---------------------------------------------------------------------------
+# 4. Proxied probe (only if a local proxy was specified and listening).
+PROXIED_IP=""
+if [[ -n "$PROXY" ]]; then
+    echo "== probe through $PROXY =="
+    echo -n "$PROBE_URL -> "
+    PROXIED_OUT=$(curl -sS --max-time "$TIMEOUT" -x "$PROXY" "$PROBE_URL" 2>/dev/null) || PROXIED_OUT=""
+    if [[ -n "$PROXIED_OUT" ]]; then
+        PROXIED_IP=$(echo "$PROXIED_OUT" | grep -oE '"ip"[[:space:]]*:[[:space:]]*"[^"]+"' | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
+        if [[ -z "$PROXIED_IP" ]]; then
+            PROXIED_IP=$(echo "$PROXIED_OUT" | head -c 80)
+        fi
+        echo "OK, public ip = ${PROXIED_IP:-unknown}"
+    else
+        echo "FAILED (no reply through proxy)"
+    fi
+    echo
+fi
+
+# ---------------------------------------------------------------------------
+# 5. Verdict.
+echo "== verdict =="
+if [[ -n "$PROXY" ]]; then
+    if [[ -n "$PROXIED_IP" && -n "$DIRECT_IP" ]]; then
+        if [[ "$PROXIED_IP" == "$DIRECT_IP" ]]; then
+            echo "SOCKS proxy is NOT changing your public IP."
+        else
+            echo "SOCKS proxy is WORKING; traffic exits through $PROXIED_IP."
+        fi
+    elif [[ -n "$PROXIED_IP" ]]; then
+        echo "SOCKS proxy works, but the default route cannot reach the probe site."
+    elif [[ -n "$DIRECT_IP" ]]; then
+        echo "Default route works, but the SOCKS proxy is NOT forwarding."
+    else
+        echo "Both default route and SOCKS proxy failed."
+    fi
+else
+    if [[ -n "$DIRECT_IP" ]]; then
+        echo "Default route works; public IP is ${DIRECT_IP}."
+    else
+        echo "Default route FAILED — your active VPN/proxy cannot reach the internet."
+        echo "Possible causes:"
+        echo "  - The remote server (149.28.201.108) is up but Shadowsocks service is down."
+        echo "  - Wrong port/password/method in the client config."
+        echo "  - Server-side firewall blocks the configured Shadowsocks port."
+    fi
+fi
