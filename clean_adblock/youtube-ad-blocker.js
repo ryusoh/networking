@@ -11,35 +11,27 @@
 (function () {
   'use strict';
 
-  const AD_SELECTORS = [
-    // Video ad containers
+  const AD_SELECTORS_JOINED = [
     '.ad-showing',
     '.video-ads',
     'ytd-ad-slot-renderer',
     'ytd-promoted-video-renderer',
     'ytd-compact-promoted-video-renderer',
     '.ytd-promoted-sparkles-web-renderer',
-
-    // Banner ads
     '#masthead-ad',
     '#player-ads',
     'ytd-statement-banner-renderer',
-
-    // Overlay ads
     '.ytp-ad-overlay-container',
     '.ytp-ad-image-overlay',
     '.ytp-ad-text-overlay',
-
-    // Sponsored content in feed
-    'ytd-ad-slot-renderer',
     '[class*="promoted"]'
-  ];
+  ].join(',');
 
-  const AD_ATTRIBUTE_PATTERNS = [
+  const AD_ATTRIBUTE_KEYS = [
     'data-ad-impressions',
     'data-ad-url',
     'data-visiting',
-    'data-renderer-type="ad"'
+    'data-renderer-type'
   ];
 
   const processedElements = new WeakSet();
@@ -57,21 +49,25 @@
     }
 
     // Check data attributes
-    for (const pattern of AD_ATTRIBUTE_PATTERNS) {
-      if (element.hasAttribute(pattern.split('=')[0])) {
+    for (let i = 0; i < AD_ATTRIBUTE_KEYS.length; i++) {
+      if (element.hasAttribute(AD_ATTRIBUTE_KEYS[i])) {
+        if (
+          AD_ATTRIBUTE_KEYS[i] === 'data-renderer-type' &&
+          element.getAttribute('data-renderer-type') !== 'ad'
+        ) {
+          continue;
+        }
         return true;
       }
     }
 
     // Check if element matches ad selectors
-    for (const selector of AD_SELECTORS) {
-      try {
-        if (element.matches(selector) || element.closest(selector)) {
-          return true;
-        }
-      } catch {
-        // Invalid selector
+    try {
+      if (element.matches(AD_SELECTORS_JOINED) || element.closest(AD_SELECTORS_JOINED)) {
+        return true;
       }
+    } catch {
+      // Invalid selector
     }
 
     return false;
@@ -130,17 +126,16 @@
     }
 
     // Find and hide ad elements
-    for (const selector of AD_SELECTORS) {
-      try {
-        const elements = document.querySelectorAll(selector);
-        for (const el of elements) {
-          if (el instanceof HTMLElement) {
-            hideAd(el);
-          }
+    try {
+      const elements = document.querySelectorAll(AD_SELECTORS_JOINED);
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i];
+        if (el instanceof HTMLElement) {
+          hideAd(el);
         }
-      } catch {
-        // Invalid selector
       }
+    } catch {
+      // Invalid selector
     }
 
     // Try to skip any playing ads
@@ -161,20 +156,31 @@
   }
 
   // Watch for dynamically loaded ads
+  let observerThrottled = false;
   const observer = new MutationObserver((mutations) => {
+    if (typeof document === 'undefined' || !document) {
+      return;
+    }
     let shouldCheck = false;
-    for (const mutation of mutations) {
-      if (mutation.addedNodes.length > 0) {
-        for (const node of mutation.addedNodes) {
-          if (node instanceof HTMLElement && isAdElement(node)) {
-            hideAd(node);
+    for (let i = 0; i < mutations.length; i++) {
+      const mutation = mutations[i];
+      const addedNodes = mutation.addedNodes;
+      if (addedNodes.length > 0) {
+        for (let j = 0; j < addedNodes.length; j++) {
+          const node = addedNodes[j];
+          if (node.nodeType === 1 && isAdElement(/** @type {HTMLElement} */ (node))) {
+            hideAd(/** @type {HTMLElement} */ (node));
           }
         }
         shouldCheck = true;
       }
     }
-    if (shouldCheck) {
-      blockYouTubeAds();
+    if (shouldCheck && !observerThrottled) {
+      observerThrottled = true;
+      setTimeout(() => {
+        observerThrottled = false;
+        blockYouTubeAds();
+      }, 50);
     }
   });
 
