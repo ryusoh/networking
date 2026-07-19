@@ -82,8 +82,8 @@ def test_proxy(ip, port):
     return None
 
 
-def update_v2ray_config():
-    # 1. Parse proxies from scraper output
+def _parse_local_proxies():
+    """Parse local proxies from proxies.html."""
     proxies = []
     if os.path.exists(PROXY_FILE):
         with open(PROXY_FILE, 'r') as f:
@@ -95,32 +95,16 @@ def update_v2ray_config():
                 proxies.append({"address": ip, "port": int(port)})
     else:
         print(f"[*] {PROXY_FILE} not found, using API sources only.")
+    return proxies
 
-    # 2. Also fetch from Geonode API
-    print("[*] Fetching from Geonode API (country=CN)...")
-    geonode = fetch_geonode_proxies()
 
-    # Deduplicate, prioritize Geonode (China-filtered) first
-    seen = set()
-    all_proxies = []
-    for p in geonode + proxies:
-        key = f"{p['address']}:{p['port']}"
-        if key not in seen:
-            seen.add(key)
-            all_proxies.append(p)
-
-    if not all_proxies:
-        print("[-] No proxies found from any source.")
-        return
-
-    print(f"\n[*] Testing {len(all_proxies)} proxies against tianditu...")
-
-    # 3. Health-check ALL proxies in parallel, then sort by speed
+def _health_check_proxies(proxies):
+    """Health-check proxies in parallel and return working candidates."""
     candidates = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_proxy = {
             executor.submit(test_proxy, p["address"], p["port"]): p
-            for p in all_proxies
+            for p in proxies
         }
         for future in as_completed(future_to_proxy):
             proxy = future_to_proxy[future]
@@ -130,20 +114,11 @@ def update_v2ray_config():
                     candidates.append((time_s, proxy))
             except Exception:
                 pass
+    return candidates
 
-    if not candidates:
-        print("\n[-] No working Chinese-exit proxies found from any source.")
-        print("[-] All proxies either timed out (000) or returned 418 (geo-blocked).")
-        return
 
-    # Sort by speed (fastest first) and take top N
-    candidates.sort(key=lambda x: x[0])
-    working = [p for _, p in candidates[:MAX_WORKING_PROXIES]]
-
-    print(f"\n[+] Found {len(candidates)} working proxies, using top {len(working)} fastest:")
-    for time_s, p in candidates[:MAX_WORKING_PROXIES]:
-        print(f"    {p['address']}:{p['port']} ({time_s:.1f}s)")
-
+def _write_outputs(working):
+    """Write verified proxies to HTML and JSON configurations."""
     # 4. Write verified proxies to proxies.html for the browser extension
     #    (pihole serves this file on port 8000, extension fetches it directly)
     #    Extension will use SOCKS5 scheme in PAC script -> bypasses V2Ray entirely
@@ -173,6 +148,49 @@ def update_v2ray_config():
         print(f"[+] Also deployed to V2Ray proxies.json (for tile_cache)")
     except Exception as e:
         print(f"[-] Error writing config: {e}")
+
+
+def update_v2ray_config():
+    # 1. Parse proxies from scraper output
+    proxies = _parse_local_proxies()
+
+    # 2. Also fetch from Geonode API
+    print("[*] Fetching from Geonode API (country=CN)...")
+    geonode = fetch_geonode_proxies()
+
+    # Deduplicate, prioritize Geonode (China-filtered) first
+    seen = set()
+    all_proxies = []
+    for p in geonode + proxies:
+        key = f"{p['address']}:{p['port']}"
+        if key not in seen:
+            seen.add(key)
+            all_proxies.append(p)
+
+    if not all_proxies:
+        print("[-] No proxies found from any source.")
+        return
+
+    print(f"\n[*] Testing {len(all_proxies)} proxies against tianditu...")
+
+    # 3. Health-check ALL proxies in parallel, then sort by speed
+    candidates = _health_check_proxies(all_proxies)
+
+    if not candidates:
+        print("\n[-] No working Chinese-exit proxies found from any source.")
+        print("[-] All proxies either timed out (000) or returned 418 (geo-blocked).")
+        return
+
+    # Sort by speed (fastest first) and take top N
+    candidates.sort(key=lambda x: x[0])
+    working = [p for _, p in candidates[:MAX_WORKING_PROXIES]]
+
+    print(f"\n[+] Found {len(candidates)} working proxies, using top {len(working)} fastest:")
+    for time_s, p in candidates[:MAX_WORKING_PROXIES]:
+        print(f"    {p['address']}:{p['port']} ({time_s:.1f}s)")
+
+    # 4 & 5. Write verified proxies to proxies.html and V2Ray config
+    _write_outputs(working)
 
     print("[*] Restarting nas_proxy container...")
     subprocess.run(["sudo", "docker", "restart", "nas_proxy"])
