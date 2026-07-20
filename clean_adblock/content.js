@@ -595,11 +595,12 @@
       return;
     }
     let shouldRun = false;
-    mutations.forEach((m) => {
-      if (m.addedNodes.length > 0) {
+    for (let i = 0; i < mutations.length; i++) {
+      if (mutations[i].addedNodes.length > 0) {
         shouldRun = true;
+        break;
       }
-    });
+    }
     if (shouldRun) {
       dismissAdmiral();
       // Throttle run() to avoid hammering chrome.storage on dynamic SPAs
