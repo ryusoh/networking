@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+
+# lock-timezone: Enforce a specific macOS timezone and disable automatic changes.
+# Run this on your Mac.
+# Usage: bin/lock-timezone [timezone]           -- check and enforce once (default: Asia/Singapore)
+#        bin/lock-timezone --install [timezone] -- install a persistent root LaunchDaemon
+#        bin/lock-timezone --uninstall          -- remove the persistent LaunchDaemon
+
+TARGET_TZ="${2:-Asia/Singapore}"
+if [[ "$1" != "--install" && "$1" != "--uninstall" && -n "$1" ]]; then
+    TARGET_TZ="$1"
+fi
+
+PLIST_LABEL="com.user.lock-timezone"
+PLIST_PATH="/Library/LaunchDaemons/${PLIST_LABEL}.plist"
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lock-timezone"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+enforce_timezone() {
+    # Check if automatic timezone is enabled
+    local auto_enabled
+    auto_enabled=$(defaults read /Library/Preferences/com.apple.timezone.auto Active 2>/dev/null)
+    
+    if [[ "$auto_enabled" != "0" ]]; then
+        log "Automatic timezone detection is enabled. Disabling it..."
+        sudo defaults write /Library/Preferences/com.apple.timezone.auto Active -bool NO
+    fi
+
+    # Check current timezone
+    local current_tz
+    current_tz=$(sudo systemsetup -gettimezone 2>/dev/null | awk -F': ' '{print $2}')
+    
+    if [[ "$current_tz" != "$TARGET_TZ" ]]; then
+        log "Timezone mismatch! Current: ${current_tz:-unknown}, Target: ${TARGET_TZ}. Enforcing..."
+        sudo systemsetup -settimezone "$TARGET_TZ"
+        log "Timezone updated to $TARGET_TZ."
+    else
+        log "Timezone is already correctly set to $TARGET_TZ."
+    fi
+}
+
+install_daemon() {
+    log "Installing LaunchDaemon to enforce timezone: $TARGET_TZ..."
+    
+    # Check if we can write to /Library/LaunchDaemons
+    if ! sudo touch "$PLIST_PATH" 2>/dev/null; then
+        echo "Error: Root privileges required to install the LaunchDaemon."
+        echo "Please run with sudo: sudo \"$SCRIPT_PATH\" --install \"$TARGET_TZ\""
+        exit 1
+    fi
+
+    # Create the plist content
+    cat <<EOF | sudo tee "$PLIST_PATH" > /dev/null
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${PLIST_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${SCRIPT_PATH}</string>
+        <string>${TARGET_TZ}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StartInterval</key>
+    <integer>3600</integer>
+    <key>WatchPaths</key>
+    <array>
+        <string>/private/etc/localtime</string>
+    </array>
+    <key>StandardOutPath</key>
+    <string>/var/log/lock-timezone.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/lock-timezone.log</string>
+</dict>
+</plist>
+EOF
+
+    # Set correct permissions
+    sudo chown root:wheel "$PLIST_PATH"
+    sudo chmod 644 "$PLIST_PATH"
+
+    # Load the LaunchDaemon
+    sudo launchctl unload "$PLIST_PATH" 2>/dev/null
+    if sudo launchctl bootstrap system "$PLIST_PATH" 2>/dev/null || sudo launchctl load "$PLIST_PATH"; then
+        log "LaunchDaemon successfully installed and loaded."
+        log "It will enforce '$TARGET_TZ' on load, every hour, and instantly whenever /private/etc/localtime changes."
+        log "Log file: /var/log/lock-timezone.log"
+    else
+        log "Failed to load the LaunchDaemon. Try running: sudo launchctl load $PLIST_PATH"
+    fi
+}
+
+uninstall_daemon() {
+    log "Uninstalling LaunchDaemon..."
+    if [ -f "$PLIST_PATH" ]; then
+        sudo launchctl unload "$PLIST_PATH" 2>/dev/null
+        sudo launchctl bootout system "$PLIST_PATH" 2>/dev/null
+        sudo rm -f "$PLIST_PATH"
+        sudo rm -f "/var/log/lock-timezone.log"
+        log "LaunchDaemon successfully removed."
+    else
+        log "No LaunchDaemon found at $PLIST_PATH."
+    fi
+}
+
+if [[ "$1" == "--install" ]]; then
+    install_daemon
+elif [[ "$1" == "--uninstall" ]]; then
+    uninstall_daemon
+else
+    enforce_timezone
+fi
