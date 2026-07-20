@@ -40,10 +40,8 @@ lint:
 lint-fix:
 	@npm run lint:fix
 
-# JS strict-typing via JSDoc (Typist lane). Non-blocking: it reports type errors
-# but does not gate, so the backlog Typist burns down stays visible without
-# breaking CI. When zero strict errors remain, drop the `|| echo` to make it
-# blocking (see .jules/typist.md).
+# JS strict-typing via JSDoc (Typist lane). Blocking: `make type` gates once the
+# included first-party JS is clean (see .jules/typist.md).
 type:
 	@npx tsc -p jsconfig.json --noEmit
 
