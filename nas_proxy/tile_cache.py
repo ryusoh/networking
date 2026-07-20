@@ -169,25 +169,24 @@ def socks5_connect(proxy_host, proxy_port, dest_host, dest_port, timeout=12):
     return sock
 
 
-def fetch_via_pool(url, timeout=15):
-    """Fetch a URL through the C connection pooler (preferred path).
-    The pooler maintains persistent SOCKS5 connections, eliminating handshake overhead."""
+def _parse_url_for_fetch(url):
     parsed = urlparse(url)
     host = parsed.hostname
     port = parsed.port or (443 if parsed.scheme == 'https' else 80)
     path = parsed.path or '/'
     if parsed.query:
         path += '?' + parsed.query
+    return parsed, host, port, path
 
+
+def _connect_pool(host, port, timeout):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(timeout)
     sock.connect((CONN_POOL_HOST, CONN_POOL_PORT))
 
-    # Send HTTP CONNECT to the pooler
     connect_req = f"CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n"
     sock.sendall(connect_req.encode())
 
-    # Read 200 Connection Established
     resp = b''
     while b'\r\n\r\n' not in resp:
         chunk = sock.recv(4096)
@@ -198,14 +197,10 @@ def fetch_via_pool(url, timeout=15):
     if b'200' not in resp.split(b'\r\n')[0]:
         sock.close()
         raise Exception(f"Pool CONNECT failed: {resp[:100]}")
+    return sock
 
-    # Now we have a tunnel — do TLS if needed
-    if parsed.scheme == 'https':
-        import ssl
-        ctx = ssl.create_default_context()
-        sock = ctx.wrap_socket(sock, server_hostname=host)
 
-    # Send HTTP GET
+def _do_http_get(sock, host, path):
     request = (
         f"GET {path} HTTP/1.1\r\n"
         f"Host: {host}\r\n"
@@ -224,7 +219,10 @@ def fetch_via_pool(url, timeout=15):
             break
         response += chunk
     sock.close()
+    return response
 
+
+def _parse_http_response(response):
     header_end = response.find(b'\r\n\r\n')
     if header_end == -1:
         raise Exception("No HTTP headers in response")
@@ -241,14 +239,25 @@ def fetch_via_pool(url, timeout=15):
     return status_code, body
 
 
+def fetch_via_pool(url, timeout=15):
+    """Fetch a URL through the C connection pooler (preferred path).
+    The pooler maintains persistent SOCKS5 connections, eliminating handshake overhead."""
+    parsed, host, port, path = _parse_url_for_fetch(url)
+    sock = _connect_pool(host, port, timeout)
+
+    # Now we have a tunnel — do TLS if needed
+    if parsed.scheme == 'https':
+        import ssl
+        ctx = ssl.create_default_context()
+        sock = ctx.wrap_socket(sock, server_hostname=host)
+
+    response = _do_http_get(sock, host, path)
+    return _parse_http_response(response)
+
+
 def fetch_via_socks5(url, timeout=12):
     """Fallback: fetch through raw SOCKS5 proxies directly."""
-    parsed = urlparse(url)
-    host = parsed.hostname
-    port = parsed.port or (443 if parsed.scheme == 'https' else 80)
-    path = parsed.path or '/'
-    if parsed.query:
-        path += '?' + parsed.query
+    parsed, host, port, path = _parse_url_for_fetch(url)
 
     proxies = load_proxies()
     if not proxies:
@@ -263,40 +272,8 @@ def fetch_via_socks5(url, timeout=12):
                 ctx = ssl.create_default_context()
                 sock = ctx.wrap_socket(sock, server_hostname=host)
 
-            request = (
-                f"GET {path} HTTP/1.1\r\n"
-                f"Host: {host}\r\n"
-                f"Accept: */*\r\n"
-                f"Accept-Language: zh-CN,zh;q=0.9\r\n"
-                f"Connection: close\r\n"
-                f"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0\r\n"
-                f"\r\n"
-            )
-            sock.sendall(request.encode())
-
-            response = b''
-            while True:
-                chunk = sock.recv(65536)
-                if not chunk:
-                    break
-                response += chunk
-            sock.close()
-
-            header_end = response.find(b'\r\n\r\n')
-            if header_end == -1:
-                continue
-
-            header_section = response[:header_end].decode('latin-1')
-            body = response[header_end + 4:]
-
-            status_line = header_section.split('\r\n')[0]
-            status_code = int(status_line.split(' ')[1])
-
-            headers_lower = header_section.lower()
-            if 'transfer-encoding: chunked' in headers_lower:
-                body = _decode_chunked(body)
-
-            return status_code, body
+            response = _do_http_get(sock, host, path)
+            return _parse_http_response(response)
 
         except Exception:
             continue
