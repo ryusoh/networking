@@ -36,9 +36,25 @@
   `;
   document.documentElement.appendChild(highlight);
 
+  let ticking = false;
+
   /** @param {MouseEvent} e */
   function handleMouseMove(e) {
-    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        updateHighlight(e.clientX, e.clientY);
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }
+
+  /**
+   * @param {number} clientX
+   * @param {number} clientY
+   */
+  function updateHighlight(clientX, clientY) {
+    const el = document.elementFromPoint(clientX, clientY);
     if (!el || el === overlay || el === highlight) {
       return;
     }

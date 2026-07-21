@@ -1,5 +1,7 @@
 describe('picker.js DOM test', () => {
   beforeEach(() => {
+    jest.useFakeTimers();
+    jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => setTimeout(cb, 16));
     jest.resetModules();
     document.documentElement.innerHTML = '';
     window.__bypassPickerActive = false;
@@ -18,6 +20,8 @@ describe('picker.js DOM test', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
     delete global.chrome;
     delete window.CSS;
     jest.restoreAllMocks();
@@ -40,6 +44,7 @@ describe('picker.js DOM test', () => {
     // Line 39 & 55: el is overlay
     document.elementFromPoint = jest.fn(() => overlay);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
+    jest.advanceTimersByTime(20);
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
 
     // Normal element
@@ -47,6 +52,7 @@ describe('picker.js DOM test', () => {
     el.id = 'my-id';
     document.elementFromPoint = jest.fn(() => el);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
+    jest.advanceTimersByTime(20);
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
 
     // Normal element with class
@@ -141,6 +147,7 @@ describe('picker.js DOM test', () => {
     require('../picker.js');
     document.elementFromPoint = jest.fn(() => null);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
+    jest.advanceTimersByTime(20);
   });
 
   it('does nothing if overlay is hit on move', () => {
@@ -148,6 +155,7 @@ describe('picker.js DOM test', () => {
     const overlay = document.querySelector('div[style*="background: rgba(0, 100, 255, 0.1)"]');
     document.elementFromPoint = jest.fn(() => overlay);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
+    jest.advanceTimersByTime(20);
   });
 
   it('does nothing if highlight is hit on move', () => {
@@ -155,6 +163,7 @@ describe('picker.js DOM test', () => {
     const highlight = document.querySelector('div[style*="border: 2px solid red"]');
     document.elementFromPoint = jest.fn(() => highlight);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
+    jest.advanceTimersByTime(20);
   });
 
   it('does nothing on click if no document.elementFromPoint', () => {
@@ -328,6 +337,7 @@ describe('picker.js DOM test', () => {
     const overlay = document.querySelector('div[style*="cursor: crosshair"]');
     document.elementFromPoint = jest.fn(() => overlay);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
+    jest.advanceTimersByTime(20);
     // Highlight shouldn't change
     const highlight = document.querySelector('div[style*="border: 2px solid red"]');
     expect(highlight.style.top).toBe('');
@@ -375,6 +385,7 @@ describe('picker.js DOM test', () => {
     require('../picker.js');
     document.elementFromPoint = jest.fn(() => null);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
+    jest.advanceTimersByTime(20);
     const highlight = document.querySelector('div[style*="border: 2px solid red"]');
     expect(highlight.style.top).toBe('');
   });
@@ -436,6 +447,7 @@ describe('picker.js DOM test', () => {
     require('../picker.js');
     document.elementFromPoint = jest.fn(() => null);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
+    jest.advanceTimersByTime(20);
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
   });
 
@@ -469,6 +481,7 @@ describe('picker.js DOM test', () => {
     const highlight = document.documentElement.children[1];
     document.elementFromPoint = jest.fn(() => highlight);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
+    jest.advanceTimersByTime(20);
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
   });
 
@@ -480,6 +493,7 @@ describe('picker.js DOM test', () => {
     const overlay = document.documentElement.children[0];
     document.elementFromPoint = jest.fn(() => overlay);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
+    jest.advanceTimersByTime(20);
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
   });
 
@@ -496,10 +510,12 @@ describe('picker.js DOM test', () => {
 
     document.elementFromPoint = () => overlay;
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
+    jest.advanceTimersByTime(20);
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
 
     document.elementFromPoint = () => highlight;
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
+    jest.advanceTimersByTime(20);
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
   });
 
@@ -519,10 +535,12 @@ describe('picker.js DOM test', () => {
     };
 
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
+    jest.advanceTimersByTime(20);
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
 
     returnsOverlay = false;
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
+    jest.advanceTimersByTime(20);
     document.dispatchEvent(new MouseEvent('click', { clientX: 0, clientY: 0 }));
   });
   it('does nothing if already active', () => {
@@ -535,6 +553,7 @@ describe('picker.js DOM test', () => {
     require('../picker.js');
     document.elementFromPoint = jest.fn(() => null);
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }));
+    jest.advanceTimersByTime(20);
   });
 
   it('click ignores if element is falsy', () => {
