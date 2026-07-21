@@ -1,5 +1,5 @@
 # Usage: make pull ID=<extension_id>
-.PHONY: pull precommit precommit-fix fmt fmt-check lint lint-fix install-dev test test-py type tm-repair sync-check
+.PHONY: pull precommit precommit-fix precommit-docker fmt fmt-check lint lint-fix install-dev test test-py type tm-repair sync-check
 
 tm-repair:
 	@./bin/tm-repair
@@ -13,6 +13,21 @@ install-dev:
 precommit: fmt-check lint type test test-py test-ebpf test-nas sync-check
 
 precommit-fix: fmt lint-fix type test test-py test-ebpf test-nas sync-check
+
+# Containerized precommit for hosts where privileged tests fail locally (e.g.
+# macOS socket permissions). Builds `Dockerfile.precommit` and runs `make precommit`
+# inside an Ubuntu container so raw-socket tests behave like CI. Starts Colima
+# automatically if the Docker daemon is not reachable.
+PRECOMMIT_DOCKER_IMAGE ?= net-tools-precommit
+precommit-docker:
+	@if ! docker info >/dev/null 2>&1; then \
+		echo "Docker daemon not reachable; starting Colima..."; \
+		colima start || { echo "Failed to start Colima. Install with: brew install colima"; exit 1; }; \
+	fi
+	@echo "Building precommit Docker image..."
+	@docker build -t $(PRECOMMIT_DOCKER_IMAGE) -f Dockerfile.precommit .
+	@echo "Running precommit in Docker..."
+	@docker run --rm -v "$$(pwd)":/app $(PRECOMMIT_DOCKER_IMAGE) make precommit
 
 # .claude/commands/ is generated from .agents/skills/ (the canonical source) by
 # tools/sync_commands.py. Fail if regeneration is not a no-op (content hash of

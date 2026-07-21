@@ -6,17 +6,21 @@ live in `.agents/skills/<name>/SKILL.md` (canonical — the open Agent Skills
 format); `.claude/commands/` is generated from it by `tools/sync_commands.py`,
 and the gate drift-checks it via `make sync-check`.
 
-Two audiences:
+## Two audiences (do not mix these up)
 
-- **Unattended Jules routines** (`.jules/` personas): you run unattended and
-  open PRs. A human only does a binary approve/close on the result — they will
-  **not** leave review comments or iterate with you. So every PR must be
-  self-evidently correct and approvable at a glance. Optimize for **approve
-  rate**, not for volume. The sections from "Non-negotiables" through "Lanes"
-  are binding on you.
-- **Interactive agents** (Claude Code, Kimi, …): the whole guide applies to
-  you — commands, gotchas, and conventions below. The PR/lane contract applies
-  when you open PRs unattended.
+- **Unattended Jules routines** (`.jules/` personas): these bots run without a
+  human in the loop and open PRs. A human only does a binary approve/close on the
+  result — they will **not** leave review comments or iterate with you. So every
+  PR must be self-evidently correct and approvable at a glance. Optimize for
+  **approve rate**, not for volume. The sections from "Non-negotiables" through
+  "Lanes" are binding on Jules routines.
+- **Interactive coding agents** (Claude Code, Kimi, Cursor, etc.): you work
+  directly with the user in a chat session. The project conventions below still
+  apply, but the Jules-only **PR/branch/lane restrictions do not**. You may edit
+  build files, Makefiles, configs, dependencies, and even `.jules/` persona files
+  when the user explicitly asks. You may commit to `main` or open PRs as directed
+  by the user. Do not invent Jules-style lane boundaries for normal interactive
+  work — if the user asks you to change something, change it.
 
 This repo (net-tools) is a collection of **independent networking and browser
 tooling subprojects** spanning several languages: a Chrome MV3 extension
