@@ -79,6 +79,10 @@ expected noise:
   compile test self-skip** when the host lacks prerequisites (e.g. macOS, bare CI
   runner). Do not "fix" a skip by apt-installing a BPF toolchain or removing a
   `skipUnless` guard.
+- **On macOS, `nas_tools` raw-socket tests may fail with `Operation not permitted`.**
+  This is a host sandbox limitation, not a code bug. Run `make precommit-docker`
+  to execute the full gate inside an Ubuntu container (auto-starts Colima if
+  needed).
 - **jsdom prints async `unhandled exception` stack traces** for errors thrown
   inside content-script code even when the test passes. These are real bugs to fix
   (Sentinel's lane), but they do not fail the suite by themselves.
@@ -141,6 +145,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 | ---------------------------------------- | ---------------------------------------- |
 | Full gate, check-only (what CI runs)     | `make precommit`                         |
 | Full gate, auto-fixing format and lint   | `make precommit-fix`                     |
+| Full gate in Docker (macOS/CI parity)    | `make precommit-docker`                  |
 | JS lint / format                         | `make lint` / `make fmt-check`           |
 | Jest with coverage                       | `make test`                              |
 | Python tests + coverage (term-missing)   | `make test-py`                           |
