@@ -41,12 +41,10 @@
   ].join(', ');
 
   /**
-   * Extract person's name + headline from a card and build a search URL.
-   * Does NOT use a[href*="/in/"] — those can match the logged-in user's own profile.
    * @param {Element} card
-   * @returns {string | null}
+   * @returns {string}
    */
-  function getDestinationForCard(card) {
+  function extractName(card) {
     const nameSelectors = [
       'span[aria-hidden="true"]',
       '.name',
@@ -55,26 +53,29 @@
       '.artdeco-entity-lockup__title span',
       '.artdeco-entity-lockup__title'
     ];
-    let name = '';
-    let headline = '';
-
     for (const selector of nameSelectors) {
       const el = card.querySelector(selector);
       if (el) {
         const cleaned = cleanLinkedInText(
           /** @type {HTMLElement} */ (/** @type {unknown} */ (el)).innerText || el.textContent
         );
-        if (cleaned.length > 1) {
-          // Skip button-like text
-          if (/^(connect|follow|message|pending|more|dismiss)$/i.test(cleaned)) {
-            continue;
-          }
-          name = cleaned;
-          break;
+        if (
+          cleaned.length > 1 &&
+          !/^(connect|follow|message|pending|more|dismiss)$/i.test(cleaned)
+        ) {
+          return cleaned;
         }
       }
     }
+    return '';
+  }
 
+  /**
+   * @param {Element} card
+   * @param {string} nameToExclude
+   * @returns {string}
+   */
+  function extractHeadline(card, nameToExclude) {
     const allText = Array.from(
       card.querySelectorAll(
         'span[aria-hidden="true"], .headline, .inline-show-more-text, .artdeco-entity-lockup__subtitle'
@@ -84,20 +85,31 @@
       const cleaned = cleanLinkedInText(
         /** @type {HTMLElement} */ (/** @type {unknown} */ (el)).innerText || el.textContent
       );
-      if (cleaned.length > 1 && cleaned !== name) {
-        if (/^(connect|follow|message|pending|more|dismiss)$/i.test(cleaned)) {
-          continue;
-        }
-        headline = cleaned;
-        break;
+      if (
+        cleaned.length > 1 &&
+        cleaned !== nameToExclude &&
+        !/^(connect|follow|message|pending|more|dismiss)$/i.test(cleaned)
+      ) {
+        return cleaned;
       }
     }
+    return '';
+  }
 
-    if (name) {
-      const query = encodeURIComponent(`${name} ${headline}`.trim());
-      return `https://www.linkedin.com/search/results/people/?keywords=${query}`;
+  /**
+   * Extract person's name + headline from a card and build a search URL.
+   * Does NOT use a[href*="/in/"] — those can match the logged-in user's own profile.
+   * @param {Element} card
+   * @returns {string | null}
+   */
+  function getDestinationForCard(card) {
+    const name = extractName(card);
+    if (!name) {
+      return null;
     }
-    return null;
+    const headline = extractHeadline(card, name);
+    const query = encodeURIComponent(`${name} ${headline}`.trim());
+    return `https://www.linkedin.com/search/results/people/?keywords=${query}`;
   }
 
   /**
