@@ -385,10 +385,20 @@ If your finding belongs to another lane, **skip it** — that lane will get it.
 > machine-gated. Your real gate is a green `make precommit` plus the scoped proof
 > your lane requires.
 
-## `.jules/` is read-only personas — never write to it
+## `.jules/` personas — editing rules
 
-The files in `.jules/<name>.md` are **persona definitions**: your identity, lane,
-and constraints, read in at the start of a run. They are **not logs**. **Never
-append to, modify, or create files under `.jules/`.** A PR that changes a `.jules/`
-file is out of scope and will be closed — those files are edited by a human, not by
-routines. Capture durable learnings in this file or `docs/` instead.
+The files in `.jules/<name>.md` are **persona definitions** for the unattended
+Jules routines: they encode identity, lane, and constraints, read at the start of
+an unattended run. They are **not logs**.
+
+- **Unattended Jules routines** must treat `.jules/` as read-only. They may **not**
+  append to, modify, or create files under `.jules/`. A PR from a Jules routine
+  that changes a `.jules/` file is out of scope and will be closed.
+- **Interactive coding agents** (Claude Code, Kimi, etc.) **may** edit `.jules/`
+  persona files when the user explicitly asks them to fix a harness bug or clarify
+  guidance. The change must still be a single-concern PR with a green
+  `make precommit`, and the agent must note in the PR body that the edit is to a
+  persona file. Do not edit `.jules/` without the user’s direction.
+
+Capture durable learnings in this file or `docs/` instead of leaving the persona
+files as the only source of truth.

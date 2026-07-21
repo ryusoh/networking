@@ -25,6 +25,18 @@ jobs:
           fetch-depth: 0
           submodules: 'false'
 
+      # Hard guard: the automated Typist routine historically opened empty PRs
+      # (e.g. #75, #78) when it mis-detected the "finalize" state. Fail fast
+      # here so an empty diff can never pass CI.
+      - name: Reject empty pull request
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          if git diff --quiet origin/${{ github.base_ref }}; then
+            echo "::error::PR contains no changes. Empty PRs are not allowed."
+            exit 1
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
