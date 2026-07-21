@@ -34,6 +34,8 @@ RUN pip install --break-system-packages -r requirements-dev.txt
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy full source and run the precommit gate by default.
+# Copy full source and run the precommit gate by default. C binaries are cleaned
+# first so that host-architecture artifacts bind-mounted into the container are
+# rebuilt as Linux binaries before the tests try to execute them.
 COPY . .
-CMD ["make", "precommit"]
+CMD ["sh", "-c", "make -C nas_tools clean && make -C nas_proxy clean && make precommit"]

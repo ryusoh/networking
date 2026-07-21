@@ -18,6 +18,11 @@ precommit-fix: fmt lint-fix type test test-py test-ebpf test-nas sync-check
 # macOS socket permissions). Builds `Dockerfile.precommit` and runs `make precommit`
 # inside an Ubuntu container so raw-socket tests behave like CI. Starts Colima
 # automatically if the Docker daemon is not reachable.
+#
+# C binaries are cleaned first inside the container: the bind-mounted repo may
+# contain host-architecture artifacts (e.g. macOS ARM64) that `make` would
+# otherwise skip rebuilding, causing "Exec format error" when the tests try to
+# run them as Linux binaries.
 PRECOMMIT_DOCKER_IMAGE ?= net-tools-precommit
 precommit-docker:
 	@if ! docker info >/dev/null 2>&1; then \
@@ -27,7 +32,8 @@ precommit-docker:
 	@echo "Building precommit Docker image..."
 	@docker build -t $(PRECOMMIT_DOCKER_IMAGE) -f Dockerfile.precommit .
 	@echo "Running precommit in Docker..."
-	@docker run --rm -v "$$(pwd)":/app $(PRECOMMIT_DOCKER_IMAGE) make precommit
+	@docker run --rm -v "$$(pwd)":/app $(PRECOMMIT_DOCKER_IMAGE) \
+		sh -c 'make -C nas_tools clean && make -C nas_proxy clean && make precommit'
 
 # .claude/commands/ is generated from .agents/skills/ (the canonical source) by
 # tools/sync_commands.py. Fail if regeneration is not a no-op (content hash of
