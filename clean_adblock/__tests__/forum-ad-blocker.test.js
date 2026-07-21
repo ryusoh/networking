@@ -307,4 +307,102 @@ describe('Auto Generated Coverage', () => {
     script.setAttribute('src', '');
     expect(script.getAttribute('src')).toBe('');
   });
+
+  describe('NYTimes regiwall', () => {
+    let originalWindowLocation;
+    beforeEach(() => {
+      document.documentElement.innerHTML = '<html><head></head><body></body></html>';
+      originalWindowLocation = window.location;
+      delete window.location;
+      window.location = {
+        hostname: 'www.nytimes.com',
+        pathname: '/test',
+        href: 'https://www.nytimes.com/test',
+        search: '',
+        protocol: 'https:',
+        assign: jest.fn(),
+        replace: jest.fn(),
+        reload: jest.fn()
+      };
+      jest.resetModules();
+      jest.clearAllMocks();
+    });
+
+    afterEach(() => {
+      window.location = originalWindowLocation;
+    });
+
+    it('removes inert attribute and gateway overlay on NYTimes', () => {
+      document.body.innerHTML = `
+        <div data-testid="vi-gateway-container" inert="true" aria-hidden="true"></div>
+        <div id="gateway-content"></div>
+        <div data-testid="onsite-messaging-unit-gateway"></div>
+      `;
+
+      const { instrumentFile } = require('./helpers/instrument');
+      const path = require('path');
+      const code = instrumentFile(path.resolve(__dirname, '../forum-ad-blocker.js'));
+      eval(code);
+
+      const event = document.createEvent('Event');
+      event.initEvent('DOMContentLoaded', true, true);
+      document.dispatchEvent(event);
+
+      const container = document.querySelector('[data-testid="vi-gateway-container"]');
+      expect(container.hasAttribute('inert')).toBe(false);
+      expect(container.hasAttribute('aria-hidden')).toBe(false);
+
+      expect(document.getElementById('gateway-content').style.display).toBe('none');
+      expect(
+        document.querySelector('[data-testid="onsite-messaging-unit-gateway"]').style.display
+      ).toBe('none');
+    });
+  });
+
+  describe('Google Funding Choices mock', () => {
+    let originalWindowLocation;
+    beforeEach(() => {
+      document.documentElement.innerHTML = '<html><head></head><body></body></html>';
+      originalWindowLocation = window.location;
+      delete window.location;
+      window.location = {
+        hostname: 'example.com',
+        pathname: '/test',
+        href: 'https://example.com/test',
+        search: '',
+        protocol: 'https:',
+        assign: jest.fn(),
+        replace: jest.fn(),
+        reload: jest.fn()
+      };
+      jest.resetModules();
+      jest.clearAllMocks();
+    });
+
+    afterEach(() => {
+      window.location = originalWindowLocation;
+    });
+
+    it('mocks window.googlefc to bypass adblock walls', () => {
+      const { instrumentFile } = require('./helpers/instrument');
+      const path = require('path');
+      const code = instrumentFile(path.resolve(__dirname, '../forum-ad-blocker.js'));
+      eval(code);
+
+      const event = document.createEvent('Event');
+      event.initEvent('DOMContentLoaded', true, true);
+      document.dispatchEvent(event);
+
+      expect(window.googlefc).toBeDefined();
+      expect(window.googlefc.getConsentStatus()).toBe(1);
+      expect(window.googlefc.getConsentedProviderIds()).toEqual([]);
+      expect(window.googlefc.callbackQueue).toEqual([]);
+
+      // Should not throw when calling set or showRevocationMessage
+      expect(() => {
+        window.googlefc = {};
+        window.googlefc.showRevocationMessage();
+      }).not.toThrow();
+    });
+  });
 });
