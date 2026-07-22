@@ -41,14 +41,16 @@
    * @param {HTMLElement} element
    * @returns {boolean}
    */
-  function isAdElement(element) {
-    // Check class names
+  function hasAdClass(element) {
     const className = element.className || '';
-    if (className.includes('ad-showing') || className.includes('video-ads')) {
-      return true;
-    }
+    return className.includes('ad-showing') || className.includes('video-ads');
+  }
 
-    // Check data attributes
+  /**
+   * @param {HTMLElement} element
+   * @returns {boolean}
+   */
+  function hasAdAttribute(element) {
     for (let i = 0; i < AD_ATTRIBUTE_KEYS.length; i++) {
       if (element.hasAttribute(AD_ATTRIBUTE_KEYS[i])) {
         if (
@@ -60,8 +62,14 @@
         return true;
       }
     }
+    return false;
+  }
 
-    // Check if element matches ad selectors
+  /**
+   * @param {HTMLElement} element
+   * @returns {boolean}
+   */
+  function matchesAdSelector(element) {
     try {
       if (element.matches(AD_SELECTORS_JOINED) || element.closest(AD_SELECTORS_JOINED)) {
         return true;
@@ -69,8 +77,15 @@
     } catch {
       // Invalid selector
     }
-
     return false;
+  }
+
+  /**
+   * @param {HTMLElement} element
+   * @returns {boolean}
+   */
+  function isAdElement(element) {
+    return hasAdClass(element) || hasAdAttribute(element) || matchesAdSelector(element);
   }
 
   /**
