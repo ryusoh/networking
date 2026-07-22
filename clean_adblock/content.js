@@ -375,7 +375,9 @@
     // Admiral URL-encodes their branding links to evade CSS selectors.
     // Scan all <a> elements and decode their href to detect Admiral.
     const allLinks = document.querySelectorAll('a[href]');
-    for (const link of allLinks) {
+    const linksLength = allLinks.length;
+    for (let j = 0; j < linksLength; j++) {
+      const link = allLinks[j];
       let decoded = '';
       try {
         decoded = decodeURIComponent(link.getAttribute('href') || '').toLowerCase();
@@ -508,19 +510,22 @@
             '#__ABoverlay'
           ];
 
-          for (const sel of ADBLOCK_POPUP_SELECTORS) {
+          const numAdblockSelectors = ADBLOCK_POPUP_SELECTORS.length;
+          for (let i = 0; i < numAdblockSelectors; i++) {
+            const sel = ADBLOCK_POPUP_SELECTORS[i];
             try {
-              document.querySelectorAll(sel).forEach(
-                /** @param {Element} el */ (el) => {
-                  if (
-                    el instanceof HTMLElement &&
-                    (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none')
-                  ) {
-                    log('Hiding adblock popup by selector:', sel);
-                    hideDetector(el);
-                  }
+              const els = document.querySelectorAll(sel);
+              const numEls = els.length;
+              for (let j = 0; j < numEls; j++) {
+                const el = els[j];
+                if (
+                  el instanceof HTMLElement &&
+                  (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none')
+                ) {
+                  log('Hiding adblock popup by selector:', sel);
+                  hideDetector(el);
                 }
-              );
+              }
             } catch {
               /* invalid selector */
             }
