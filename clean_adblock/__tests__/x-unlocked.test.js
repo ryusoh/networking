@@ -230,4 +230,99 @@ describe('Auto Generated Coverage', () => {
 
     jest.useRealTimers();
   });
+
+  test('does not switch tab if url is not home', () => {
+    jest.useFakeTimers();
+
+    document.body.innerHTML = `
+      <div role="presentation">
+        <div role="tab" aria-selected="false">For you</div>
+      </div>
+      <div role="tab" aria-selected="false">Finance</div>
+    `;
+
+    const tabs = document.querySelectorAll('[role="tab"]');
+    tabs[0].innerText = 'For you';
+    tabs[1].innerText = 'Finance';
+    tabs[1].click = jest.fn();
+
+    // not home
+    window.location = new URL('https://x.com/otherpath');
+
+    loadContentScript();
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    jest.advanceTimersByTime(1000);
+    expect(tabs[1].click).not.toHaveBeenCalled();
+
+    jest.useRealTimers();
+  });
+
+  test('early returns from tryTabSwitch if tabSwitched is true', () => {
+    jest.useFakeTimers();
+
+    window.location = new URL('https://x.com/home');
+
+    document.body.innerHTML = `
+      <div role="presentation">
+        <div role="tab" aria-selected="false">For you</div>
+      </div>
+      <div role="tab" aria-selected="false">Finance</div>
+    `;
+
+    const tabs = document.querySelectorAll('[role="tab"]');
+    tabs[0].innerText = 'For you';
+    tabs[1].innerText = 'Finance';
+    tabs[1].click = jest.fn();
+
+    loadContentScript();
+
+    // First trigger sets tabSwitched = true inside content script
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    jest.advanceTimersByTime(1000);
+    expect(tabs[1].click).toHaveBeenCalledTimes(1);
+
+    // Trigger mutation observer
+    const newDiv = document.createElement('div');
+    document.body.appendChild(newDiv);
+
+    jest.advanceTimersByTime(1000);
+    // Should not call again because tabSwitched is true
+    expect(tabs[1].click).toHaveBeenCalledTimes(1);
+
+    jest.useRealTimers();
+  });
+
+  test('throttleTimer returns early when true', () => {
+    jest.useFakeTimers();
+    window.location = new URL('https://x.com/home');
+
+    document.body.innerHTML = `
+      <div role="presentation">
+        <div role="tab" aria-selected="false">For you</div>
+      </div>
+      <div role="tab" aria-selected="false">Finance</div>
+    `;
+
+    loadContentScript();
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    // Fire many mutations to hit the early return `if (throttleTimer) return;`
+    for (let i = 0; i < 5; i++) {
+      document.body.appendChild(document.createElement('div'));
+    }
+
+    jest.advanceTimersByTime(1000);
+
+    jest.useRealTimers();
+  });
 });

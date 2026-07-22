@@ -488,4 +488,28 @@ describe('Cookie Banner Blocker - Extension configuration', () => {
 
     expect(global.MutationObserver.prototype.observe).toHaveBeenCalled();
   });
+
+  test('dismissConsentDialog continues if dialog is not HTMLElement', () => {
+    global.chrome = {
+      runtime: { id: 'test-id' },
+      storage: {
+        sync: { get: jest.fn((keys, cb) => cb({ features: { cookieBannerBlocker: true } })) }
+      }
+    };
+
+    // Inject a non-HTMLElement dialog (SVGElement)
+    document.body.innerHTML = `<svg role="dialog" aria-modal="true"></svg>`;
+
+    jest.isolateModules(() => {
+      const { instrumentFile } = require('./helpers/instrument');
+      const path = require('path');
+      const contentScriptPath = path.resolve(__dirname, '../cookie-banner-blocker.js');
+      const code = instrumentFile(contentScriptPath);
+      eval(code);
+    });
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+  });
 });

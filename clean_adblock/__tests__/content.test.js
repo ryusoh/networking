@@ -517,3 +517,114 @@ describe('Clean AdBlock Content Script - Admiral', () => {
     jest.useRealTimers();
   });
 });
+
+describe('content.js coverage additional', () => {
+  const contentScriptPath = path.resolve(__dirname, '../content.js');
+
+  beforeEach(() => {
+    delete window.location;
+    window.location = new URL('https://example.com');
+    document.documentElement.innerHTML = '<head></head><body></body>';
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  function loadContentScript() {
+    const code = instrumentFile(contentScriptPath);
+    eval(code);
+  }
+
+  test('skips execution for search engines', () => {
+    window.location = new URL('https://www.google.com');
+    expect(() => loadContentScript()).not.toThrow();
+  });
+
+  test('scoreElement calculation handles matches and overlays correctly', () => {
+    global.chrome = {
+      runtime: { id: 'test-id', onMessage: { addListener: jest.fn() } },
+      storage: {
+        sync: { get: jest.fn((keys, cb) => cb({ enabled: true, mode: 'aggressive' })) },
+        local: { get: jest.fn((keys, cb) => cb({ customSelectors: {} })) }
+      }
+    };
+
+    document.body.innerHTML = `
+      <div id="detector-overlay" style="position: fixed; width: 100vw; height: 100vh;">
+        <div id="detector-message">
+          Please disable your adblocker to continue using this site.
+          We rely on ads to keep the content free.
+        </div>
+      </div>
+      <div id="short-text">abc</div>
+      <div id="no-match-long">This is a very long string that does not match any known keywords at all. It just has text.</div>
+    `;
+
+    const overlay = document.getElementById('detector-overlay');
+    overlay.getBoundingClientRect = () => ({ width: 1000, height: 800 });
+    Object.defineProperty(window, 'innerWidth', { value: 1024, writable: true });
+    Object.defineProperty(window, 'innerHeight', { value: 768, writable: true });
+
+    const msg = document.getElementById('detector-message');
+    msg.getBoundingClientRect = () => ({ width: 400, height: 200 });
+
+    loadContentScript();
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    expect(overlay.style.getPropertyValue('display')).toBe('none');
+  });
+
+  test('restores interaction by capturing specific events', () => {
+    global.chrome = {
+      runtime: { id: 'test-id', onMessage: { addListener: jest.fn() } },
+      storage: {
+        sync: { get: jest.fn((keys, cb) => cb({ enabled: true, mode: 'aggressive' })) },
+        local: { get: jest.fn((keys, cb) => cb({ customSelectors: {} })) }
+      }
+    };
+
+    loadContentScript();
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    const copyEvent = new Event('copy', { bubbles: true, cancelable: true });
+    copyEvent.stopPropagation = jest.fn();
+    copyEvent.stopImmediatePropagation = jest.fn();
+
+    document.documentElement.dispatchEvent(copyEvent);
+
+    expect(copyEvent.stopPropagation).toHaveBeenCalled();
+    expect(copyEvent.stopImmediatePropagation).toHaveBeenCalled();
+  });
+
+  test('dismisses Admiral popups when target link is found', () => {
+    global.chrome = {
+      runtime: { id: 'test-id', onMessage: { addListener: jest.fn() } },
+      storage: {
+        sync: { get: jest.fn((keys, cb) => cb({ enabled: true, mode: 'aggressive' })) },
+        local: { get: jest.fn((keys, cb) => cb({ customSelectors: {} })) }
+      }
+    };
+
+    document.body.innerHTML = `
+      <div id="admiral-container">
+        <a href="https://example.com" id="normal-link">Normal Link</a>
+        <a href="https://getadmiral.com/test?param=1" id="admiral-link">Admiral</a>
+      </div>
+    `;
+
+    const container = document.getElementById('admiral-container');
+
+    loadContentScript();
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    expect(container.style.getPropertyValue('display')).toBe('none');
+  });
+});
