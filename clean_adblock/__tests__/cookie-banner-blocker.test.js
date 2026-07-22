@@ -407,3 +407,85 @@ describe('Cookie Banner Blocker - Additional Tests', () => {
     expect(banner.style.display).toBe('none');
   });
 });
+
+describe('Cookie Banner Blocker - Extension configuration', () => {
+  let originalWindowLocation;
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    originalWindowLocation = window.location;
+    delete window.location;
+    window.location = { hostname: 'example.com' };
+
+    // Reset global chrome mock
+    global.chrome = {
+      storage: {
+        sync: {
+          get: jest.fn()
+        }
+      },
+      runtime: {
+        lastError: null
+      }
+    };
+
+    // We mock MutationObserver to check if start() is bypassed
+    global.MutationObserver = class {
+      constructor(callback) {}
+      observe() {
+        this.observed = true;
+      }
+    };
+    jest.spyOn(global.MutationObserver.prototype, 'observe');
+  });
+
+  afterEach(() => {
+    window.location = originalWindowLocation;
+    jest.restoreAllMocks();
+  });
+
+  function loadScript() {
+    const code = instrumentFile(path.resolve(__dirname, '../cookie-banner-blocker.js'));
+    eval(code);
+  }
+
+  test('does not run if features.cookieBannerBlocker is false', () => {
+    global.chrome.storage.sync.get.mockImplementation((keys, cb) => {
+      cb({ features: { cookieBannerBlocker: false } });
+    });
+
+    loadScript();
+
+    expect(global.MutationObserver.prototype.observe).not.toHaveBeenCalled();
+  });
+
+  test('does not run if host is in whitelist', () => {
+    global.chrome.storage.sync.get.mockImplementation((keys, cb) => {
+      cb({ whitelist: ['example.com'] });
+    });
+
+    loadScript();
+
+    expect(global.MutationObserver.prototype.observe).not.toHaveBeenCalled();
+  });
+
+  test('does not run if chrome.runtime.lastError is set', () => {
+    global.chrome.runtime.lastError = new Error('Test error');
+    global.chrome.storage.sync.get.mockImplementation((keys, cb) => {
+      cb({});
+    });
+
+    loadScript();
+
+    expect(global.MutationObserver.prototype.observe).not.toHaveBeenCalled();
+  });
+
+  test('runs if preferences are not set or default', () => {
+    global.chrome.storage.sync.get.mockImplementation((keys, cb) => {
+      cb({});
+    });
+
+    loadScript();
+
+    expect(global.MutationObserver.prototype.observe).toHaveBeenCalled();
+  });
+});
