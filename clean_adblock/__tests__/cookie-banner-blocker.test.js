@@ -430,7 +430,6 @@ describe('Cookie Banner Blocker - Extension configuration', () => {
 
     // We mock MutationObserver to check if start() is bypassed
     global.MutationObserver = class {
-      constructor(callback) {}
       observe() {
         this.observed = true;
       }
@@ -498,7 +497,7 @@ describe('Cookie Banner Blocker - Extension configuration', () => {
     };
 
     // Inject a non-HTMLElement dialog (SVGElement)
-    document.body.innerHTML = `<svg role="dialog" aria-modal="true"></svg>`;
+    document.body.innerHTML = '<svg role="dialog" aria-modal="true"></svg>';
 
     jest.isolateModules(() => {
       const { instrumentFile } = require('./helpers/instrument');
