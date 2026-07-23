@@ -355,7 +355,7 @@ class TileCacheHandler(BaseHTTPRequestHandler):
             self.send_response(502)
             self.end_headers()
 
-    def log_message(self, fmt, *args):
+    def log_message(self, _fmt, *args):
         pass  # Quiet
 
 

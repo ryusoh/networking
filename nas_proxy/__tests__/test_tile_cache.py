@@ -8,7 +8,7 @@ from nas_proxy import tile_cache
 
 class TestTileCache(unittest.TestCase):
     @patch("nas_proxy.tile_cache.storage_get")
-    def test_storage_get_mocked(self, mock_get):
+    def test_storage_get_mocked(self, _mock_get):
         pass
 
     @patch("nas_proxy.tile_cache.ctypes.CDLL")
@@ -35,14 +35,14 @@ class TestTileCache(unittest.TestCase):
 
     @patch("nas_proxy.tile_cache.os.makedirs")
     @patch("nas_proxy.tile_cache.os.path.exists")
-    def test_disk_put_get(self, mock_exists, mock_makedirs):
+    def test_disk_put_get(self, mock_exists, _mock_makedirs):
         # disk_get
         mock_exists.return_value = False
         self.assertIsNone(tile_cache.disk_get("http://test.com"))
 
         # disk_put
         mock_exists.return_value = True
-        import builtins
+
         with patch("builtins.open", unittest.mock.mock_open(read_data=b"data")):
             self.assertEqual(tile_cache.disk_get("http://test.com"), b"data")
             tile_cache.disk_put("http://test.com", b"data")
@@ -93,7 +93,7 @@ class TestTileCache(unittest.TestCase):
     @patch("nas_proxy.tile_cache.fetch_via_pool")
     @patch("nas_proxy.tile_cache.storage_put")
     @patch("nas_proxy.tile_cache.disk_put")
-    def test_handler_do_GET(self, mock_dput, mock_sput, mock_fetch, mock_dget, mock_sget):
+    def test_handler_do_GET(self, _mock_dput, _mock_sput, mock_fetch, mock_dget, mock_sget):
         from io import BytesIO
         class MockRequest:
             def __init__(self):

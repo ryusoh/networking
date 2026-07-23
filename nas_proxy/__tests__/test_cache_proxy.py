@@ -76,7 +76,7 @@ class TestCacheProxy(unittest.TestCase):
     @patch("nas_proxy.cache_proxy.load_proxies")
     @patch("nas_proxy.cache_proxy.socks5_connect")
     @patch("nas_proxy.cache_proxy.relay")
-    def test_proxy_handler(self, mock_relay, mock_connect, mock_load):
+    def test_proxy_handler(self, _, mock_connect, mock_load):
         from io import BytesIO
         class MockRequest:
             def __init__(self):
