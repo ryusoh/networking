@@ -15,6 +15,9 @@
     );
 
     for (const btn of buttons) {
+      if (!(btn instanceof window.HTMLElement)) {
+        continue;
+      }
       const text = (btn.textContent || btn.innerText || '').trim();
       if (text === '影像') {
         btn.click();
@@ -26,6 +29,9 @@
     /* Fallback: look for any clickable element containing 影像 */
     const allEls = document.querySelectorAll('span, div, a, button, li');
     for (const el of allEls) {
+      if (!(el instanceof window.HTMLElement)) {
+        continue;
+      }
       if (el.children.length === 0 && (el.textContent || '').trim() === '影像') {
         el.click();
         console.log('[Tianditu] Switched to 影像 (Satellite) mode (fallback)');
