@@ -79,7 +79,7 @@ class TestRetriever(unittest.TestCase):
     @patch('builtins.print')
     @patch('os.getcwd')
     @patch('builtins.open', new_callable=mock_open, read_data='{"name": "My Extension Name"}')
-    def test_successful_pull_with_manifest(self, mock_file, mock_getcwd, mock_print, mock_rmtree, mock_copytree, mock_isdir, mock_listdir, mock_exists):
+    def test_successful_pull_with_manifest(self, _mock_file, mock_getcwd, mock_print, mock_rmtree, mock_copytree, mock_isdir, mock_listdir, mock_exists):
         mock_exists.return_value = True
         mock_listdir.return_value = ["1.0.0_0"]
         mock_isdir.return_value = True
@@ -100,7 +100,7 @@ class TestRetriever(unittest.TestCase):
     @patch('builtins.print')
     @patch('os.getcwd')
     @patch('builtins.open', new_callable=mock_open, read_data='{"name": "Single"}')
-    def test_successful_pull_with_manifest_single_word(self, mock_file, mock_getcwd, mock_print, mock_rmtree, mock_copytree, mock_isdir, mock_listdir, mock_exists):
+    def test_successful_pull_with_manifest_single_word(self, _mock_file, mock_getcwd, mock_print, mock_rmtree, mock_copytree, mock_isdir, mock_listdir, mock_exists):
         mock_exists.return_value = True
         mock_listdir.return_value = ["1.0.0_0"]
         mock_isdir.return_value = True
@@ -176,7 +176,7 @@ class TestRetriever(unittest.TestCase):
 
     @patch('sys.argv', ['pull.py', 'test_ext'])
     @patch('retriever.pull.pull_extension')
-    def test_main_with_args(self, mock_pull):
+    def test_main_with_args(self, _mock_pull):
         import runpy
         try:
             runpy.run_path("retriever/pull.py", run_name="__main__")

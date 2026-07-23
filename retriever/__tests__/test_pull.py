@@ -15,7 +15,7 @@ class TestPull(unittest.TestCase):
     @patch("retriever.pull.shutil.rmtree")
     def test_pull_extension_success(self, mock_rmtree, mock_copytree, mock_isdir, mock_listdir, mock_glob, mock_exists):
         # exists returning true means it finds the profile directory
-        mock_exists.side_effect = lambda x: True
+        mock_exists.side_effect = lambda _x: True
         mock_listdir.return_value = ["1.0.0_0"]
         mock_isdir.return_value = True
 

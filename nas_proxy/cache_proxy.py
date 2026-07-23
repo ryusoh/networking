@@ -139,7 +139,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         except Exception:
             pass
 
-    def log_message(self, fmt, *args):
+    def log_message(self, _fmt, *args):
         pass  # Quiet
 
 
