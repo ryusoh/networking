@@ -489,6 +489,8 @@
     'iframe[src*="upapi=true"]'
   ];
 
+  const FORUM_AD_SELECTORS_JOINED = FORUM_AD_SELECTORS.join(',');
+
   const processedElements = new WeakSet();
 
   /**
@@ -523,15 +525,24 @@
   }
 
   function blockForumAds() {
-    for (const selector of FORUM_AD_SELECTORS) {
-      try {
-        document.querySelectorAll(selector).forEach((el) => {
-          if (el instanceof HTMLElement) {
-            hideAd(el);
-          }
-        });
-      } catch {
-        /* invalid selector */
+    try {
+      document.querySelectorAll(FORUM_AD_SELECTORS_JOINED).forEach((el) => {
+        if (el instanceof HTMLElement) {
+          hideAd(el);
+        }
+      });
+    } catch {
+      // Fallback if joined selector is invalid
+      for (const selector of FORUM_AD_SELECTORS) {
+        try {
+          document.querySelectorAll(selector).forEach((el) => {
+            if (el instanceof HTMLElement) {
+              hideAd(el);
+            }
+          });
+        } catch {
+          /* invalid selector */
+        }
       }
     }
     removeAdScripts();
@@ -654,13 +665,19 @@
         }
 
         // Check if the added node itself is an ad
-        for (const selector of FORUM_AD_SELECTORS) {
-          try {
-            if (node instanceof HTMLElement && node.matches(selector)) {
-              hideAd(node);
+        try {
+          if (node instanceof HTMLElement && node.matches(FORUM_AD_SELECTORS_JOINED)) {
+            hideAd(node);
+          }
+        } catch {
+          for (const selector of FORUM_AD_SELECTORS) {
+            try {
+              if (node instanceof HTMLElement && node.matches(selector)) {
+                hideAd(node);
+              }
+            } catch {
+              /* invalid selector */
             }
-          } catch {
-            /* invalid selector */
           }
         }
 
