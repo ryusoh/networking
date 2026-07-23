@@ -170,17 +170,25 @@
   // --- Layer 2: Click Interception (kill event on entire card) ---
 
   /**
+   * Resolves the target of an event to a valid Element.
+   * @param {EventTarget | null} target
+   * @returns {Element | null}
+   */
+  function resolveEventTarget(target) {
+    if (!(target instanceof Element)) {
+      if (target && 'parentElement' in target && target.parentElement instanceof Element) {
+        return target.parentElement;
+      }
+      return null;
+    }
+    return target;
+  }
+
+  /**
    * @param {Event} e
    */
   function handleIntercept(e) {
-    let target = e.target;
-    if (!(target instanceof Element)) {
-      if (target && 'parentElement' in target && target.parentElement instanceof Element) {
-        target = target.parentElement;
-      } else {
-        return;
-      }
-    }
+    const target = resolveEventTarget(e.target);
     if (!target) {
       return;
     }
@@ -222,14 +230,7 @@
    * @param {Event} e
    */
   function onHover(e) {
-    let target = e.target;
-    if (!(target instanceof Element)) {
-      if (target && 'parentElement' in target && target.parentElement instanceof Element) {
-        target = target.parentElement;
-      } else {
-        return;
-      }
-    }
+    const target = resolveEventTarget(e.target);
     if (!target) {
       return;
     }
