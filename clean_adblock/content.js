@@ -374,9 +374,20 @@
    * @returns {boolean}
    */
   function isAdmiralLink(link) {
+    const rawHref = link.getAttribute('href');
+    if (!rawHref) {
+      return false;
+    }
+
+    // Quick filter before slow decode and lowercasing
+    const lowerRaw = rawHref.toLowerCase();
+    if (!lowerRaw.includes('admiral') && !lowerRaw.includes('%')) {
+      return false;
+    }
+
     let decoded = '';
     try {
-      decoded = decodeURIComponent(link.getAttribute('href') || '').toLowerCase();
+      decoded = decodeURIComponent(lowerRaw).toLowerCase();
     } catch {
       return false;
     }
@@ -425,11 +436,10 @@
     }
     // Admiral URL-encodes their branding links to evade CSS selectors.
     // Scan all <a> elements and decode their href to detect Admiral.
-    const allLinks = document.querySelectorAll('a[href]');
+    const allLinks = document.links;
     const linksLength = allLinks.length;
     for (let j = 0; j < linksLength; j++) {
       const link = allLinks[j];
-
       if (!isAdmiralLink(link)) {
         continue;
       }
