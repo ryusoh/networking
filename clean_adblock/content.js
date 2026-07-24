@@ -368,6 +368,57 @@
     (d) => currentHost === d || currentHost.endsWith('.' + d)
   );
 
+  /**
+   * Check if a link is an Admiral anti-adblock link.
+   * @param {Element} link
+   * @returns {boolean}
+   */
+  function isAdmiralLink(link) {
+    let decoded = '';
+    try {
+      decoded = decodeURIComponent(link.getAttribute('href') || '').toLowerCase();
+    } catch {
+      return false;
+    }
+
+    if (
+      !decoded.includes('getadmiral.com') &&
+      !decoded.includes('admiral.mgr') &&
+      !decoded.includes('admiralcdn.com') &&
+      !decoded.includes('admiral-media.com')
+    ) {
+      return false;
+    }
+
+    log('Admiral link found:', decoded);
+    return true;
+  }
+
+  /**
+   * Hide the Admiral overlay container given an Admiral link.
+   * @param {Element} link
+   * @returns {boolean} True if successfully hidden
+   */
+  function hideAdmiralContainer(link) {
+    let container = link;
+    let best = link;
+    for (let i = 0; i < 15 && container.parentElement; i++) {
+      container = container.parentElement;
+      if (container === document.body || container === document.documentElement) {
+        break;
+      }
+      best = container;
+    }
+
+    if (best instanceof HTMLElement && best !== link) {
+      log('Hiding Admiral overlay container');
+      best.style.setProperty('display', 'none', 'important');
+      restoreScrolling();
+      return true;
+    }
+    return false;
+  }
+
   function dismissAdmiral() {
     if (skipAdmiral) {
       return;
@@ -378,40 +429,12 @@
     const linksLength = allLinks.length;
     for (let j = 0; j < linksLength; j++) {
       const link = allLinks[j];
-      let decoded = '';
-      try {
-        decoded = decodeURIComponent(link.getAttribute('href') || '').toLowerCase();
-      } catch {
-        continue;
-      }
-      // Only match Admiral anti-adblock service domains, not the word "admiral"
-      // in general (e.g. "vanguard-500-index-admiral" on investing.com)
-      if (
-        !decoded.includes('getadmiral.com') &&
-        !decoded.includes('admiral.mgr') &&
-        !decoded.includes('admiralcdn.com') &&
-        !decoded.includes('admiral-media.com')
-      ) {
+
+      if (!isAdmiralLink(link)) {
         continue;
       }
 
-      log('Admiral link found:', decoded);
-
-      // Walk up to the topmost overlay container
-      let container = link;
-      let best = link;
-      for (let i = 0; i < 15 && container.parentElement; i++) {
-        container = container.parentElement;
-        if (container === document.body || container === document.documentElement) {
-          break;
-        }
-        best = container;
-      }
-
-      if (best instanceof HTMLElement && best !== link) {
-        log('Hiding Admiral overlay container');
-        best.style.setProperty('display', 'none', 'important');
-        restoreScrolling();
+      if (hideAdmiralContainer(link)) {
         return;
       }
     }
