@@ -374,13 +374,24 @@
     }
     // Admiral URL-encodes their branding links to evade CSS selectors.
     // Scan all <a> elements and decode their href to detect Admiral.
-    const allLinks = document.querySelectorAll('a[href]');
+    const allLinks = document.links;
     const linksLength = allLinks.length;
     for (let j = 0; j < linksLength; j++) {
       const link = allLinks[j];
+      const rawHref = link.getAttribute('href');
+      if (!rawHref) {
+        continue;
+      }
+
+      // Quick filter before slow decode and lowercasing
+      const lowerRaw = rawHref.toLowerCase();
+      if (!lowerRaw.includes('admiral') && !lowerRaw.includes('%')) {
+        continue;
+      }
+
       let decoded = '';
       try {
-        decoded = decodeURIComponent(link.getAttribute('href') || '').toLowerCase();
+        decoded = decodeURIComponent(lowerRaw).toLowerCase();
       } catch {
         continue;
       }
@@ -398,7 +409,9 @@
       log('Admiral link found:', decoded);
 
       // Walk up to the topmost overlay container
+      /** @type {HTMLElement} */
       let container = link;
+      /** @type {HTMLElement} */
       let best = link;
       for (let i = 0; i < 15 && container.parentElement; i++) {
         container = container.parentElement;
