@@ -160,10 +160,6 @@ describe('video-stream-ad-blocker.js', () => {
     );
     eval(code);
 
-    // Assuming we can trigger this by not passing a video, or we can mock querySelectorAll to return [null]
-    // which shouldn't happen but we can try to test it if exported or triggerable.
-    // wait, removeAdFromVideo isn't exported. We can't call it directly.
-    // Let's mock querySelectorAll('video') to return [null] and then call monitorVideoAds
     document.body.innerHTML = '<video></video>';
     const originalQuerySelectorAll = document.querySelectorAll.bind(document);
     document.querySelectorAll = jest.fn((selector) => {
