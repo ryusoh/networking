@@ -148,8 +148,8 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 | Full gate in Docker (macOS/CI parity)    | `make precommit-docker`                  |
 | JS lint / format                         | `make lint` / `make fmt-check`           |
 | Dependency-structure gate (JS)           | `make depcheck`                          |
-| Jest with coverage                       | `make test`                              |
-| Python tests + coverage (term-missing)   | `make test-py`                           |
+| Jest with coverage (floor-gated)         | `make test`                              |
+| Python tests + coverage (floor-gated)    | `make test-py`                           |
 | JS type-check (JSDoc, non-blocking)      | `make type`                              |
 | Rank least-covered files (Testpilot)     | `python3 bin/coverage_rank.py --limit 5` |
 | Scoped Jest while iterating              | `npx jest <path>`                        |
@@ -222,6 +222,13 @@ Both `make precommit` and `precommit-fix` print a coverage table after the tests
 Jest (`clean_adblock/*.js`, scoped via `collectCoverageFrom` in `package.json`)
 and pytest (source modules only; test files/`__init__.py` omitted via the
 `[tool.coverage.run]` section in `pyproject.toml`).
+
+**Whole-suite coverage floor (blocking):** Jest enforces a global
+`coverageThreshold` in `package.json` (statements/functions/lines 94, branches
+85) and pytest enforces `--cov-fail-under=94` in `make test-py`. Both floors sit
+~1 point under the day-one measurements (Jest 95.08/86.27/95.61/95.04; pytest
+95.47%), so the gate is a ratchet against regression, not a target — raising a
+floor is a deliberate Testpilot PR, lowering one is a red flag.
 
 **`make precommit` runs `fmt-check` (`prettier --check .`) first, and it scans
 the whole tree.** Generated output dirs are excluded via `.prettierignore`
@@ -433,8 +440,10 @@ If your finding belongs to another lane, **skip it** — that lane will get it.
 > `eslint-suppressions.json`, and `xenon` freezing Python's ranks in `make lint`
 > (see "Complexity ratchet" above). So is the JS dependency-structure gate
 > (`make depcheck`, wired into `make lint` — see "Dependency-structure gate"
-> above). Coverage is still reported but not gated,
-> and the JS type-check (`make type`) is **non-blocking**. The Testpilot and
+> above). Whole-suite coverage **is** gated — a global Jest
+> `coverageThreshold` (94/85/94/94) and pytest `--cov-fail-under=94`, both
+> ~1 point under the day-one measurement (see "Coverage reports" above). Only
+> the JS type-check (`make type`) is **non-blocking**. The Testpilot and
 > Typist targets are therefore judgment-guided, not machine-gated. Your real
 > gate is a green `make precommit` plus the scoped proof your lane requires.
 

@@ -34,6 +34,14 @@
     "coverageReporters": [
       "text",
       "text-summary"
-    ]
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 94,
+        "branches": 85,
+        "functions": 94,
+        "lines": 94
+      }
+    }
   }
 }

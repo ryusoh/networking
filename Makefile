@@ -85,6 +85,7 @@ test:
 # nas_tools contributes C-binary integration tests but no Python source to cover.
 # nas_tools' privileged tests (ICMP / eth0) self-skip when the host lacks the
 # prerequisites — see the skipUnless guards in nas_tools/__tests__/test_tools.py.
+# Whole-suite floor: measured 95.5% total; gate fails below 94%.
 PY ?= python3
 test-py:
 	@echo "Building nas_tools binaries (needed by its tests)..."
@@ -93,7 +94,8 @@ test-py:
 	@$(PY) -m pytest nas_proxy retriever vps_kernel_proxy nas_tools bin \
 		-p no:cacheprovider \
 		--cov=nas_proxy --cov=retriever --cov=vps_kernel_proxy \
-		--cov-report=term-missing
+		--cov-report=term-missing \
+		--cov-fail-under=94
 
 test-ebpf:
 	@echo "Running eBPF Kernel Tests (via Docker)..."
