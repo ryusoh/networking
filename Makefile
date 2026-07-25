@@ -1,5 +1,5 @@
 # Usage: make pull ID=<extension_id>
-.PHONY: pull precommit precommit-fix precommit-docker fmt fmt-check lint lint-fix install-dev test test-py type tm-repair sync-check
+.PHONY: pull precommit precommit-fix precommit-docker fmt fmt-check lint depcheck lint-fix install-dev test test-py type tm-repair sync-check
 
 tm-repair:
 	@./bin/tm-repair
@@ -58,7 +58,7 @@ fmt:
 fmt-check:
 	@npm run fmt:check
 
-lint:
+lint: depcheck
 	@npm run lint
 	@# Complexity ratchet: xenon fails if the average/worst cyclomatic-complexity
 	@# rank regresses past these ceilings (current: average A, worst block C).
@@ -66,6 +66,11 @@ lint:
 
 lint-fix:
 	@npm run lint:fix
+
+# Dependency-structure gate (JS): no circular deps, no cross-subproject
+# imports, production source never imports tests. Rules: .dependency-cruiser.cjs
+depcheck:
+	npx --yes dependency-cruiser clean_adblock tianditu_bypass jest.setup.js --config .dependency-cruiser.cjs
 
 # JS strict-typing via JSDoc (Typist lane). Blocking: `make type` gates once the
 # included first-party JS is clean (see .jules/typist.md).

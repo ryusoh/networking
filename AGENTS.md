@@ -147,6 +147,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 | Full gate, auto-fixing format and lint   | `make precommit-fix`                     |
 | Full gate in Docker (macOS/CI parity)    | `make precommit-docker`                  |
 | JS lint / format                         | `make lint` / `make fmt-check`           |
+| Dependency-structure gate (JS)           | `make depcheck`                          |
 | Jest with coverage                       | `make test`                              |
 | Python tests + coverage (term-missing)   | `make test-py`                           |
 | JS type-check (JSDoc, non-blocking)      | `make type`                              |
@@ -182,6 +183,38 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   coverage ranking helper.
 
 ## Repo conventions
+
+### Dependency-structure gate (`make depcheck`)
+
+`make depcheck` (wired into `make lint`, hence into `make precommit`) runs
+dependency-cruiser over `clean_adblock tianditu_bypass jest.setup.js` with the
+rules in `.dependency-cruiser.cjs`: no circular deps, no cross-subproject
+imports (mirrors non-negotiable #2), production source never imports
+`__tests__`. Measured **zero violations** on day one (56 modules, 51
+dependencies, fully resolved — no `couldNotResolve`), so no baseline was
+needed; the gate is purely preventive. Probe-tested: a cross-subproject import
+and a prod→test import each fail the gate; `git restore` returns green. This
+wiring was done by an interactive agent explicitly directed to change
+build/lint config (non-negotiable #6 binds Jules routines, not interactive
+agents).
+
+- **No alias config, on purpose:** this repo has no path aliases (no import
+  map, no `jsconfig.json` `paths`, no bare specifiers). If aliases are ever
+  added, resolve them via a webpack-config stub — **never** `options.tsConfig`,
+  which makes dependency-cruiser look for a typescript <7 compiler (this repo
+  has v7) and print a spurious "missing-typescript-transpiler" warning.
+- **Python import-linter: deliberately skipped after measuring.** The
+  `test-py` scope (`nas_proxy`, `retriever`, `vps_kernel_proxy` are real
+  packages with `__init__.py`; `nas_tools`, `bin` are PEP 420 namespace dirs)
+  was graphed with grimp (import-linter's builder): **zero** cross-top-level
+  import edges across all five dirs — every package imports only itself and
+  the stdlib. A `layers`/`independence` contract would gate an empty relation,
+  so nothing was wired and import-linter was not added to
+  `requirements-dev.txt`. Unblock condition: if real cross-package imports
+  appear, revisit with a minimal contract.
+- **grimp measurement gotcha:** running grimp/import-linter in the repo root
+  writes a `.grimp_cache/` dir that fails `fmt-check` — measure in a venv and
+  delete the cache afterwards.
 
 ### Coverage reports and the fmt-check gotcha
 
@@ -398,7 +431,9 @@ If your finding belongs to another lane, **skip it** — that lane will get it.
 > **Enforcement note:** cyclomatic complexity **is** machine-gated — ESLint
 > `complexity: ['error', { max: 20 }]` with the legacy violations baselined in
 > `eslint-suppressions.json`, and `xenon` freezing Python's ranks in `make lint`
-> (see "Complexity ratchet" above). Coverage is still reported but not gated,
+> (see "Complexity ratchet" above). So is the JS dependency-structure gate
+> (`make depcheck`, wired into `make lint` — see "Dependency-structure gate"
+> above). Coverage is still reported but not gated,
 > and the JS type-check (`make type`) is **non-blocking**. The Testpilot and
 > Typist targets are therefore judgment-guided, not machine-gated. Your real
 > gate is a green `make precommit` plus the scoped proof your lane requires.
