@@ -244,6 +244,18 @@ scores are signal for humans, not thresholds.
 - `mutmut` is pinned in `requirements-dev.txt`, so it is also present in the
   `Dockerfile.precommit` image (installed, never run by the gate).
 
+### Acceptance tests
+
+`nas_proxy/__tests__/test_socks5_bridge_acceptance.py` is the first
+acceptance-layer stream: behaviour-level tests for the SOCKS5-to-HTTP bridge
+(`cache_proxy.socks5_connect` / `relay`) against a **real** loopback TCP
+server and real socketpairs — no mocks. The RFC 1928 byte strings are
+hand-computed and the test names use the bridge's domain language ("the
+bridge delegates DNS to the proxy", "the relay carries bytes in both
+directions until a side hangs up"). Keep the split: unit tests
+(`test_cache_proxy.py`) mock internals; acceptance tests use real I/O and
+hand-computed expectations.
+
 ### Coverage reports and the fmt-check gotcha
 
 Both `make precommit` and `precommit-fix` print a coverage table after the tests:
@@ -252,8 +264,7 @@ and pytest (source modules only; test files/`__init__.py` omitted via the
 `[tool.coverage.run]` section in `pyproject.toml`).
 
 **Whole-suite coverage floor (blocking):** Jest enforces a global
-`coverageThreshold` in `package.json` (statements/functions/lines 94, branches
-85) and pytest enforces `--cov-fail-under=94` in `make test-py`. Both floors sit
+`coverageThreshold` in `package.json` (statements/functions/lines 94, branches 85) and pytest enforces `--cov-fail-under=94` in `make test-py`. Both floors sit
 ~1 point under the day-one measurements (Jest 95.08/86.27/95.61/95.04; pytest
 95.47%), so the gate is a ratchet against regression, not a target — raising a
 floor is a deliberate Testpilot PR, lowering one is a red flag.
