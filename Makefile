@@ -1,5 +1,5 @@
 # Usage: make pull ID=<extension_id>
-.PHONY: pull precommit precommit-fix precommit-docker fmt fmt-check lint depcheck lint-fix install-dev test test-py type tm-repair sync-check
+.PHONY: pull precommit precommit-fix precommit-docker fmt fmt-check lint depcheck lint-fix install-dev test test-py type tm-repair sync-check mutate-js mutate-py
 
 tm-repair:
 	@./bin/tm-repair
@@ -71,6 +71,18 @@ lint-fix:
 # imports, production source never imports tests. Rules: .dependency-cruiser.cjs
 depcheck:
 	npx --yes dependency-cruiser clean_adblock tianditu_bypass jest.setup.js --config .dependency-cruiser.cjs
+
+# Mutation testing (NON-BLOCKING scaffold — deliberately NOT wired into
+# precommit or CI gates; informational scores only).
+# mutate-js: StrykerJS, incremental, scoped to clean_adblock/picker.js
+#   (config: stryker.config.mjs; cache: .stryker-tmp/, reports/).
+# mutate-py: mutmut over the three test-py source packages
+#   (config: [tool.mutmut] in pyproject.toml; cache: mutants/, .mutmut-cache/).
+mutate-js:
+	npx stryker run
+
+mutate-py:
+	$(PY) -m mutmut run
 
 # JS strict-typing via JSDoc (Typist lane). Blocking: `make type` gates once the
 # included first-party JS is clean (see .jules/typist.md).

@@ -5,3 +5,27 @@ omit = [
     "*/__tests__/*",
     "*/__init__.py",
 ]
+
+# mutmut (mutation testing, NON-BLOCKING scaffold — see `make mutate-py`).
+# Scope = the three importable source packages `make test-py` covers (mutating
+# uncovered code is noise). Tests live in each package's `__tests__/`.
+# The -k exclusion is required: 8 retriever tests patch `os.getcwd` on the
+# shared os module, and mutmut 3.6.0's trampoline stats recording resolves its
+# relative source_paths against that mocked cwd
+# (Path("retriever").resolve(strict=True) -> FileNotFoundError), crashing the
+# baseline stats collection. The excluded tests still run in `make test-py`.
+[tool.mutmut]
+source_paths = ["retriever", "nas_proxy", "vps_kernel_proxy"]
+do_not_mutate = ["*/__tests__/*"]
+pytest_add_cli_args = [
+    "-p",
+    "no:cacheprovider",
+    "-q",
+    "-k",
+    "not test_pull_extension_cwd and not test_pull_extension_retriever_cwd and not test_extension_found_in_other_profile and not test_successful_pull_no_manifest and not test_successful_pull_with_manifest and not test_successful_pull_overwrite and not test_copy_error",
+]
+pytest_add_cli_args_test_selection = [
+    "retriever/__tests__/",
+    "nas_proxy/__tests__/",
+    "vps_kernel_proxy/__tests__/",
+]

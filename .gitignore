@@ -41,3 +41,9 @@ coverage/
 *.gcno
 coverage.info
 venv/
+
+# Mutation-testing artifacts (non-blocking scaffold: make mutate-js / mutate-py)
+.stryker-tmp/
+reports/
+mutants/
+.mutmut-cache/

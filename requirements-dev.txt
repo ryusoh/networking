@@ -3,3 +3,5 @@ pytest>=9.1.1,<10
 pytest-cov>=7.1.0,<8
 radon>=6.0.1,<7
 xenon>=0.9.3,<0.10
+# Non-blocking mutation-testing scaffold (`make mutate-py`); not used by any gate.
+mutmut>=3.6,<4

@@ -151,6 +151,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 | Jest with coverage (floor-gated)         | `make test`                              |
 | Python tests + coverage (floor-gated)    | `make test-py`                           |
 | JS type-check (JSDoc, non-blocking)      | `make type`                              |
+| Mutation smoke, JS / Python (non-gated)  | `make mutate-js` / `make mutate-py`      |
 | Rank least-covered files (Testpilot)     | `python3 bin/coverage_rank.py --limit 5` |
 | Scoped Jest while iterating              | `npx jest <path>`                        |
 | Pull an extension (retriever)            | `make pull ID=<extension_id>`            |
@@ -215,6 +216,33 @@ agents).
 - **grimp measurement gotcha:** running grimp/import-linter in the repo root
   writes a `.grimp_cache/` dir that fails `fmt-check` — measure in a venv and
   delete the cache afterwards.
+
+### Mutation testing (NON-BLOCKING scaffold)
+
+`make mutate-js` (StrykerJS, `stryker.config.mjs`) and `make mutate-py`
+(mutmut, `[tool.mutmut]` in `pyproject.toml`) are **informational only** —
+deliberately not wired into `make precommit`, and the weekly
+`.github/workflows/mutation.yml` runs them `continue-on-error`. Mutation
+scores are signal for humans, not thresholds.
+
+- **JS scope:** `clean_adblock/picker.js` only (small, 100% statement
+  coverage), incremental mode. Day-one smoke: 146 mutants, 61 killed, 85
+  survived, score **41.78%** in ~9 s. Widen `mutate` one file at a time.
+- **Python scope:** the three `test-py` source packages, `*/__tests__/*`
+  excluded via `do_not_mutate` (mutmut otherwise mutates the test files
+  themselves — day one that produced 1602 mutants with hundreds of noise
+  "survived" results in `test_ebpf`). Source-only smoke: 1012 mutants, 292
+  killed, 575 survived, 143 no-tests, 2 timeouts (~25 s).
+- **mutmut vs. `os.getcwd` mocks:** 8 retriever tests patch `os.getcwd` on the
+  shared os module; mutmut 3.6.0's `record_trampoline_hit` resolves its
+  relative `source_paths` against that mocked cwd
+  (`Path("retriever").resolve(strict=True)` → `FileNotFoundError`), crashing
+  baseline stats collection. They are excluded via the `-k` filter in
+  `pytest_add_cli_args` (they still run in `make test-py`).
+- **Artifacts** (`.stryker-tmp/`, `reports/`, `mutants/`, `.mutmut-cache/`)
+  are git- and prettier-ignored; delete them freely, they regenerate.
+- `mutmut` is pinned in `requirements-dev.txt`, so it is also present in the
+  `Dockerfile.precommit` image (installed, never run by the gate).
 
 ### Coverage reports and the fmt-check gotcha
 

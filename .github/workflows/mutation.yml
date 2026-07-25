@@ -1,0 +1,46 @@
+name: Mutation testing (non-blocking)
+
+# Weekly informational smoke of the mutation-testing scaffold. This workflow
+# is deliberately NON-BLOCKING: it is not a PR/push gate, and the job is
+# continue-on-error so a red run never blocks anything. Mutation scores are
+# signal for humans, not a threshold — read AGENTS.md "Mutation testing".
+
+on:
+  schedule:
+    - cron: '17 3 * * 1' # Mondays 03:17 UTC
+  workflow_dispatch:
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      NODE_VERSION: '24'
+      PYTHON_VERSION: '3.13'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: StrykerJS smoke (clean_adblock/picker.js)
+        run: make mutate-js
+
+      - name: mutmut smoke (retriever, nas_proxy, vps_kernel_proxy)
+        run: make mutate-py
