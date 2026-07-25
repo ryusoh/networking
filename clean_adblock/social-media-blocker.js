@@ -65,17 +65,10 @@
 
   /**
    * @param {Document | Element} root
-   * @returns {HTMLElement[]}
+   * @param {PlatformConfig} config
+   * @param {HTMLElement[]} results
    */
-  function findSponsoredContent(root = document) {
-    const platform = currentPlatform || detectPlatform();
-    if (!platform) {
-      return [];
-    }
-
-    const config = PLATFORM_CONFIG[platform];
-    const results = [];
-
+  function findSponsoredBySelectors(root, config, results) {
     for (const selector of config.selectors) {
       try {
         const elements = root.querySelectorAll(selector);
@@ -89,45 +82,69 @@
         // Invalid selector
       }
     }
+  }
 
-    // Also check by text patterns — only match leaf-level elements to avoid
-    // hiding parent containers (textContent includes all descendant text)
-    if (config.textPatterns.length > 0) {
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
-        acceptNode: (node) => {
-          if (processedElements.has(node) || !isVisible(/** @type {Element} */ (node))) {
-            return NodeFilter.FILTER_SKIP;
-          }
-          // Only match elements with short direct text (likely labels, not containers)
-          const directText = Array.from(node.childNodes)
-            .filter((n) => n.nodeType === Node.TEXT_NODE)
-            .map((n) => (n.textContent || '').trim())
-            .join(' ');
-          if (
-            directText.length > 0 &&
-            directText.length < 200 &&
-            matchesPattern({ textContent: directText }, config.textPatterns)
-          ) {
-            return NodeFilter.FILTER_ACCEPT;
-          }
+  /**
+   * @param {Document | Element} root
+   * @param {PlatformConfig} config
+   * @param {HTMLElement[]} results
+   */
+  function findSponsoredByText(root, config, results) {
+    if (config.textPatterns.length === 0) {
+      return;
+    }
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (node) => {
+        if (processedElements.has(node) || !isVisible(/** @type {Element} */ (node))) {
           return NodeFilter.FILTER_SKIP;
         }
-      });
+        // Only match elements with short direct text (likely labels, not containers)
+        const directText = Array.from(node.childNodes)
+          .filter((n) => n.nodeType === Node.TEXT_NODE)
+          .map((n) => (n.textContent || '').trim())
+          .join(' ');
+        if (
+          directText.length > 0 &&
+          directText.length < 200 &&
+          matchesPattern({ textContent: directText }, config.textPatterns)
+        ) {
+          return NodeFilter.FILTER_ACCEPT;
+        }
+        return NodeFilter.FILTER_SKIP;
+      }
+    });
 
-      let current;
-      while ((current = walker.nextNode())) {
-        if (current instanceof Element) {
-          // Walk up to the nearest post/article container rather than hiding just the label
-          const post =
-            /** @type {Element} */ (current).closest('article, [role="article"], [data-testid]') ||
-            current;
-          if (!processedElements.has(post)) {
-            results.push(/** @type {HTMLElement} */ (post));
-            processedElements.add(post);
-          }
+    let current;
+    while ((current = walker.nextNode())) {
+      if (current instanceof Element) {
+        // Walk up to the nearest post/article container rather than hiding just the label
+        const post =
+          /** @type {Element} */ (current).closest('article, [role="article"], [data-testid]') ||
+          current;
+        if (!processedElements.has(post)) {
+          results.push(/** @type {HTMLElement} */ (post));
+          processedElements.add(post);
         }
       }
     }
+  }
+
+  /**
+   * @param {Document | Element} root
+   * @returns {HTMLElement[]}
+   */
+  function findSponsoredContent(root = document) {
+    const platform = currentPlatform || detectPlatform();
+    if (!platform) {
+      return [];
+    }
+
+    const config = PLATFORM_CONFIG[platform];
+    /** @type {HTMLElement[]} */
+    const results = [];
+
+    findSponsoredBySelectors(root, config, results);
+    findSponsoredByText(root, config, results);
 
     return results;
   }
