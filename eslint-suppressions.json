@@ -1,0 +1,17 @@
+{
+  "clean_adblock/content.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "clean_adblock/gurufocus-unlocked.js": {
+    "complexity": {
+      "count": 4
+    }
+  },
+  "clean_adblock/nytimes-unlocked.js": {
+    "complexity": {
+      "count": 1
+    }
+  }
+}

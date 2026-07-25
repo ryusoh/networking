@@ -60,6 +60,9 @@ fmt-check:
 
 lint:
 	@npm run lint
+	@# Complexity ratchet: xenon fails if the average/worst cyclomatic-complexity
+	@# rank regresses past these ceilings (current: average A, worst block C).
+	$(PY) -m xenon --max-average A --max-modules C --max-absolute C nas_proxy retriever vps_kernel_proxy nas_tools bin
 
 lint-fix:
 	@npm run lint:fix

@@ -1,3 +1,5 @@
 # Python dev/test dependencies (used by `make test-py` and CI).
 pytest>=9.1.1,<10
 pytest-cov>=7.1.0,<8
+radon>=6.0.1,<7
+xenon>=0.9.3,<0.10

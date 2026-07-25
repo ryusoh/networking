@@ -161,6 +161,13 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 - `make test-py` first builds the `nas_tools` C binaries the tests shell out to,
   then runs pytest. If `--cov` is unrecognized, install dev deps:
   `python3 -m pip install -r requirements-dev.txt --break-system-packages`.
+- **Complexity ratchet** — `make lint` also gates cyclomatic complexity: ESLint
+  `complexity` errors above 20 with `eslint-suppressions.json` baselining the 6
+  legacy violations (any NEW or worsened one fails; shrink the baseline with
+  `npx eslint --prune-suppressions` after a fix), and `xenon` freezes Python's
+  complexity ranks (`--max-average A --max-modules C --max-absolute C` over the
+  `make test-py` source dirs). Never raise the ceilings or hand-edit the
+  suppressions file.
 
 ## Layout
 
@@ -388,11 +395,13 @@ logs to the repository.
 
 If your finding belongs to another lane, **skip it** — that lane will get it.
 
-> **Enforcement note:** this repo configures no ESLint `complexity` rule and no
-> coverage threshold, and the JS type-check (`make type`) is **non-blocking**. The
-> Architect, Testpilot, and Typist targets are therefore judgment-guided, not
-> machine-gated. Your real gate is a green `make precommit` plus the scoped proof
-> your lane requires.
+> **Enforcement note:** cyclomatic complexity **is** machine-gated — ESLint
+> `complexity: ['error', { max: 20 }]` with the legacy violations baselined in
+> `eslint-suppressions.json`, and `xenon` freezing Python's ranks in `make lint`
+> (see "Complexity ratchet" above). Coverage is still reported but not gated,
+> and the JS type-check (`make type`) is **non-blocking**. The Testpilot and
+> Typist targets are therefore judgment-guided, not machine-gated. Your real
+> gate is a green `make precommit` plus the scoped proof your lane requires.
 
 ## `.jules/` personas — editing rules
 
