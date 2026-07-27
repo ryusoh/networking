@@ -47,23 +47,6 @@
   let adsBlocked = 0;
 
   /**
-   * @param {Element} element
-   * @returns {boolean}
-   */
-  function isAdElement(element) {
-    for (const selector of AD_SELECTORS) {
-      try {
-        if (element.matches(selector) || element.closest(selector)) {
-          return true;
-        }
-      } catch {
-        // Invalid selector
-      }
-    }
-    return false;
-  }
-
-  /**
    * @param {string} url
    * @returns {boolean}
    */
@@ -217,7 +200,25 @@
     init();
   }
 
+  /**
+   * @param {Element} element
+   * @returns {boolean}
+   */
+  function isAdElement(element) {
+    for (const selector of AD_SELECTORS) {
+      try {
+        if (element.matches(selector) || element.closest(selector)) {
+          return true;
+        }
+      } catch {
+        // Invalid selector
+      }
+    }
+    return false;
+  }
+
   // Watch for dynamically loaded ads
+  let observerThrottled = false;
   const observer = new MutationObserver((mutations) => {
     let shouldCheck = false;
     for (const mutation of mutations) {
@@ -230,8 +231,12 @@
         shouldCheck = true;
       }
     }
-    if (shouldCheck) {
-      blockTwitchAds();
+    if (shouldCheck && !observerThrottled) {
+      observerThrottled = true;
+      setTimeout(() => {
+        observerThrottled = false;
+        blockTwitchAds();
+      }, 50);
     }
   });
 
