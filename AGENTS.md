@@ -302,6 +302,11 @@ isn't.
   `ubuntu-latest` runner has clang but **not** libbpf-dev, so it skips there
   rather than failing. The map-content tests (which just read the `.bpf.c`
   source) still run everywhere.
+- **Action-version hygiene:** before bumping a workflow `uses:` pin to a new
+  major version (e.g. `actions/checkout@v8`), verify the tag actually exists
+  (`gh api repos/<owner>/<repo>/git/refs/tags/v<N>`). Major-version floating
+  tags are created by action maintainers at different cadences; an assumed
+  version will fail the runner with "unable to find version".
 
 ### clean_adblock conventions
 
