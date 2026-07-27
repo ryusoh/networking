@@ -393,11 +393,21 @@
 
     const target = document.body || document.documentElement;
     if (target) {
+      let observerThrottled = false;
       const observer = new MutationObserver((mutations) => {
+        let shouldCheck = false;
         for (const mutation of mutations) {
           if (mutation.addedNodes.length > 0) {
-            blockCookieBanner();
+            shouldCheck = true;
+            break;
           }
+        }
+        if (shouldCheck && !observerThrottled) {
+          observerThrottled = true;
+          setTimeout(() => {
+            observerThrottled = false;
+            blockCookieBanner();
+          }, 50);
         }
       });
       observer.observe(target, { childList: true, subtree: true });
