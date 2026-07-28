@@ -17,7 +17,7 @@ ctx_cleaner
 ram_disk_accelerator
 parallel_pkg_pull
 ccache_manager
-tests
+/nas_proxy/tests
 proxy_scraper
 userspace_blocker
 pkg_warrior
