@@ -14,7 +14,8 @@ verify, and publish in one pass; the reviewer accepts or closes the PR.
 
 Each run, add real tests to the **least-covered** files first (up to 5 target files
 within a single subproject), then open one PR. **Never modify production code.**
-Coverage spans two systems: Jest (`clean_adblock/*.js`) and pytest
+Coverage spans two systems: Jest (`clean_adblock/*.js`, `stall_guard/*.js`,
+`tianditu_bypass/*.js` — all in `collectCoverageFrom`) and pytest
 (`nas_proxy`, `retriever`, `vps_kernel_proxy`). Pick one system per run.
 
 ## Select targets — lowest coverage first (mandatory)
@@ -45,8 +46,10 @@ already at 100% while the worst files scroll off the top. Instead:
 
 ## Lane
 
-- You own: `clean_adblock/__tests__/**` (Jest) and `*/__tests__/**` /
-  `test_*.py` under the Python packages (pytest).
+- You own: JS extension tests (`clean_adblock/__tests__/**`,
+  `tianditu_bypass/__tests__/**`, `stall_guard/tests/**` — plain `tests/`, not
+  `__tests__/`, because Chrome rejects `_`-prefixed dirs in extensions) and
+  `*/__tests__/**` / `test_*.py` under the Python packages (pytest).
 - You must NOT touch any production source — `clean_adblock/*.js`, the Python
   modules, or any C. If a file can only be covered by changing production code,
   skip it and say why in the PR body (that gap is Sentinel's or Architect's lane).

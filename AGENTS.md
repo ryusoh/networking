@@ -274,15 +274,23 @@ hand-computed expectations.
 ### Coverage reports and the fmt-check gotcha
 
 Both `make precommit` and `precommit-fix` print a coverage table after the tests:
-Jest (`clean_adblock/*.js`, scoped via `collectCoverageFrom` in `package.json`)
+Jest (all three JS extensions — `clean_adblock`, `stall_guard`,
+`tianditu_bypass` — scoped via `collectCoverageFrom` in `package.json`)
 and pytest (source modules only; test files/`__init__.py` omitted via the
 `[tool.coverage.run]` section in `pyproject.toml`).
 
 **Whole-suite coverage floor (blocking):** Jest enforces a global
-`coverageThreshold` in `package.json` (statements/functions/lines 94, branches 85) and pytest enforces `--cov-fail-under=94` in `make test-py`. Both floors sit
-~1 point under the day-one measurements (Jest 95.08/86.27/95.61/95.04; pytest
-95.47%), so the gate is a ratchet against regression, not a target — raising a
-floor is a deliberate Testpilot PR, lowering one is a red flag.
+`coverageThreshold` in `package.json` (statements/lines 86, branches 80,
+functions 85) and pytest enforces `--cov-fail-under=94` in `make test-py`
+(day-one measurement 95.47%). The
+Jest floor sits ~1 point under the day-one measurement over the widened
+three-extension set (87.42/81.18/85.96/87.35; clean_adblock alone measured
+95.08/86.27/95.61/95.04 when the scope was clean_adblock-only), so the gate is
+a ratchet against regression, not a target — raising a floor is a deliberate
+Testpilot PR, lowering one is a red flag. New JS extensions are added to
+`collectCoverageFrom` when created so their gaps stay visible to
+`bin/coverage_rank.py` (and therefore to Testpilot); the floor absorbs them
+because it is set on the aggregate.
 
 **`make precommit` runs `fmt-check` (`prettier --check .`) first, and it scans
 the whole tree.** Generated output dirs are excluded via `.prettierignore`

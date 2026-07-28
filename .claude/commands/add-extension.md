@@ -62,9 +62,12 @@ failed attempt before they were understood.
 
 4. `tests/<name>.test.js` — `require('../<script>.js')` and drive the exported
    functions with plain fake objects (e.g. a fake `video` element literal).
-   Coverage gate is unaffected: `collectCoverageFrom` only covers
-   `clean_adblock/*.js`, so a new subproject's tests never trip the global
-   `coverageThreshold`.
+5. **Register the extension in `collectCoverageFrom`** (`package.json` jest
+   config, e.g. `"<dir>/*.js"`). The global `coverageThreshold` is an aggregate
+   over all registered extensions, so a new extension's gaps are absorbed by
+   the floor while remaining visible to `bin/coverage_rank.py` — that
+   visibility is what lets Testpilot pick them up later. Leaving a new
+   extension unregistered hides its coverage gaps permanently.
 
 ## Code style (matches what eslint/prettier enforce here)
 
