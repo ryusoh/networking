@@ -56,9 +56,26 @@
   }
 
   // Rewind lands the playhead back inside contiguously buffered data, before
-  // whatever hole or rendition boundary caused the stall.
+  // whatever hole or rendition boundary caused the stall. When the playhead
+  // sits just past the end of a buffered range (a small hole — a failed or
+  // timed-out segment), rewind only enough to land just inside that range
+  // instead of the full SEEK_BACK_S: the seek alone re-triggers the missing
+  // fetch, so a minimal rewind is less disruptive.
   function computeResumeTime(video) {
-    return Math.max(0, Math.min(video.currentTime - SEEK_BACK_S, video.duration));
+    const t = video.currentTime;
+    if (video.buffered) {
+      for (let i = 0; i < video.buffered.length; i++) {
+        const start = video.buffered.start(i);
+        const end = video.buffered.end(i);
+        if (t >= start && t <= end) {
+          break; // playhead is inside a range: use the default rewind
+        }
+        if (end < t && t - end < SEEK_BACK_S) {
+          return Math.max(start, end - 1);
+        }
+      }
+    }
+    return Math.max(0, Math.min(t - SEEK_BACK_S, video.duration));
   }
 
   function recover(video, now, state) {

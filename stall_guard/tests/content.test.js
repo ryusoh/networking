@@ -17,8 +17,17 @@ function fakeVideo(overrides = {}) {
     duration: 3600,
     readyState: 4,
     currentTime: 100,
+    buffered: { length: 0, start: () => 0, end: () => 0 },
     play: jest.fn().mockResolvedValue(undefined),
     ...overrides
+  };
+}
+
+function fakeBuffered(ranges) {
+  return {
+    length: ranges.length,
+    start: (i) => ranges[i][0],
+    end: (i) => ranges[i][1]
   };
 }
 
@@ -85,6 +94,29 @@ describe('computeResumeTime', () => {
   test('never seeks past the end', () => {
     const v = fakeVideo({ currentTime: 3600, duration: 3600 });
     expect(computeResumeTime(v)).toBe(3600 - SEEK_BACK_S);
+  });
+
+  test('small hole: rewinds just inside the preceding buffered range', () => {
+    // Buffered 0–95 and 99–200, playhead stalled at 97 (in the hole).
+    const v = fakeVideo({
+      currentTime: 97,
+      buffered: fakeBuffered([
+        [0, 95],
+        [99, 200]
+      ])
+    });
+    expect(computeResumeTime(v)).toBe(94);
+  });
+
+  test('large hole: falls back to the full rewind', () => {
+    // Buffered 0–80 only, playhead at 100 — hole is 20s > SEEK_BACK_S.
+    const v = fakeVideo({ currentTime: 100, buffered: fakeBuffered([[0, 80]]) });
+    expect(computeResumeTime(v)).toBe(100 - SEEK_BACK_S);
+  });
+
+  test('playhead inside a range: default rewind, not hole logic', () => {
+    const v = fakeVideo({ currentTime: 100, buffered: fakeBuffered([[50, 150]]) });
+    expect(computeResumeTime(v)).toBe(100 - SEEK_BACK_S);
   });
 });
 
