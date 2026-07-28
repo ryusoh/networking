@@ -80,7 +80,7 @@ failed attempt before they were understood.
 
 ## Verify (scoped, fast — full `make precommit` only before a PR)
 
-```
+```bash
 npx jest <dir>
 npx eslint <dir>
 npx prettier --check <dir>
