@@ -180,8 +180,23 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 - `retriever/` — the `pull` script. `vps_kernel_proxy/` — kernel/user proxy +
   eBPF. `vps_user_proxy/` — userspace proxy variant.
 - `tianditu_bypass/`, `vmware/`, `bin/` — misc tools and C build accelerators.
+- `stall_guard/` — Chrome MV3 extension that auto-recovers HTML5 video stalls
+  (seek-back-and-resume); tests in `stall_guard/tests/` — **not** `__tests__/`,
+  because Chrome refuses to load extensions containing `_`-prefixed dirs. See
+  the `add-extension` skill for the full new-extension checklist.
 - `docs/` — `EBPF_RESEARCH.md`, `NAS_STRATEGY.md`. `bin/coverage_rank.py` — the
   coverage ranking helper.
+
+### Shell scripts in `bin/` (macOS bash 3.2 gotchas)
+
+macOS ships `/bin/bash` 3.2, and the `bin/*.sh` tools run on it:
+
+- Under `set -u`, expanding an empty array (`"${arr[@]}"`) is a fatal
+  "unbound variable" error. Use `${arr[@]+"${arr[@]}"}` for arrays that may
+  be empty.
+- `stat` is BSD-flavored: `stat -f%z <file>` for size, not GNU's `stat -c%s`.
+- `ping` timeout is `-t <seconds>` (TTL flag on Linux); per-packet wait is
+  `-W <milliseconds>`, not seconds.
 
 ## Repo conventions
 
