@@ -4,19 +4,31 @@
 # fine": speedtests use many parallel connections, video needs ONE steady
 # stream. This measures the single-stream case.
 #
-# Usage: stream-check [proxy-spec] [probe-url]
+# Usage: stream-check [--watch] [proxy-spec] [probe-url]
+#   --watch:    freeze-detection mode — download a 40MB object, sample progress
+#               every second, and report stretches below the 540p bitrate
+#               (~0.3MB/s). Run this DURING a stall to catch the freeze.
 #   proxy-spec: 7897, http://127.0.0.1:7897, socks5h://..., empty = direct
-#   probe-url:  defaults to a 20MB Cloudflare object
+#   probe-url:  defaults to a 20MB Cloudflare object (40MB in --watch mode)
 #
 # Verdict thresholds (approx. HLS bitrates):
-#   720p ~3 Mbps | 1080p ~8 Mbps | 4K ~20 Mbps
+#   540p ~2 Mbps | 720p ~3 Mbps | 1080p ~8 Mbps | 4K ~20 Mbps
 # Stalls happen when sustained single-stream throughput < stream bitrate,
-# or when throughput variance is high (repeated runs differ a lot).
+# or when throughput variance is high (repeated runs differ a lot). At low
+# bitrates like 540p, stalls are almost always FREEZES (flow stops entirely
+# for seconds), not low average speed — --watch detects those.
 
 set -uo pipefail
 
+WATCH=0
+if [[ "${1:-}" == "--watch" ]]; then
+    WATCH=1
+    shift
+fi
+
 SPEC="${1:-}"
 URL="${2:-https://speed.cloudflare.com/__down?bytes=20000000}"
+[[ $WATCH -eq 1 && -z "${2:-}" ]] && URL="https://speed.cloudflare.com/__down?bytes=40000000"
 RUNS="${STREAM_CHECK_RUNS:-3}"
 
 PROXY_ARGS=()
@@ -25,6 +37,49 @@ if [[ -n "$SPEC" ]]; then
     PROXY_ARGS=(-x "$SPEC")
 fi
 LABEL="${SPEC:-direct}"
+
+# ---------------------------------------------------------------------------
+if [[ $WATCH -eq 1 ]]; then
+    echo "== freeze watch via $LABEL (540p needs ~0.3MB/s sustained) =="
+    TMP=$(mktemp -t stream-check)
+    start=$(date +%s)
+    curl -sS -o "$TMP" --max-time 180 ${PROXY_ARGS[@]+"${PROXY_ARGS[@]}"} "$URL" &
+    CURL_PID=$!
+    prev=0; low=0; run=0; worstrun=0; t=0
+    while kill -0 "$CURL_PID" 2>/dev/null; do
+        sleep 1; t=$((t+1))
+        sz=$(stat -f%z "$TMP" 2>/dev/null || echo 0)
+        delta=$(( (sz-prev)/1000 ))
+        if [[ "$delta" -lt 300 ]]; then
+            low=$((low+1)); run=$((run+1))
+        else
+            [[ "$run" -gt "$worstrun" ]] && worstrun=$run
+            [[ "$run" -ge 3 ]] && echo "  t=${t}s: ${run}s below 540p bitrate just ended"
+            run=0
+        fi
+        prev=$sz
+    done
+    [[ "$run" -gt "$worstrun" ]] && worstrun=$run
+    wait "$CURL_PID"; rc=$?
+    end=$(date +%s)
+    sz=$(stat -f%z "$TMP" 2>/dev/null || echo 0)
+    rm -f "$TMP"
+    echo "downloaded $((sz/1000000))MB in $((end-start))s (avg $(( sz*8/1000000/(end-start) )) Mbps, curl rc=$rc)"
+    echo "seconds below 540p bitrate: ${low}/${t}; longest sub-540p stretch: ${worstrun}s"
+    echo
+    echo "== verdict =="
+    if [[ "$worstrun" -ge 10 ]]; then
+        echo "  FREEZES detected: ${worstrun}s stretches would drain any buffer — this is what stalls your 540p playback."
+        exit 1
+    elif [[ "$low" -gt 0 ]]; then
+        echo "  minor dips only; 540p should survive these with a normal buffer."
+    else
+        echo "  clean path right now — if it still stalls, rerun this DURING a stall."
+    fi
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
 
 echo "== single-stream throughput via $LABEL ($RUNS runs) =="
 mbps=()
