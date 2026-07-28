@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# stream-check — measure whether your current proxy path can sustain video
+# streaming bitrates. Answers "why does the movie stall when my bandwidth is
+# fine": speedtests use many parallel connections, video needs ONE steady
+# stream. This measures the single-stream case.
+#
+# Usage: stream-check [proxy-spec] [probe-url]
+#   proxy-spec: 7897, http://127.0.0.1:7897, socks5h://..., empty = direct
+#   probe-url:  defaults to a 20MB Cloudflare object
+#
+# Verdict thresholds (approx. HLS bitrates):
+#   720p ~3 Mbps | 1080p ~8 Mbps | 4K ~20 Mbps
+# Stalls happen when sustained single-stream throughput < stream bitrate,
+# or when throughput variance is high (repeated runs differ a lot).
+
+set -uo pipefail
+
+SPEC="${1:-}"
+URL="${2:-https://speed.cloudflare.com/__down?bytes=20000000}"
+RUNS="${STREAM_CHECK_RUNS:-3}"
+
+PROXY_ARGS=()
+if [[ -n "$SPEC" ]]; then
+    [[ "$SPEC" =~ ^[0-9]+$ ]] && SPEC="http://127.0.0.1:$SPEC"
+    PROXY_ARGS=(-x "$SPEC")
+fi
+LABEL="${SPEC:-direct}"
+
+echo "== single-stream throughput via $LABEL ($RUNS runs) =="
+mbps=()
+for i in $(seq 1 "$RUNS"); do
+    out=$(curl -sS -o /dev/null ${PROXY_ARGS[@]+"${PROXY_ARGS[@]}"} --max-time 60 \
+        -w "%{speed_download} %{time_total} %{size_download}" "$URL" 2>&1) || {
+        echo "  run $i: FAILED ($out)"
+        continue
+    }
+    read -r bps total size <<< "$out"
+    m=$(awk "BEGIN {printf \"%.1f\", $bps * 8 / 1000000}")
+    mbps+=("$m")
+    echo "  run $i: ${m} Mbps ($size bytes in ${total}s)"
+done
+
+if [[ ${#mbps[@]} -eq 0 ]]; then
+    echo "all runs failed — proxy is not usable at all"
+    exit 1
+fi
+
+best=$(printf '%s\n' "${mbps[@]}" | sort -rn | head -1)
+worst=$(printf '%s\n' "${mbps[@]}" | sort -n | head -1)
+
+echo
+echo "== latency via $LABEL =="
+curl -sS -o /dev/null ${PROXY_ARGS[@]+"${PROXY_ARGS[@]}"} --max-time 15 \
+    -w "  tls=%{time_appconnect}s ttfb=%{time_starttransfer}s\n" \
+    https://www.criterionchannel.com/ || echo "  probe failed"
+
+echo
+echo "== verdict =="
+echo "best ${best} Mbps, worst ${worst} Mbps (single stream)"
+awk "BEGIN {exit !($worst < 3)}"  && { echo "  cannot sustain 720p — expect constant stalls"; exit 1; }
+awk "BEGIN {exit !($worst < 8)}"  && { echo "  720p ok; 1080p will stall when throughput dips"; exit 1; }
+awk "BEGIN {exit !($worst < 20)}" && { echo "  1080p ok; 4K will stall when throughput dips"; exit 0; }
+echo "  enough even for 4K"
+exit 0
