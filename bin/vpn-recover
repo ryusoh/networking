@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# vpn-recover — recover networking after Astrill (wireguard/stealthvpn) teardown
+# breaks a subsequently-started SS/vmess client (Clash Verge, mihomo, etc.).
+#
+# What it fixes (macOS):
+#   1. Stale `default` routes still pointing at dead utun interfaces left by the
+#      previous VPN — new VPN traffic blackholes into them.
+#   2. Dead tunnel-DNS servers (e.g. 198.18.x.x fake-ip) left in the resolver
+#      list — DNS for the proxy server times out for minutes.
+#   3. Poisoned DNS/ARP caches that keep the failures alive long after the
+#      routes/DNS are fixed.
+#
+# Usage:
+#   vpn-recover           diagnose only (no changes, no sudo needed)
+#   vpn-recover --fix     apply the repairs (asks for sudo when required)
+#
+# Exit code: 0 = network healthy, 1 = problems found (diagnose) or repair
+# finished but verification still failing (fix).
+
+set -uo pipefail
+
+FIX=0
+[[ "${1:-}" == "--fix" ]] && FIX=1
+
+if [[ "$OSTYPE" != darwin* ]]; then
+    echo "vpn-recover: this script targets macOS (Darwin) only." >&2
+    exit 1
+fi
+
+SUDO=""
+if [[ $FIX -eq 1 && $EUID -ne 0 ]]; then
+    SUDO="sudo"
+fi
+
+problems=0
+say()  { echo "$@"; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# ---------------------------------------------------------------------------
+# Interface reachability probe: send one ping bound to the interface.
+if_alive() {
+    local ifname="$1"
+    ping -c 1 -t 2 -b "$ifname" 223.5.5.5 >/dev/null 2>&1
+}
+
+# ---------------------------------------------------------------------------
+say "== 1. default routes / stale utun =="
+
+# Collect interfaces that currently carry a default route.
+DEFAULT_IFS=$(netstat -rn -f inet | awk '$1 == "default" {print $NF}' | sort -u)
+say "default route interface(s): $(echo $DEFAULT_IFS | tr '\n' ' ')"
+say "connected VPN service(s): $(scutil --nc list | awk '/^\*.*Connected/ {found=1} END {print found ? "yes" : "none"}')"
+
+stale_ifs=()
+for ifn in $DEFAULT_IFS; do
+    case "$ifn" in
+        utun*)
+            if if_alive "$ifn"; then
+                say "  $ifn: tunnel answers ping, keeping"
+            else
+                say "  $ifn: STALE — default route into a dead tunnel (typical Astrill leftover)"
+                stale_ifs+=("$ifn")
+                problems=1
+            fi
+            ;;
+        *)
+            say "  $ifn: physical interface, fine"
+            ;;
+    esac
+done
+
+if [[ $FIX -eq 1 && ${#stale_ifs[@]} -gt 0 ]]; then
+    for ifn in "${stale_ifs[@]}"; do
+        say "  removing default route via $ifn"
+        $SUDO route -n delete default -ifscope "$ifn" >/dev/null 2>&1 \
+            || $SUDO route -n delete default >/dev/null 2>&1 \
+            || say "  WARNING: could not delete default route via $ifn"
+    done
+fi
+
+# ---------------------------------------------------------------------------
+say
+say "== 2. DNS resolvers =="
+
+# Nameservers in the fake-ip / tunnel ranges are only valid while their VPN is
+# connected. If no VPN is connected at all, they are dead weight.
+DEAD_DNS=$(scutil --dns | awk '/nameserver\[/ {print $NF}' | sort -u | grep -E '^(198\.18\.|198\.19\.|172\.19\.0\.2|10\.255\.)' || true)
+ANY_VPN=$(scutil --nc list | grep -c 'Connected' || true)
+
+if [[ -n "$DEAD_DNS" && "$ANY_VPN" -eq 0 ]]; then
+    say "dead tunnel DNS present with no VPN connected:"
+    echo "$DEAD_DNS" | sed 's/^/  /'
+    problems=1
+elif [[ -n "$DEAD_DNS" ]]; then
+    say "tunnel DNS in use (a VPN is connected, so this is expected):"
+    echo "$DEAD_DNS" | sed 's/^/  /'
+else
+    say "resolver list looks sane"
+fi
+
+if [[ $FIX -eq 1 ]]; then
+    say "  flushing DNS caches (dscacheutil + mDNSResponder HUP)"
+    $SUDO dscacheutil -flushcache
+    $SUDO killall -HUP mDNSResponder 2>/dev/null || true
+fi
+
+# ---------------------------------------------------------------------------
+say
+say "== 3. leftover pf kill-switch anchors =="
+
+if have pfctl; then
+    ANCHORS=$($SUDO pfctl -s Anchors 2>/dev/null | grep -i -E 'astrill|vpn|kill' || true)
+    if [[ -n "$ANCHORS" ]]; then
+        say "suspicious pf anchor(s) found:"
+        echo "$ANCHORS" | sed 's/^/  /'
+        say "  (Astrill's kill switch survives disconnects; blocking rules here"
+        say "   will blackhole the new VPN's traffic.)"
+        problems=1
+        if [[ $FIX -eq 1 ]]; then
+            while read -r a; do
+                say "  flushing anchor: $a"
+                $SUDO pfctl -a "$a" -F all >/dev/null 2>&1 || true
+            done <<< "$ANCHORS"
+        fi
+    else
+        say "no suspicious pf anchors"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+say
+say "== 4. verification =="
+
+check() {
+    local label="$1"; shift
+    if out=$("$@" 2>&1); then
+        say "  $label: OK"
+        return 0
+    else
+        say "  $label: FAIL"
+        [[ -n "$out" ]] && echo "$out" | head -2 | sed 's/^/    /'
+        return 1
+    fi
+}
+
+verify_failed=0
+check "default-route ping 223.5.5.5" ping -c 1 -t 3 223.5.5.5 || verify_failed=1
+check "DNS resolve apple.com" dscacheutil -q host -a name apple.com || verify_failed=1
+check "HTTPS probe ipinfo.io" curl -sS --max-time 8 -o /dev/null https://ipinfo.io || verify_failed=1
+
+# ---------------------------------------------------------------------------
+say
+if [[ $FIX -eq 0 ]]; then
+    if [[ $problems -eq 1 ]]; then
+        say "verdict: problems found — run 'vpn-recover --fix' to repair."
+        exit 1
+    fi
+    say "verdict: no stale-route/DNS leftovers detected."
+    exit 0
+fi
+
+if [[ $verify_failed -eq 0 ]]; then
+    say "verdict: network recovered. Now reconnect your SS/vmess profile."
+    exit 0
+fi
+
+say "verdict: repairs applied but connectivity still failing."
+say "next steps:"
+say "  - quit and relaunch the SS/vmess client (Clash Verge), or toggle its TUN mode"
+say "  - if Astrill is fully quit but utun interfaces keep accumulating, reboot once"
+say "  - run 'bin/check-ss <local-socks-port>' to test the proxy itself"
+exit 1
