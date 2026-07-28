@@ -70,7 +70,8 @@
         "*://*.google.co.in/*",
         "*://*.bing.com/*",
         "*://*.duckduckgo.com/*",
-        "*://*.nvidia.com/*"
+        "*://*.nvidia.com/*",
+        "*://*.criterionchannel.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
@@ -91,7 +92,8 @@
         "*://*.google.co.in/*",
         "*://*.bing.com/*",
         "*://*.duckduckgo.com/*",
-        "*://*.nvidia.com/*"
+        "*://*.nvidia.com/*",
+        "*://*.criterionchannel.com/*"
       ],
       "js": ["cookie-banner-blocker.js"],
       "run_at": "document_start"
@@ -112,7 +114,8 @@
         "*://*.google.co.in/*",
         "*://*.bing.com/*",
         "*://*.duckduckgo.com/*",
-        "*://*.nvidia.com/*"
+        "*://*.nvidia.com/*",
+        "*://*.criterionchannel.com/*"
       ],
       "js": ["cookie-popup-blocker-main.js"],
       "run_at": "document_start",
@@ -134,7 +137,8 @@
         "*://*.google.co.in/*",
         "*://*.bing.com/*",
         "*://*.duckduckgo.com/*",
-        "*://*.nvidia.com/*"
+        "*://*.nvidia.com/*",
+        "*://*.criterionchannel.com/*"
       ],
       "js": ["forum-ad-blocker.js"],
       "run_at": "document_start"
@@ -210,6 +214,7 @@
         "*://*.iqiyi.com/*",
         "*://*.youku.com/*"
       ],
+      "exclude_matches": ["*://player.vimeo.com/*"],
       "js": ["video-stream-ad-blocker.js"],
       "run_at": "document_start"
     },
