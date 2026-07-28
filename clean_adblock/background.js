@@ -28,7 +28,10 @@ const updateBlockingRules = async (hostnames) => {
   try {
     const uniqueHosts = Array.from(new Set(hostnames || [])).filter((h) => h && h.trim());
     const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
-    const removeRuleIds = existingRules.map((r) => r.id);
+    // Only replace this function's own rules (ids < 9000). IDs 9000+ belong to
+    // setupAdNetworkBlocking; removing them here races with it at install/startup
+    // and silently wipes ad-network blocking.
+    const removeRuleIds = existingRules.filter((r) => r.id < 9000).map((r) => r.id);
     /** @type {chrome.declarativeNetRequest.Rule[]} */
     const addRules = [];
 
@@ -95,7 +98,15 @@ const AD_NETWORK_DOMAINS = [
   'erebor.douban.com'
 ];
 
+let isUpdatingAdRules = false;
 async function setupAdNetworkBlocking() {
+  // onInstalled and the startup block both call this; without a guard they race
+  // and the second call adds rule IDs 9000+ that the first just created
+  // (duplicate-ID rejection).
+  if (isUpdatingAdRules) {
+    return;
+  }
+  isUpdatingAdRules = true;
   try {
     const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
     // Use IDs 9000+ to avoid conflicts with jsBlocked rules
@@ -119,6 +130,8 @@ async function setupAdNetworkBlocking() {
     });
   } catch (e) {
     console.error('Ad network blocking setup failed:', e);
+  } finally {
+    isUpdatingAdRules = false;
   }
 }
 

@@ -38,9 +38,10 @@ rsync -a --delete \
     "$SRC/" "$DST/"
 
 # Fail loudly if anything underscore-prefixed still slipped through — Chrome
-# would reject the load with a confusing error otherwise. _locales is the one
-# reserved name Chrome explicitly allows (i18n).
-leftovers=$(find "$DST" -name '_*' ! -name '_locales' -print -quit)
+# would reject the load with a confusing error otherwise. Allowed exceptions:
+# _locales (i18n, part of the source) and _metadata (Chrome writes this into
+# the loaded unpacked directory itself, so it reappears in dist after loading).
+leftovers=$(find "$DST" -path '*/_metadata' -prune -o -name '_*' ! -name '_locales' -print -quit)
 if [[ -n "$leftovers" ]]; then
     echo "pack-extension: '_' -prefixed entry remains: $leftovers" >&2
     echo "add an --exclude rule for it in $0" >&2

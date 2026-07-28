@@ -2022,4 +2022,44 @@ describe('XHS Session Keep Alive coverage', () => {
       removed: false
     });
   });
+
+  it('updateBlockingRules preserves 9000+ ad-network rules', async () => {
+    require('../background.js');
+    // Simulate ad-network rules already installed by setupAdNetworkBlocking.
+    chrome.declarativeNetRequest.getDynamicRules.mockResolvedValue([
+      { id: 9000 },
+      { id: 9001 },
+      { id: 3 }
+    ]);
+    const syncGetCallback = chrome.storage.sync.get.mock.calls[0][1];
+    await syncGetCallback({ jsBlocked: ['example.com'], enabled: true, mode: 'selective' });
+    // Flush the async updateBlockingRules body.
+    await new Promise((r) => setTimeout(r, 0));
+    const calls = chrome.declarativeNetRequest.updateDynamicRules.mock.calls;
+    const jsBlockedCall = calls.find(
+      ([arg]) => arg.addRules && arg.addRules.some((rule) => rule.id < 9000)
+    );
+    expect(jsBlockedCall).toBeDefined();
+    expect(jsBlockedCall[0].removeRuleIds).toEqual([3]);
+    expect(jsBlockedCall[0].removeRuleIds).not.toContain(9000);
+    expect(jsBlockedCall[0].removeRuleIds).not.toContain(9001);
+  });
+
+  it('setupAdNetworkBlocking skips a concurrent invocation', async () => {
+    // Hold the first call inside getDynamicRules so the guard is engaged when
+    // onInstalled fires its own setupAdNetworkBlocking.
+    let release;
+    chrome.declarativeNetRequest.getDynamicRules.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        })
+    );
+    require('../background.js'); // startup block calls setupAdNetworkBlocking (pending)
+    const onInstalledCallback = chrome.runtime.onInstalled.addListener.mock.calls[0][0];
+    onInstalledCallback({ reason: 'install' }); // second call must bail on the guard
+    release([]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(chrome.declarativeNetRequest.updateDynamicRules).toHaveBeenCalledTimes(1);
+  });
 });
