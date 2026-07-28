@@ -301,26 +301,372 @@
     roe: 'roe_estimate'
   };
 
-  function fillOriginalForecastTables() {
-    // Find parent component with estimate.estimate_current
+  /**
+   * @typedef {Object} VueComponent
+   * @property {VueComponent} [$parent]
+   * @property {{ estimate_current?: Record<string, unknown>, long_term_growth?: { future_revenue_estimate_growth?: number, future_eps_nri_estimate_growth?: number }, past_term_growth?: { revenue_estimate_growth?: number, eps_nri_estimate_growth?: number }, estimate_history?: Record<string, unknown>, estimate_trend?: Record<string, unknown>, estimate_revision?: Record<string, unknown> }} [estimate]
+   */
+
+  /**
+   * @typedef {Record<string, Record<string, Record<string, number | null>>>} TableSubData
+   */
+  /**
+   * @typedef {{ annual?: TableSubData, quarterly?: TableSubData }} TableDataStructure
+   */
+
+  /** @returns {VueComponent|null} */
+  function findEstimateViewModel() {
     const el = document.querySelector('.m-t-md.border.p-md');
     const elVueObj = el
       ? /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (el))['__vue__']
       : null;
     if (!el || !elVueObj) {
-      return false;
+      return null;
     }
-
-    /**
-     * @typedef {Object} VueComponent
-     * @property {VueComponent} [$parent]
-     * @property {{ estimate_current?: Record<string, unknown>, long_term_growth?: { future_revenue_estimate_growth?: number, future_eps_nri_estimate_growth?: number }, past_term_growth?: { revenue_estimate_growth?: number, eps_nri_estimate_growth?: number }, estimate_history?: Record<string, unknown>, estimate_trend?: Record<string, unknown>, estimate_revision?: Record<string, unknown> }} [estimate]
-     */
     let vm = /** @type {VueComponent | null} */ (elVueObj);
     while (vm && !(vm.estimate && vm.estimate.estimate_current)) {
       vm = vm.$parent || null;
     }
-    if (!vm || !vm.estimate) {
+    return vm && vm.estimate ? vm : null;
+  }
+
+  /**
+   * @param {VueComponent} vm
+   * @param {string} hText
+   * @returns {number|null|undefined}
+   */
+  function getGrowthForecastValue(vm, hText) {
+    if (!vm.estimate) {
+      return null;
+    }
+
+    if (hText.indexOf('future 3-5y total revenue') !== -1) {
+      return vm.estimate.long_term_growth
+        ? vm.estimate.long_term_growth.future_revenue_estimate_growth
+        : null;
+    }
+    if (hText.indexOf('past 3-year total revenue') !== -1) {
+      return vm.estimate.past_term_growth
+        ? vm.estimate.past_term_growth.revenue_estimate_growth
+        : null;
+    }
+    if (hText.indexOf('future 3-5y eps') !== -1) {
+      return vm.estimate.long_term_growth
+        ? vm.estimate.long_term_growth.future_eps_nri_estimate_growth
+        : null;
+    }
+    if (hText.indexOf('past 3-year eps') !== -1) {
+      return vm.estimate.past_term_growth
+        ? vm.estimate.past_term_growth.eps_nri_estimate_growth
+        : null;
+    }
+    return null;
+  }
+
+  /**
+   * @param {HTMLElement} table
+   * @param {VueComponent} vm
+   * @returns {boolean}
+   */
+  function fillGrowthForecastTable(table, vm) {
+    let filledAny = false;
+    /** @type {NodeListOf<HTMLElement>} */
+    const gTds = table.querySelectorAll('tbody td');
+    /** @type {NodeListOf<HTMLElement>} */
+    const gThs = table.querySelectorAll('thead th');
+    for (let c = 0; c < gThs.length; c++) {
+      const gVal = getGrowthForecastValue(vm, gThs[c].innerText.toLowerCase());
+      if (
+        gVal != null &&
+        gTds[c] &&
+        (!gTds[c].innerText.trim() || gTds[c].innerText.trim() === '-')
+      ) {
+        gTds[c].innerText = String(gVal) + '%';
+        gTds[c].style.color = '#409eff';
+        gTds[c].style.fontWeight = 'bold';
+        filledAny = true;
+      }
+    }
+    return filledAny;
+  }
+
+  /**
+   * @param {string} tableTitle
+   * @param {VueComponent} vm
+   * @param {Record<string, unknown>} est
+   * @returns {TableDataStructure}
+   */
+  function getTableDataStructure(tableTitle, vm, est) {
+    if (tableTitle.indexOf('surprise') !== -1) {
+      return /** @type {TableDataStructure} */ (
+        /** @type {unknown} */ (vm.estimate?.estimate_history || {})
+      );
+    } else if (tableTitle.indexOf('trends') !== -1) {
+      return /** @type {TableDataStructure} */ (
+        /** @type {unknown} */ (vm.estimate?.estimate_trend || {})
+      );
+    } else if (tableTitle.indexOf('revisions') !== -1) {
+      return /** @type {TableDataStructure} */ (
+        /** @type {unknown} */ (vm.estimate?.estimate_revision || {})
+      );
+    }
+    return /** @type {TableDataStructure} */ (/** @type {unknown} */ (est));
+  }
+
+  /**
+   * @type {Record<string, string>}
+   */
+  const EXACT_STAT_LABELS = {
+    estimate: 'surprisemean',
+    actual: 'actual',
+    difference: 'difference',
+    'current estimate': '0',
+    '7 days ago': '7',
+    '30 days ago': '30',
+    '60 days ago': '60',
+    '90 days ago': '90',
+    'up last 30 days': 'up_num',
+    'down last 30 days': 'down_num'
+  };
+
+  /**
+   * @param {string} label
+   * @returns {string|null}
+   */
+  function getStatKeyFromLabel(label) {
+    if (EXACT_STAT_LABELS[label]) {
+      return EXACT_STAT_LABELS[label];
+    }
+    if (label.indexOf('no. of analysts') !== -1) {
+      return 'num';
+    }
+    if (label.indexOf('high estimate') !== -1) {
+      return 'high';
+    }
+    if (label.indexOf('low estimate') !== -1) {
+      return 'low';
+    }
+    if (label.indexOf('median estimate') !== -1) {
+      return 'med';
+    }
+    if (label.indexOf('standard deviation') !== -1) {
+      return 'std';
+    }
+    if (label.indexOf('smart estimate') !== -1) {
+      return 'smart';
+    }
+    if (label.indexOf('surprise %') !== -1) {
+      return 'surprise_pct';
+    }
+    return null;
+  }
+
+  /**
+   * @param {HTMLElement} dateRow
+   * @returns {Record<number, string>}
+   */
+  function extractColumnMap(dateRow) {
+    /** @type {Record<number, string>} */
+    const colMap = {};
+    /** @type {NodeListOf<HTMLElement>} */
+    const ths = dateRow.querySelectorAll('th, td');
+    for (let c = 0; c < ths.length; c++) {
+      const match = ths[c].innerText.trim().match(/^(\d{4})-(\d{2})/);
+      if (match) {
+        colMap[c] = match[1] + match[2];
+      }
+    }
+    return colMap;
+  }
+
+  /**
+   * @param {TableDataStructure} tableData
+   * @param {string} mKey
+   * @param {string} ek
+   * @param {string} statKey
+   * @returns {number|null}
+   */
+  function getValFromTableData(tableData, mKey, ek, statKey) {
+    if (
+      tableData.annual &&
+      tableData.annual[mKey] &&
+      tableData.annual[mKey][ek] &&
+      tableData.annual[mKey][ek][statKey] != null
+    ) {
+      return tableData.annual[mKey][ek][statKey];
+    } else if (
+      tableData.quarterly &&
+      tableData.quarterly[mKey] &&
+      tableData.quarterly[mKey][ek] &&
+      tableData.quarterly[mKey][ek][statKey] != null
+    ) {
+      return tableData.quarterly[mKey][ek][statKey];
+    }
+    return null;
+  }
+
+  /**
+   * @param {HTMLElement} cell
+   * @param {number|null} val
+   * @param {string} statKey
+   */
+  function applyCellValue(cell, val, statKey) {
+    if (statKey === 'num' || statKey === 'up_num' || statKey === 'down_num') {
+      cell.innerText = String(val);
+    } else {
+      cell.innerText = fmt(val) + (statKey === 'surprise_pct' ? '%' : '');
+    }
+    cell.style.color = '#409eff';
+    if (statKey === 'mean') {
+      cell.style.fontWeight = 'bold';
+    }
+  }
+
+  /**
+   * @param {NodeListOf<HTMLElement>} tds
+   * @param {number} thsLength
+   * @param {Record<number, string>} colMap
+   * @param {TableDataStructure} tableData
+   * @param {string} mKey
+   * @param {string} statKey
+   * @returns {{filledAny: boolean, totalEmptyExpected: number}}
+   */
+  function processForecastRowCells(tds, thsLength, colMap, tableData, mKey, statKey) {
+    let filledAny = false;
+    let totalEmptyExpected = 0;
+    const offset = tds.length - thsLength;
+    for (const colIdxStr in colMap) {
+      const colIdx = parseInt(colIdxStr, 10);
+      const tdIndex = colIdx + offset;
+      if (tdIndex <= 0 || tdIndex >= tds.length) {
+        continue;
+      }
+      const cell = tds[tdIndex];
+      const innerText = cell.innerText.trim();
+      if (!innerText || innerText === '-') {
+        totalEmptyExpected++;
+        const ek = colMap[colIdx];
+        const val = getValFromTableData(tableData, mKey, ek, statKey);
+
+        if (val != null) {
+          applyCellValue(cell, val, statKey);
+          filledAny = true;
+        }
+      }
+    }
+    return { filledAny, totalEmptyExpected };
+  }
+
+  /**
+   * @param {NodeListOf<HTMLElement>} trs
+   * @param {number} thsLength
+   * @param {Record<number, string>} colMap
+   * @param {TableDataStructure} tableData
+   * @returns {{filledAny: boolean, totalEmptyExpected: number}}
+   */
+  function processForecastRows(trs, thsLength, colMap, tableData) {
+    let filledAny = false;
+    let totalEmptyExpected = 0;
+    let lastMKey = null;
+
+    for (let r = 0; r < trs.length; r++) {
+      /** @type {NodeListOf<HTMLElement>} */
+      const tds = trs[r].querySelectorAll('td');
+      if (!tds.length) {
+        continue;
+      }
+
+      /** @type {HTMLElement} */
+      const labelNode = tds[0].querySelector('.el-tooltip') || tds[0];
+      const label = labelNode.innerText.trim().toLowerCase();
+
+      let mKey = LABEL_TO_METRIC[label];
+      let statKey = null;
+
+      if (mKey) {
+        lastMKey = mKey;
+        statKey = 'mean';
+      } else if (lastMKey) {
+        statKey = getStatKeyFromLabel(label);
+        if (!statKey) {
+          lastMKey = null;
+          continue;
+        }
+        mKey = lastMKey;
+      } else {
+        continue;
+      }
+
+      const result = processForecastRowCells(tds, thsLength, colMap, tableData, mKey, statKey);
+      if (result.filledAny) {
+        filledAny = true;
+      }
+      totalEmptyExpected += result.totalEmptyExpected;
+    }
+    return { filledAny, totalEmptyExpected };
+  }
+
+  /**
+   * @param {HTMLElement} table
+   * @returns {HTMLElement | null}
+   */
+  function findDateRow(table) {
+    /** @type {NodeListOf<HTMLElement>} */
+    const trs = table.querySelectorAll('tr');
+    let dateRow = null;
+    for (let j = 0; j < trs.length; j++) {
+      if (trs[j].innerText.match(/\d{4}-\d{2}/)) {
+        dateRow = trs[j]; // get the lowest row containing dates
+      }
+    }
+    return dateRow;
+  }
+
+  /**
+   * @param {HTMLElement} table
+   * @param {string} tableTitle
+   * @param {VueComponent} vm
+   * @param {Record<string, unknown>} est
+   * @returns {{filledAny: boolean, totalEmptyExpected: number}}
+   */
+  function processForecastSection(table, tableTitle, vm, est) {
+    const tableData = getTableDataStructure(tableTitle, vm, est);
+    const dateRow = findDateRow(table);
+    if (!dateRow) {
+      return { filledAny: false, totalEmptyExpected: 0 };
+    }
+    const thsLength = dateRow.querySelectorAll('th, td').length;
+    const colMap = extractColumnMap(dateRow);
+    /** @type {NodeListOf<HTMLElement>} */
+    const trs = table.querySelectorAll('tr');
+    return processForecastRows(trs, thsLength, colMap, tableData);
+  }
+
+  /**
+   * @param {HTMLElement} section
+   * @param {VueComponent} vm
+   * @param {Record<string, unknown>} est
+   * @returns {{filledAny: boolean, totalEmptyExpected: number}}
+   */
+  function processForecastSectionWrapper(section, vm, est) {
+    const table = section.querySelector('table');
+    if (!table) {
+      return { filledAny: false, totalEmptyExpected: 0 };
+    }
+
+    const tableTitle = section.innerText.split('\n')[0].toLowerCase();
+    const hasGrowth = vm.estimate?.long_term_growth && vm.estimate?.past_term_growth;
+
+    if (tableTitle.indexOf('growth forecast') !== -1 && hasGrowth) {
+      const filled = fillGrowthForecastTable(table, vm);
+      return { filledAny: filled, totalEmptyExpected: 0 };
+    }
+    return processForecastSection(table, tableTitle, vm, est);
+  }
+
+  function fillOriginalForecastTables() {
+    const vm = findEstimateViewModel();
+    if (!vm || !vm.estimate || !vm.estimate.estimate_current) {
       return false;
     }
 
@@ -331,202 +677,13 @@
     let totalEmptyExpected = 0;
 
     for (let i = 0; i < sections.length; i++) {
-      const table = sections[i].querySelector('table');
-      if (!table) {
-        continue;
+      const res = processForecastSectionWrapper(sections[i], vm, est);
+      if (res.filledAny) {
+        filledAny = true;
       }
-
-      const tableTitle = sections[i].innerText.split('\n')[0].toLowerCase();
-
-      if (
-        tableTitle.indexOf('growth forecast') !== -1 &&
-        vm.estimate.long_term_growth &&
-        vm.estimate.past_term_growth
-      ) {
-        /** @type {NodeListOf<HTMLElement>} */
-        const gTds = table.querySelectorAll('tbody td');
-        /** @type {NodeListOf<HTMLElement>} */
-        const gThs = table.querySelectorAll('thead th');
-        for (let c = 0; c < gThs.length; c++) {
-          const hText = gThs[c].innerText.toLowerCase();
-          let gVal = null;
-          if (hText.indexOf('future 3-5y total revenue') !== -1) {
-            gVal = vm.estimate.long_term_growth.future_revenue_estimate_growth;
-          } else if (hText.indexOf('past 3-year total revenue') !== -1) {
-            gVal = vm.estimate.past_term_growth.revenue_estimate_growth;
-          } else if (hText.indexOf('future 3-5y eps') !== -1) {
-            gVal = vm.estimate.long_term_growth.future_eps_nri_estimate_growth;
-          } else if (hText.indexOf('past 3-year eps') !== -1) {
-            gVal = vm.estimate.past_term_growth.eps_nri_estimate_growth;
-          }
-
-          if (
-            gVal != null &&
-            gTds[c] &&
-            (!gTds[c].innerText.trim() || gTds[c].innerText.trim() === '-')
-          ) {
-            gTds[c].innerText = gVal + '%';
-            gTds[c].style.color = '#409eff';
-            gTds[c].style.fontWeight = 'bold';
-            filledAny = true;
-          }
-        }
-        continue;
-      }
-
-      /**
-       * @typedef {Record<string, Record<string, Record<string, number | null>>>} TableSubData
-       */
-      /**
-       * @typedef {{ annual?: TableSubData, quarterly?: TableSubData }} TableDataStructure
-       */
-      /** @type {TableDataStructure} */
-      let tableData = /** @type {TableDataStructure} */ (/** @type {unknown} */ (est));
-      if (tableTitle.indexOf('surprise') !== -1) {
-        tableData = /** @type {TableDataStructure} */ (
-          /** @type {unknown} */ (vm.estimate.estimate_history || {})
-        );
-      } else if (tableTitle.indexOf('trends') !== -1) {
-        tableData = /** @type {TableDataStructure} */ (
-          /** @type {unknown} */ (vm.estimate.estimate_trend || {})
-        );
-      } else if (tableTitle.indexOf('revisions') !== -1) {
-        tableData = /** @type {TableDataStructure} */ (
-          /** @type {unknown} */ (vm.estimate.estimate_revision || {})
-        );
-      }
-
-      let dateRow = null;
-      /** @type {NodeListOf<HTMLElement>} */
-      const trs = table.querySelectorAll('tr');
-      for (let j = 0; j < trs.length; j++) {
-        if (trs[j].innerText.match(/\d{4}-\d{2}/)) {
-          dateRow = trs[j]; // get the lowest row containing dates
-        }
-      }
-      if (!dateRow) {
-        continue;
-      }
-
-      /** @type {NodeListOf<HTMLElement>} */
-      const ths = dateRow.querySelectorAll('th, td');
-      /** @type {Record<number, string>} */
-      const colMap = {};
-      for (let c = 0; c < ths.length; c++) {
-        const match = ths[c].innerText.trim().match(/^(\d{4})-(\d{2})/);
-        if (match) {
-          colMap[c] = match[1] + match[2];
-        }
-      }
-
-      let lastMKey = null;
-      for (let r = 0; r < trs.length; r++) {
-        /** @type {NodeListOf<HTMLElement>} */
-        const tds = trs[r].querySelectorAll('td');
-        if (!tds.length) {
-          continue;
-        }
-
-        /** @type {HTMLElement} */
-        const labelNode = tds[0].querySelector('.el-tooltip') || tds[0];
-        const label = labelNode.innerText.trim().toLowerCase();
-
-        let mKey = LABEL_TO_METRIC[label];
-        let statKey = null;
-
-        if (mKey) {
-          lastMKey = mKey;
-          statKey = 'mean';
-        } else if (lastMKey) {
-          if (label.indexOf('no. of analysts') !== -1) {
-            statKey = 'num';
-          } else if (label.indexOf('high estimate') !== -1) {
-            statKey = 'high';
-          } else if (label.indexOf('low estimate') !== -1) {
-            statKey = 'low';
-          } else if (label.indexOf('median estimate') !== -1) {
-            statKey = 'med';
-          } else if (label.indexOf('standard deviation') !== -1) {
-            statKey = 'std';
-          } else if (label.indexOf('smart estimate') !== -1) {
-            statKey = 'smart';
-          } else if (label === 'estimate') {
-            statKey = 'surprisemean';
-          } else if (label === 'actual') {
-            statKey = 'actual';
-          } else if (label === 'difference') {
-            statKey = 'difference';
-          } else if (label.indexOf('surprise %') !== -1) {
-            statKey = 'surprise_pct';
-          } else if (label === 'current estimate') {
-            statKey = '0';
-          } else if (label === '7 days ago') {
-            statKey = '7';
-          } else if (label === '30 days ago') {
-            statKey = '30';
-          } else if (label === '60 days ago') {
-            statKey = '60';
-          } else if (label === '90 days ago') {
-            statKey = '90';
-          } else if (label === 'up last 30 days') {
-            statKey = 'up_num';
-          } else if (label === 'down last 30 days') {
-            statKey = 'down_num';
-          } else {
-            lastMKey = null;
-            continue;
-          }
-          mKey = lastMKey;
-        } else {
-          continue;
-        }
-
-        const offset = tds.length - ths.length;
-        for (const colIdxStr in colMap) {
-          const colIdx = parseInt(colIdxStr, 10);
-          const tdIndex = colIdx + offset;
-          if (tdIndex > 0 && tdIndex < tds.length) {
-            const cell = tds[tdIndex];
-            const innerText = cell.innerText.trim();
-            if (!innerText || innerText === '-') {
-              totalEmptyExpected++;
-              const ek = colMap[colIdx];
-              let val = null;
-              if (
-                tableData.annual &&
-                tableData.annual[mKey] &&
-                tableData.annual[mKey][ek] &&
-                tableData.annual[mKey][ek][statKey] != null
-              ) {
-                val = tableData.annual[mKey][ek][statKey];
-              } else if (
-                tableData.quarterly &&
-                tableData.quarterly[mKey] &&
-                tableData.quarterly[mKey][ek] &&
-                tableData.quarterly[mKey][ek][statKey] != null
-              ) {
-                val = tableData.quarterly[mKey][ek][statKey];
-              }
-
-              if (val != null) {
-                if (statKey === 'num' || statKey === 'up_num' || statKey === 'down_num') {
-                  cell.innerText = String(val);
-                } else {
-                  cell.innerText = fmt(val) + (statKey === 'surprise_pct' ? '%' : '');
-                }
-                cell.style.color = '#409eff';
-                if (statKey === 'mean') {
-                  cell.style.fontWeight = 'bold';
-                }
-                filledAny = true;
-              }
-            }
-          }
-        }
-      }
+      totalEmptyExpected += res.totalEmptyExpected;
     }
 
-    // Return true if we found and filled at least one cell, OR if we didn't expect to fill any
     return filledAny || totalEmptyExpected === 0;
   }
 
