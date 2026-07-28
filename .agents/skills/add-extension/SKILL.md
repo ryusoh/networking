@@ -14,9 +14,13 @@ failed attempt before they were understood.
 
 - **No underscore-prefixed dirs inside the extension folder.** Chrome refuses
   to load an extension containing `_anything` ("Filenames starting with '_' are
-  reserved"). So the repo's usual `__tests__/` convention is **not** usable
-  here — put tests in `tests/` (plain). Jest finds them by the `*.test.js`
-  filename pattern regardless of directory name.
+  reserved"; `_locales` is the one allowed exception). So the repo's usual
+  `__tests__/` convention is **not** usable here — put tests in `tests/`
+  (plain). Jest finds them by the `*.test.js` filename pattern regardless of
+  directory name. If the subproject already contains `__tests__/` (e.g.
+  `clean_adblock`) or a stray `_metadata/`, do **not** load the checkout
+  directly — run `bin/pack-extension <dir>` and load `<dir>/dist` instead
+  (generated, git- and prettier-ignored).
 - **`.gitignore` ignores bare build-artifact names** (`tests`, `lan_scanner`,
   ...). `tests` is scoped to `/nas_proxy/tests`, so `tests/` directories are
   trackable — but if you add a file that shares a name with a C binary target,
