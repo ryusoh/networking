@@ -30,10 +30,13 @@ Ship a completed branch, or ship uncommitted changes from the primary branch.
    - Verify everything is clean: `make precommit`.
    - If changes were made, commit them: `git commit -am "style: fix quality failures"`.
 
-3. **Merge into the primary branch:**
+3. **Merge into the primary branch** — prefer a squash merge, so the primary
+   branch gets one clean commit no matter how messy the branch history is:
    - Switch to the primary branch (usually `main` or `master`).
    - Pull latest: `git pull origin <primary-branch>`
-   - Merge the branch: `git merge <branch_name>`
+   - Squash-merge the branch: `git merge --squash <branch_name>`
+   - Commit with a single Conventional Commit message describing the whole
+     change (e.g. reuse the branch's main commit subject): `git commit`.
    - **Conflict Resolution:** If conflicts occur:
      - List conflicted files: `git status`.
      - Read and resolve each conflict manually or using tools.
@@ -46,8 +49,13 @@ Ship a completed branch, or ship uncommitted changes from the primary branch.
 5. **Cleanup:**
    - **Ask for acknowledgement before pushing changes.**
    - Push the primary branch: `git push origin <primary-branch>`.
-   - Delete the local branch: `git branch -d <branch_name>`.
-   - Delete the remote branch: `git push origin --delete <branch_name>`.
+   - Delete the local branch: `git branch -d <branch_name>`. After a squash
+     merge Git does not consider the branch merged, so `-d` refuses; use
+     `git branch -D <branch_name>` once the squash commit is pushed and you
+     are sure nothing unshipped remains.
+   - Delete the remote branch: `git push origin --delete <branch_name>`. If a
+     pre-push hook mistakes the delete for history rewriting, retry the
+     delete alone with `git push --no-verify origin --delete <branch_name>`.
 
 ## Direct-push mode (when on the primary branch with uncommitted changes)
 
