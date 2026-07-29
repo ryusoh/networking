@@ -7,7 +7,9 @@ const {
   makeState,
   GRACE_MS,
   SEEK_BACK_S,
-  COOLDOWN_MS
+  COOLDOWN_MS,
+  FUTILE_LIMIT,
+  RELOAD_COOLDOWN_MS
 } = require('../content.js');
 
 function fakeVideo(overrides = {}) {
@@ -140,5 +142,71 @@ describe('recover', () => {
     // Let the rejection handler run so Jest does not flag an unhandled rejection.
     await Promise.resolve();
     expect(v.play).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('reload escalation', () => {
+  // Stuck at the same wall: every recovery stalls at the same currentTime.
+  function stuckVideo() {
+    return fakeVideo({ currentTime: 100, readyState: 2 });
+  }
+
+  test('reloads after FUTILE_LIMIT consecutive no-progress recoveries', () => {
+    const v = stuckVideo();
+    const s = makeState();
+    const reload = jest.fn();
+    const t0 = 1000000;
+    recover(v, t0, s, reload); // baseline stall point
+    recover(v, t0 + 1, s, reload); // futile 1
+    recover(v, t0 + 2, s, reload); // futile 2
+    expect(reload).not.toHaveBeenCalled();
+    recover(v, t0 + 3, s, reload); // futile 3 -> reload
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(s.reloads).toBe(1);
+    expect(v.play).toHaveBeenCalledTimes(3); // the reload recovery does not seek/play
+  });
+
+  test('real progress resets the futile counter', () => {
+    const v = stuckVideo();
+    const s = makeState();
+    const reload = jest.fn();
+    const t0 = 1000000;
+    recover(v, t0, s, reload); // baseline
+    recover(v, t0 + 1, s, reload); // futile 1
+    recover(v, t0 + 2, s, reload); // futile 2
+    v.currentTime = 110; // the wall moved: playback advanced 10s
+    recover(v, t0 + 3, s, reload); // progress -> counter resets
+    recover(v, t0 + 4, s, reload); // futile 1 at the new wall
+    recover(v, t0 + 5, s, reload); // futile 2
+    expect(reload).not.toHaveBeenCalled();
+    recover(v, t0 + 6, s, reload); // futile 3 -> reload
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  test('reload cooldown and per-page cap are enforced', () => {
+    const v = stuckVideo();
+    const s = makeState();
+    const reload = jest.fn();
+    let now = 1000000;
+    const recoverUntilReload = () => {
+      // One call sets the baseline wall; FUTILE_LIMIT more trigger the reload.
+      for (let i = 0; i <= FUTILE_LIMIT; i++) {
+        now += 1;
+        recover(v, now, s, reload);
+      }
+    };
+    recoverUntilReload(); // reload #1
+    expect(reload).toHaveBeenCalledTimes(1);
+    recoverUntilReload(); // within cooldown: no reload, futile counter resets at cap
+    expect(reload).toHaveBeenCalledTimes(1);
+    now += RELOAD_COOLDOWN_MS;
+    recoverUntilReload(); // reload #2
+    expect(reload).toHaveBeenCalledTimes(2);
+    now += RELOAD_COOLDOWN_MS;
+    recoverUntilReload(); // reload #3 = MAX_RELOADS
+    expect(reload).toHaveBeenCalledTimes(3);
+    now += RELOAD_COOLDOWN_MS;
+    recoverUntilReload(); // cap reached: never again this page life
+    expect(reload).toHaveBeenCalledTimes(3);
   });
 });

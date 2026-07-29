@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Stall Guard",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Auto-recover from HTML5 video stalls: when playback freezes mid-stream, seek back a few seconds and resume instead of waiting for the network.",
   "icons": {
     "16": "assets/icon16.png",
