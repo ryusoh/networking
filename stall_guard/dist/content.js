@@ -133,6 +133,9 @@
     }
     const state = makeState();
     watched.set(video, state);
+    if (typeof console !== 'undefined' && console.info) {
+      console.info('[stall-guard] watching video in frame ' + window.location.host);
+    }
     setInterval(function () {
       if (shouldRecover(video, Date.now(), state)) {
         recover(video, Date.now(), state);
