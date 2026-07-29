@@ -508,38 +508,46 @@
   }
 
   function removeAdScripts() {
-    document.querySelectorAll('script[src]').forEach((script) => {
+    const scripts = document.querySelectorAll('script[src]');
+    for (let i = 0; i < scripts.length; i++) {
+      const script = scripts[i];
       if (script instanceof HTMLScriptElement && shouldBlockScript(script.src)) {
         script.remove();
       }
-    });
+    }
   }
 
   function removeAdIframes() {
-    document.querySelectorAll('iframe').forEach((iframe) => {
+    const iframes = document.querySelectorAll('iframe');
+    for (let i = 0; i < iframes.length; i++) {
+      const iframe = iframes[i];
       const src = iframe.src || iframe.getAttribute('data-src') || '';
       if (BLOCKED_SCRIPT_PATTERNS.some((p) => src.includes(p))) {
         hideAd(iframe);
       }
-    });
+    }
   }
 
   function blockForumAds() {
     try {
-      document.querySelectorAll(FORUM_AD_SELECTORS_JOINED).forEach((el) => {
+      const joinedAds = document.querySelectorAll(FORUM_AD_SELECTORS_JOINED);
+      for (let i = 0; i < joinedAds.length; i++) {
+        const el = joinedAds[i];
         if (el instanceof HTMLElement) {
           hideAd(el);
         }
-      });
+      }
     } catch {
       // Fallback if joined selector is invalid
       for (const selector of FORUM_AD_SELECTORS) {
         try {
-          document.querySelectorAll(selector).forEach((el) => {
+          const selectedAds = document.querySelectorAll(selector);
+          for (let j = 0; j < selectedAds.length; j++) {
+            const el = selectedAds[j];
             if (el instanceof HTMLElement) {
               hideAd(el);
             }
-          });
+          }
         } catch {
           /* invalid selector */
         }
@@ -549,15 +557,19 @@
     removeAdIframes();
 
     // Hide Taboola ad containers (walk up from taboola links)
-    document.querySelectorAll('a[href*="taboola.com"]').forEach((link) => {
+    const taboolas = document.querySelectorAll('a[href*="taboola.com"]');
+    for (let i = 0; i < taboolas.length; i++) {
+      const link = taboolas[i];
       const container = link.closest('li, .hot-banner, .hot-content') || link.parentElement;
       if (container instanceof HTMLElement) {
         hideAd(container);
       }
-    });
+    }
 
     // Hide Admaru ad label and its parent container (text says "Admaru")
-    document.querySelectorAll('div').forEach((el) => {
+    const divs = document.querySelectorAll('div');
+    for (let i = 0; i < divs.length; i++) {
+      const el = divs[i];
       const txt = el.textContent || '';
       if (txt.includes('Admaru') && txt.length < 50) {
         if (el instanceof HTMLElement) {
@@ -567,7 +579,7 @@
           hideAd(el.parentElement);
         }
       }
-    });
+    }
 
     // Hide DoubleClick / DV360 display ads and their containers
     // These are often injected dynamically by BSA or GPT into ad zones
@@ -579,11 +591,13 @@
       'img[src*="simgad"]'
     ];
     for (const sel of dcSelectors) {
-      document.querySelectorAll(sel).forEach((el) => {
+      const dsEls = document.querySelectorAll(sel);
+      for (let j = 0; j < dsEls.length; j++) {
+        const el = dsEls[j];
         // Walk up to the nearest BSA zone or ad-sized container
         let target = el;
         let parent = el.parentElement;
-        for (let i = 0; i < 10 && parent && parent !== document.body; i++) {
+        for (let k = 0; k < 10 && parent && parent !== document.body; k++) {
           const id = parent.id || '';
           const cls = parent.className || '';
           if (
@@ -604,30 +618,36 @@
         if (target instanceof HTMLElement) {
           hideAd(target);
         }
-      });
+      }
     }
 
     // Hide Douban erebor redirect ad containers
-    document.querySelectorAll('a[href*="erebor.douban.com"]').forEach((link) => {
+    const erebors = document.querySelectorAll('a[href*="erebor.douban.com"]');
+    for (let i = 0; i < erebors.length; i++) {
+      const link = erebors[i];
       const container = link.closest('.customize-slot, .article-card') || link.parentElement;
       if (container instanceof HTMLElement) {
         hideAd(container);
       }
-    });
+    }
 
     // NYTimes regiwall: remove inert attribute and gateway overlay
     if (host.endsWith('nytimes.com')) {
-      document.querySelectorAll('[data-testid="vi-gateway-container"][inert]').forEach((el) => {
+      const inerts = document.querySelectorAll('[data-testid="vi-gateway-container"][inert]');
+      for (let i = 0; i < inerts.length; i++) {
+        const el = inerts[i];
         el.removeAttribute('inert');
         el.removeAttribute('aria-hidden');
-      });
-      document
-        .querySelectorAll('#gateway-content, [data-testid="onsite-messaging-unit-gateway"]')
-        .forEach((el) => {
-          if (el instanceof HTMLElement) {
-            hideAd(el);
-          }
-        });
+      }
+      const gateways = document.querySelectorAll(
+        '#gateway-content, [data-testid="onsite-messaging-unit-gateway"]'
+      );
+      for (let i = 0; i < gateways.length; i++) {
+        const el = gateways[i];
+        if (el instanceof HTMLElement) {
+          hideAd(el);
+        }
+      }
     }
 
     // Restore scroll if ad overlay locked it
@@ -635,13 +655,15 @@
       document.body.classList.remove('fc-overflow-hidden');
       document.documentElement.classList.remove('fc-overflow-hidden');
 
-      [document.body, document.documentElement].forEach((el) => {
+      const roots = [document.body, document.documentElement];
+      for (let i = 0; i < roots.length; i++) {
+        const el = roots[i];
         const style = window.getComputedStyle(el);
         if (style.overflow === 'hidden' || style.overflowY === 'hidden') {
           el.style.setProperty('overflow', 'auto', 'important');
           el.style.setProperty('overflow-y', 'auto', 'important');
         }
-      });
+      }
     }
   }
 
