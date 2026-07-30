@@ -113,36 +113,43 @@
     subtree: true
   });
 
-  // --- Forecast data rendering from Vue components ---
-  function injectForecast() {
-    if (document.querySelector('.gf-u-forecast')) {
-      return true;
-    }
-    if (!/\/forecast/.test(window.location.pathname)) {
-      return false;
-    }
+  /**
+   * @typedef {object} EstimateData
+   * @property {number} mean
+   * @property {number} high
+   * @property {number} med
+   * @property {number} low
+   * @property {number} num
+   * @property {string} [entry_date]
+   */
 
+  /**
+   * @returns {{ estimateData: EstimateData, priceData: Array<Array<string>> | undefined } | null}
+   */
+  function getForecastVueContext() {
     const vueEl = document.querySelector('[data-v-5ccaf75f]');
     const vueObj = vueEl
       ? /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (vueEl))['__vue__']
       : null;
     if (!vueEl || !vueObj) {
-      return false;
+      return null;
     }
     const vm =
-      /** @type {{ loading?: boolean, noData?: boolean, estimateData?: { mean: number, high: number, med: number, low: number, num: number, entry_date?: string }, priceData?: Array<Array<string>> }} */ (
+      /** @type {{ loading?: boolean, noData?: boolean, estimateData?: EstimateData, priceData?: Array<Array<string>> }} */ (
         vueObj
       );
-    if (vm.loading || vm.noData) {
-      return false;
+    if (vm.loading || vm.noData || !vm.estimateData) {
+      return null;
     }
+    return { estimateData: vm.estimateData, priceData: vm.priceData };
+  }
 
-    const est = vm.estimateData;
-    const priceData = vm.priceData;
-    if (!est) {
-      return false;
-    }
-
+  /**
+   * @param {EstimateData} est
+   * @param {Array<Array<string>> | undefined} priceData
+   * @returns {string}
+   */
+  function buildForecastHtml(est, priceData) {
     const currentPrice =
       priceData && priceData.length ? parseFloat(priceData[priceData.length - 1][1]) : null;
     const isPositive = currentPrice ? est.mean >= currentPrice : false;
@@ -151,7 +158,7 @@
       : null;
     const upsideColor = isPositive ? '#67c23a' : '#f56c6c';
 
-    const html =
+    return (
       '<div class="gf-u-forecast" style="padding:16px;margin:12px 0;background:#fff;border:1px solid #eee;border-radius:8px;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">' +
       '<h3 style="margin:0 0 12px;font-size:16px;color:#333;">Analyst Price Target</h3>' +
       '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;">' +
@@ -193,9 +200,15 @@
           (est.entry_date || '') +
           '</div>'
         : '') +
-      '</div>';
+      '</div>'
+    );
+  }
 
-    // Replace blur image containers or insert after subscribe card removal points
+  /**
+   * @param {string} html
+   * @returns {boolean}
+   */
+  function insertForecastHtml(html) {
     let inserted = false;
     const blurImgParents = document.querySelectorAll('[data-v-5ccaf75f]');
     for (let i = 0; i < blurImgParents.length; i++) {
@@ -226,6 +239,24 @@
       }
     }
     return inserted;
+  }
+
+  // --- Forecast data rendering from Vue components ---
+  function injectForecast() {
+    if (document.querySelector('.gf-u-forecast')) {
+      return true;
+    }
+    if (!/\/forecast/.test(window.location.pathname)) {
+      return false;
+    }
+
+    const ctx = getForecastVueContext();
+    if (!ctx) {
+      return false;
+    }
+
+    const html = buildForecastHtml(ctx.estimateData, ctx.priceData);
+    return insertForecastHtml(html);
   }
 
   // --- Shared Utilities ---
