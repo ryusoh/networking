@@ -40,7 +40,7 @@ JS_TEST_EXTENSIONS = (".js", ".cjs", ".mjs")
 # stripped; unanchored ones may appear anywhere in the comment.
 THINKING_RE = re.compile(
     r"(?:"
-    r"\bwait[,!?…—]"  # "Wait, ..." / "oh wait!"
+    r"\bwait[,!?…—]"  # sentence-opening interjection
     r"|^hmm+\b"
     r"|^huh\b"
     r"|^ah[,!?]"  # "Ah, ..."
@@ -52,6 +52,9 @@ THINKING_RE = re.compile(
     r"|^how about\b"
     r"|^let'?s (?:check|see|try|look|mock)\b"
     r"|^let me think\b"
+    r"|\blet'?s (?:assume|rely)\b"  # deliberation anywhere in the comment
+    r"|\bmight be (?:easier|better|simpler|cleaner)\b"
+    r"|^this is (?:tricky|hard|hacky)\b"
     r"|\b(?:hits?|reach(?:es)?) line \d+"  # coverage-chasing notes
     r")",
     re.IGNORECASE,

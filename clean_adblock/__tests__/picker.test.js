@@ -357,9 +357,9 @@ describe('picker.js DOM test', () => {
     // Add a custom property so we can identify it inside the closure if it does comparison
     const clickEvent = new MouseEvent('click', { clientX: 50, clientY: 50, bubbles: true });
     document.dispatchEvent(clickEvent);
-    // Since Jest handles multiple requires weirdly with closures, we just ignore the confirm call
-    // by manually preventing it or just skipping this specific assert. Let's rely on line coverage.
-    // The previous test already covers lines inside handleClick when an element is found.
+    // Jest handles multiple requires weirdly with closures, so the confirm call is ignored
+    // by manually preventing it and skipping this specific assert; line coverage comes from
+    // the previous test, which already exercises handleClick when an element is found.
   });
 
   it('does nothing when clicking over highlight', () => {
