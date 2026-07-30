@@ -431,8 +431,8 @@ describe('nytimes-unlocked.js additional tests', () => {
 
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
-    // Since newParagraphs is empty due to duplicate text, it hits line 246 early return
-    // Then clear articleBody and call restoreArticle via interval to hit line 200 early return
+    // newParagraphs is empty due to duplicate text, so restoreArticle returns early.
+    // Clear articleBody so the interval-driven restoreArticle call also returns early.
     document.body.innerHTML = '';
 
     jest.useFakeTimers();

@@ -60,7 +60,9 @@ eBPF (`vps_kernel_proxy/`, Docker-only).
    committed code: no thinking-out-loud comments ("Wait, ...", "Ah, ..."), no
    abandoned `pass`-only or empty test bodies. If an approach fails mid-write,
    delete the attempt — don't commit the trail. Code comments state facts about
-   behaviour.
+   behaviour. Enforced deterministically by `make thinking-check`
+   (`tools/check_thinking_comments.py`) over all tracked py/js/css/c/h/sh
+   sources.
 
 ## Reading the gate output (this repo is noisy on purpose)
 
@@ -154,6 +156,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 | Full gate in Docker (macOS/CI parity)    | `make precommit-docker`                  |
 | JS lint / format                         | `make lint` / `make fmt-check`           |
 | Dependency-structure gate (JS)           | `make depcheck`                          |
+| Stream-of-consciousness gate             | `make thinking-check`                    |
 | Jest with coverage (floor-gated)         | `make test`                              |
 | Python tests + coverage (floor-gated)    | `make test-py`                           |
 | JS type-check (JSDoc, non-blocking)      | `make type`                              |
@@ -240,6 +243,24 @@ agents).
   writes a `.grimp_cache/` dir that fails `fmt-check` — measure in a venv and
   delete the cache afterwards.
 
+### Stream-of-consciousness gate (`make thinking-check`)
+
+`make thinking-check` (wired into `make precommit`) runs
+`tools/check_thinking_comments.py`, a stdlib-only deterministic scan of all
+git-tracked sources (py/js/css/c/h/sh) enforcing non-negotiable #9: Python
+comments matched via `tokenize` (strings never match), JS/CSS/C via a
+block-comment-aware line scan that ignores URL schemes, shell via full-line
+`#` comments only, plus abandoned-test detection (pytest-collectable
+`pass`/`...`/docstring-only bodies, JS `it()`/`test()` with empty callbacks).
+Measured **8 violations** on day one (all in test files: coverage-chasing
+"to hit line N" notes, "Let's mock ..." reasoning, one abandoned `pass`-only
+test) — fixed in place, no baseline needed; the gate is purely preventive.
+Probe-tested: a thinking comment plus an abandoned `pass`-only test appended
+to a tracked file fails the gate; `git restore` returns green. This wiring was
+done by an interactive agent explicitly directed to change
+build/lint config (non-negotiable #6 binds Jules routines, not interactive
+agents).
+
 ### Mutation testing (NON-BLOCKING scaffold)
 
 `make mutate-js` (StrykerJS, `stryker.config.mjs`) and `make mutate-py`
@@ -318,8 +339,10 @@ isn't.
   `requirements-dev.txt` (pytest + pytest-cov); gcc/make come with the runner.
 - The eBPF step is a no-op in CI (no `ebpf-builder` Docker image) and stays green
   because the Makefile ignores it (`-@`).
-- `make test-py` runs `nas_proxy`, `retriever`, `vps_kernel_proxy`, and
-  `nas_tools`. The target first runs `make -C nas_tools all` to build the C
+- `make test-py` runs `nas_proxy`, `retriever`, `vps_kernel_proxy`, `nas_tools`,
+  `bin`, and `tools` (the last two contribute tests only, no coverage scope —
+  `tools/__tests__/` is the thinking-check detector's suite). The target first
+  runs `make -C nas_tools all` to build the C
   binaries (`wol`, `netmon`, `lan_scanner`, `speedtest`) the tests shell out to.
 - **`nas_tools` privileged tests self-skip** via `skipUnless` guards in
   `nas_tools/__tests__/test_tools.py`: `test_netmon_run` needs ICMP sockets

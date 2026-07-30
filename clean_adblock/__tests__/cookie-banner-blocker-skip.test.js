@@ -76,11 +76,8 @@ describe('Cookie Banner Blocker - Hardcoded Skips & Fallbacks', () => {
     style.textContent = '.accept-btn { opacity: 0; }';
     document.head.appendChild(style);
 
-    // We need to provide a selector that `findButton` uses.
-    // The `ACCEPT_BUTTONS` list probably includes something matching text or classes.
-    // Let's rely on the text matching heuristic in `dismissConsentDialog` or `dismissBanner`...
-    // Actually, dismissBanner searches for ACCEPT_BUTTONS on the banner element.
-    // Let's mock querySelectorAll to return our button for a known selector.
+    // dismissBanner searches for ACCEPT_BUTTONS on the banner element, so mock
+    // querySelectorAll to return our button for any selector.
     jest.spyOn(banner, 'querySelectorAll').mockImplementation(() => {
       return [acceptBtn]; // return our button for ANY selector, so findButton finds it
     });

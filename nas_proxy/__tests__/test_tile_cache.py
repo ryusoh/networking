@@ -7,10 +7,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from nas_proxy import tile_cache
 
 class TestTileCache(unittest.TestCase):
-    @patch("nas_proxy.tile_cache.storage_get")
-    def test_storage_get_mocked(self, _mock_get):
-        pass
-
     @patch("nas_proxy.tile_cache.ctypes.CDLL")
     def test_init_tile_storage(self, mock_cdll):
         # mock CDLL loading

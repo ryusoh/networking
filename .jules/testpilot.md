@@ -47,7 +47,9 @@ already at 100% while the worst files scroll off the top. Instead:
   "Ah, ...", "To hit line N, ...") and the abandoned `pass`-only or empty test
   bodies that usually come with them. If a line turns out uncoverable mid-write,
   delete the attempt entirely and explain the skip in the PR body. Test comments
-  state stable facts about behaviour, never your thought process.
+  state stable facts about behaviour, never your thought process. This is
+  machine-enforced: `make thinking-check` (in `make precommit`) fails the gate
+  on these patterns across all tracked sources, so they cannot slip through.
 
 ## Lane
 

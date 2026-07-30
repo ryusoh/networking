@@ -90,7 +90,7 @@ class TestCacheProxy(unittest.TestCase):
         mock_load.return_value = []
         handler = cache_proxy.ProxyHandler(MockRequest(), ("127.0.0.1", 1234), MagicMock())
         # We can't really test BaseHTTPRequestHandler easily this way because it requires a full request
-        # Let's mock the internal methods called by the server
+        # Mock the internal methods called by the server instead.
 
         handler = cache_proxy.ProxyHandler.__new__(cache_proxy.ProxyHandler)
         handler.path = "test.com:443"

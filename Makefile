@@ -1,5 +1,5 @@
 # Usage: make pull ID=<extension_id>
-.PHONY: pull precommit precommit-fix precommit-docker fmt fmt-check lint depcheck lint-fix install-dev test test-py type tm-repair sync-check mutate-js mutate-py
+.PHONY: pull precommit precommit-fix precommit-docker fmt fmt-check lint depcheck lint-fix install-dev test test-py type tm-repair sync-check thinking-check mutate-js mutate-py
 
 tm-repair:
 	@./bin/tm-repair
@@ -10,9 +10,9 @@ pull:
 install-dev:
 	@npm install
 
-precommit: fmt-check lint type test test-py test-ebpf test-nas sync-check
+precommit: fmt-check lint thinking-check type test test-py test-ebpf test-nas sync-check
 
-precommit-fix: fmt lint-fix type test test-py test-ebpf test-nas sync-check
+precommit-fix: fmt lint-fix thinking-check type test test-py test-ebpf test-nas sync-check
 
 # Containerized precommit for hosts where privileged tests fail locally (e.g.
 # macOS socket permissions). Builds `Dockerfile.precommit` and runs `make precommit`
@@ -37,6 +37,13 @@ precommit-docker:
 	@echo "Running precommit in Docker..."
 	@docker run --rm -v "$$(pwd)":/app $(PRECOMMIT_DOCKER_IMAGE) \
 		sh -c 'make -C nas_tools clean && make -C nas_proxy clean && python3 tools/sync_commands.py && make precommit'
+
+# Stream-of-consciousness gate (AGENTS.md non-negotiable #9): deterministic scan
+# of all git-tracked sources (py/js/css/c/h/sh) for thinking-out-loud comments
+# and abandoned test bodies. Detector: tools/check_thinking_comments.py
+# (tests in tools/__tests__/, run by test-py).
+thinking-check:
+	@$(PY) tools/check_thinking_comments.py
 
 # .claude/commands/ is generated from .agents/skills/ (the canonical source) by
 # tools/sync_commands.py. Fail if regeneration is not a no-op (content hash of
@@ -95,6 +102,8 @@ test:
 # Python unit tests + coverage (term-missing), mirroring the Jest coverage report.
 # Coverage is scoped to the three importable packages (the source modules);
 # nas_tools contributes C-binary integration tests but no Python source to cover.
+# bin and tools are collected for their tests only (no coverage scope) — tools
+# holds the thinking-check detector's suite.
 # nas_tools' privileged tests (ICMP / eth0) self-skip when the host lacks the
 # prerequisites — see the skipUnless guards in nas_tools/__tests__/test_tools.py.
 # Whole-suite floor: measured 95.5% total; gate fails below 94%.
@@ -103,7 +112,7 @@ test-py:
 	@echo "Building nas_tools binaries (needed by its tests)..."
 	@$(MAKE) -C nas_tools all
 	@echo "Running Python Tests (pytest + coverage)..."
-	@$(PY) -m pytest nas_proxy retriever vps_kernel_proxy nas_tools bin \
+	@$(PY) -m pytest nas_proxy retriever vps_kernel_proxy nas_tools bin tools \
 		-p no:cacheprovider \
 		--cov=nas_proxy --cov=retriever --cov=vps_kernel_proxy \
 		--cov-report=term-missing \

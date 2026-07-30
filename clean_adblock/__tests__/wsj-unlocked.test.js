@@ -115,7 +115,7 @@ describe('wsj-unlocked.js', () => {
   test('removePaywall :has selector fallback', () => {
     const path = require('path');
     const { instrumentFile } = require('./helpers/instrument');
-    // jsdom doesn't fully support :has but we can mock querySelectorAll to hit line 104
+    // jsdom doesn't fully support :has, so mock querySelectorAll to exercise the fallback path
     global.chrome = undefined;
     window.location = new URL('https://www.wsj.com/articles/something');
 
@@ -168,7 +168,7 @@ describe('wsj-unlocked.js', () => {
   test('removePaywall :has selector fallback', () => {
     const path = require('path');
     const { instrumentFile } = require('./helpers/instrument');
-    // jsdom doesn't fully support :has but we can mock querySelectorAll to hit line 104
+    // jsdom doesn't fully support :has, so mock querySelectorAll to exercise the fallback path
     global.chrome = undefined;
     window.location = new URL('https://www.wsj.com/articles/something');
 
