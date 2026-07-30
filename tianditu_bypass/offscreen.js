@@ -3,6 +3,9 @@
  * Parses the proxy list from multiple sources.
  */
 
+/**
+ * @param {Document} doc
+ */
 function parseFreeproxyworld(doc) {
   let rows = Array.from(doc.querySelectorAll('table.layui-table tbody tr'));
   if (rows.length === 0) {
@@ -36,9 +39,16 @@ function parseFreeproxyworld(doc) {
 
       return { ip, port, scheme, speed };
     })
-    .filter((p) => p && p.ip && p.port && p.ip.includes('.') && !isNaN(parseInt(p.port)));
+    .filter(
+      /** @type {(p: any) => p is {ip: string, port: string, scheme: string, speed: number}} */ (
+        (p) => p && p.ip && p.port && p.ip.includes('.') && !isNaN(parseInt(p.port))
+      )
+    );
 }
 
+/**
+ * @param {Document} doc
+ */
 function parseDatabay(doc) {
   // Databay uses a more modern Tailwind table structure.
   // Looking for rows inside the main table.
@@ -68,14 +78,21 @@ function parseDatabay(doc) {
 
       return { ip, port, scheme, speed };
     })
-    .filter((p) => p && p.ip && p.port && p.ip.includes('.') && !isNaN(parseInt(p.port)));
+    .filter(
+      /** @type {(p: any) => p is {ip: string, port: string, scheme: string, speed: number}} */ (
+        (p) => p && p.ip && p.port && p.ip.includes('.') && !isNaN(parseInt(p.port))
+      )
+    );
 }
 
+/**
+ * @param {string} text
+ */
 function parseRawText(text) {
   // Parses "IP:Port" format - these are NAS-verified SOCKS5 Chinese-exit proxies
   return text
     .split('\n')
-    .map((line) => {
+    .map((/** @type {string} */ line) => {
       const parts = line.trim().split(':');
       if (parts.length === 2 && parts[0].includes('.')) {
         return {
@@ -87,7 +104,11 @@ function parseRawText(text) {
       }
       return null;
     })
-    .filter((p) => p && p.ip && p.port);
+    .filter(
+      /** @type {(p: any) => p is {ip: string, port: string, scheme: string, speed: number}} */ (
+        (p) => p && p.ip && p.port
+      )
+    );
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -121,7 +142,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return r.text();
       })
       .then((html) => sendResponse({ html }))
-      .catch((e) => {
+      .catch((/** @type {Error} */ e) => {
         console.error(`[OFFSCREEN] Fetch error for ${request.url}:`, e);
         sendResponse({ error: e.toString() });
       });
@@ -133,6 +154,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(request.html, 'text/html');
 
+      /** @type {Array<{ip: string, port: string, scheme: string, speed: number}>} */
       let proxies = [];
       if (request.sourceType === 'freeproxyworld') {
         proxies = parseFreeproxyworld(doc);
@@ -143,7 +165,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
 
       sendResponse({ proxies: proxies });
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
       console.error('[OFFSCREEN] Parsing error:', e);
       sendResponse({ error: e.toString(), proxies: [] });
     }
