@@ -56,6 +56,11 @@ eBPF (`vps_kernel_proxy/`, Docker-only).
 8. **Check open and recently-closed PRs before you start, and don't repeat them.**
    Run `gh pr list --state all --limit 30` and read the recent ones. A closed PR
    was closed for a reason; an open one already claims that work. Pick something new.
+9. **No stream-of-consciousness in the diff.** Your reasoning stays out of
+   committed code: no thinking-out-loud comments ("Wait, ...", "Ah, ..."), no
+   abandoned `pass`-only or empty test bodies. If an approach fails mid-write,
+   delete the attempt — don't commit the trail. Code comments state facts about
+   behaviour.
 
 ## Reading the gate output (this repo is noisy on purpose)
 

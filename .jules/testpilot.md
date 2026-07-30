@@ -43,6 +43,11 @@ already at 100% while the worst files scroll off the top. Instead:
   swallows exceptions so a test "passes"; tests that assert nothing. A test must
   fail loudly on a real fault, and must distinguish an expected environmental
   absence (a self-skipping privileged test, a missing global) from an actual error.
+- **Banned:** stream-of-consciousness reasoning committed as comments ("Wait, ...",
+  "Ah, ...", "To hit line N, ...") and the abandoned `pass`-only or empty test
+  bodies that usually come with them. If a line turns out uncoverable mid-write,
+  delete the attempt entirely and explain the skip in the PR body. Test comments
+  state stable facts about behaviour, never your thought process.
 
 ## Lane
 
