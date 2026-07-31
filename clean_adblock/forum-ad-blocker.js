@@ -528,6 +528,150 @@
     }
   }
 
+  function hideTaboolaAds() {
+    // Hide Taboola ad containers (walk up from taboola links)
+    const taboolas = document.querySelectorAll('a[href*="taboola.com"]');
+    for (let i = 0; i < taboolas.length; i++) {
+      const link = taboolas[i];
+      const container = link.closest('li, .hot-banner, .hot-content') || link.parentElement;
+      if (container instanceof HTMLElement) {
+        hideAd(container);
+      }
+    }
+  }
+
+  function hideAdmaruAds() {
+    // Hide Admaru ad label and its parent container (text says "Admaru")
+    const divs = document.querySelectorAll('div');
+    for (let i = 0; i < divs.length; i++) {
+      const el = divs[i];
+      const txt = el.textContent || '';
+      if (txt.includes('Admaru') && txt.length < 50) {
+        if (el instanceof HTMLElement) {
+          hideAd(el);
+        }
+        if (el.parentElement instanceof HTMLElement) {
+          hideAd(el.parentElement);
+        }
+      }
+    }
+  }
+
+  /**
+   * @param {Element} el
+   * @returns {Element}
+   */
+
+  /**
+   * @param {HTMLElement} parent
+   * @returns {boolean}
+   */
+  function isDoubleClickAdContainer(parent) {
+    const id = parent.id || '';
+    const cls = parent.className || '';
+    return (
+      id.startsWith('bsa-zone') ||
+      cls.includes('bsa') ||
+      id.includes('buysellads') ||
+      id.includes('div-gpt-ad') ||
+      cls.includes('ad-container') ||
+      cls.includes('ad-slot') ||
+      cls.includes('ad-unit')
+    );
+  }
+
+  /**
+   * @param {Element} el
+   * @returns {Element|null}
+   */
+  function getDoubleClickTarget(el) {
+    // Walk up to the nearest BSA zone or ad-sized container
+    let target = el;
+    let parent = el.parentElement;
+    for (let k = 0; k < 10 && parent && parent !== document.body; k++) {
+      if (isDoubleClickAdContainer(parent)) {
+        target = parent;
+        break;
+      }
+      target = parent;
+      parent = parent.parentElement;
+    }
+    return target;
+  }
+
+  function hideDoubleClickAds() {
+    // Hide DoubleClick / DV360 display ads and their containers
+    // These are often injected dynamically by BSA or GPT into ad zones
+    const dcSelectors = [
+      'a[href*="adclick.g.doubleclick.net"]',
+      'a[href*="ad.doubleclick.net"]',
+      'a[id^="img_anch_"]',
+      'img[src*="2mdn.net"]',
+      'img[src*="simgad"]'
+    ];
+    for (const sel of dcSelectors) {
+      const dsEls = document.querySelectorAll(sel);
+      for (let j = 0; j < dsEls.length; j++) {
+        const el = dsEls[j];
+        const target = getDoubleClickTarget(el);
+        if (target instanceof HTMLElement) {
+          hideAd(target);
+        }
+      }
+    }
+  }
+
+  function hideDoubanAds() {
+    // Hide Douban erebor redirect ad containers
+    const erebors = document.querySelectorAll('a[href*="erebor.douban.com"]');
+    for (let i = 0; i < erebors.length; i++) {
+      const link = erebors[i];
+      const container = link.closest('.customize-slot, .article-card') || link.parentElement;
+      if (container instanceof HTMLElement) {
+        hideAd(container);
+      }
+    }
+  }
+
+  function removeNYTimesRegiwall() {
+    // NYTimes regiwall: remove inert attribute and gateway overlay
+    if (host.endsWith('nytimes.com')) {
+      const inerts = document.querySelectorAll('[data-testid="vi-gateway-container"][inert]');
+      for (let i = 0; i < inerts.length; i++) {
+        const el = inerts[i];
+        el.removeAttribute('inert');
+        el.removeAttribute('aria-hidden');
+      }
+      const gateways = document.querySelectorAll(
+        '#gateway-content, [data-testid="onsite-messaging-unit-gateway"]'
+      );
+      for (let i = 0; i < gateways.length; i++) {
+        const el = gateways[i];
+        if (el instanceof HTMLElement) {
+          hideAd(el);
+        }
+      }
+    }
+  }
+
+  function restoreAdOverlayScroll() {
+    // Restore scroll if ad overlay locked it
+    if (document.body) {
+      document.body.classList.remove('fc-overflow-hidden');
+      document.documentElement.classList.remove('fc-overflow-hidden');
+
+      const roots = [document.body, document.documentElement];
+      for (let i = 0; i < roots.length; i++) {
+        const el = roots[i];
+        const style = window.getComputedStyle(el);
+        if (style.overflow === 'hidden' || style.overflowY === 'hidden') {
+          el.style.setProperty('overflow', 'auto', 'important');
+          el.style.setProperty('overflow-y', 'auto', 'important');
+        }
+      }
+    }
+  }
+
   function blockForumAds() {
     try {
       const joinedAds = document.querySelectorAll(FORUM_AD_SELECTORS_JOINED);
@@ -556,115 +700,17 @@
     removeAdScripts();
     removeAdIframes();
 
-    // Hide Taboola ad containers (walk up from taboola links)
-    const taboolas = document.querySelectorAll('a[href*="taboola.com"]');
-    for (let i = 0; i < taboolas.length; i++) {
-      const link = taboolas[i];
-      const container = link.closest('li, .hot-banner, .hot-content') || link.parentElement;
-      if (container instanceof HTMLElement) {
-        hideAd(container);
-      }
-    }
+    hideTaboolaAds();
 
-    // Hide Admaru ad label and its parent container (text says "Admaru")
-    const divs = document.querySelectorAll('div');
-    for (let i = 0; i < divs.length; i++) {
-      const el = divs[i];
-      const txt = el.textContent || '';
-      if (txt.includes('Admaru') && txt.length < 50) {
-        if (el instanceof HTMLElement) {
-          hideAd(el);
-        }
-        if (el.parentElement instanceof HTMLElement) {
-          hideAd(el.parentElement);
-        }
-      }
-    }
+    hideAdmaruAds();
 
-    // Hide DoubleClick / DV360 display ads and their containers
-    // These are often injected dynamically by BSA or GPT into ad zones
-    const dcSelectors = [
-      'a[href*="adclick.g.doubleclick.net"]',
-      'a[href*="ad.doubleclick.net"]',
-      'a[id^="img_anch_"]',
-      'img[src*="2mdn.net"]',
-      'img[src*="simgad"]'
-    ];
-    for (const sel of dcSelectors) {
-      const dsEls = document.querySelectorAll(sel);
-      for (let j = 0; j < dsEls.length; j++) {
-        const el = dsEls[j];
-        // Walk up to the nearest BSA zone or ad-sized container
-        let target = el;
-        let parent = el.parentElement;
-        for (let k = 0; k < 10 && parent && parent !== document.body; k++) {
-          const id = parent.id || '';
-          const cls = parent.className || '';
-          if (
-            id.startsWith('bsa-zone') ||
-            cls.includes('bsa') ||
-            id.includes('buysellads') ||
-            id.includes('div-gpt-ad') ||
-            cls.includes('ad-container') ||
-            cls.includes('ad-slot') ||
-            cls.includes('ad-unit')
-          ) {
-            target = parent;
-            break;
-          }
-          target = parent;
-          parent = parent.parentElement;
-        }
-        if (target instanceof HTMLElement) {
-          hideAd(target);
-        }
-      }
-    }
+    hideDoubleClickAds();
 
-    // Hide Douban erebor redirect ad containers
-    const erebors = document.querySelectorAll('a[href*="erebor.douban.com"]');
-    for (let i = 0; i < erebors.length; i++) {
-      const link = erebors[i];
-      const container = link.closest('.customize-slot, .article-card') || link.parentElement;
-      if (container instanceof HTMLElement) {
-        hideAd(container);
-      }
-    }
+    hideDoubanAds();
 
-    // NYTimes regiwall: remove inert attribute and gateway overlay
-    if (host.endsWith('nytimes.com')) {
-      const inerts = document.querySelectorAll('[data-testid="vi-gateway-container"][inert]');
-      for (let i = 0; i < inerts.length; i++) {
-        const el = inerts[i];
-        el.removeAttribute('inert');
-        el.removeAttribute('aria-hidden');
-      }
-      const gateways = document.querySelectorAll(
-        '#gateway-content, [data-testid="onsite-messaging-unit-gateway"]'
-      );
-      for (let i = 0; i < gateways.length; i++) {
-        const el = gateways[i];
-        if (el instanceof HTMLElement) {
-          hideAd(el);
-        }
-      }
-    }
+    removeNYTimesRegiwall();
 
-    // Restore scroll if ad overlay locked it
-    if (document.body) {
-      document.body.classList.remove('fc-overflow-hidden');
-      document.documentElement.classList.remove('fc-overflow-hidden');
-
-      const roots = [document.body, document.documentElement];
-      for (let i = 0; i < roots.length; i++) {
-        const el = roots[i];
-        const style = window.getComputedStyle(el);
-        if (style.overflow === 'hidden' || style.overflowY === 'hidden') {
-          el.style.setProperty('overflow', 'auto', 'important');
-          el.style.setProperty('overflow-y', 'auto', 'important');
-        }
-      }
-    }
+    restoreAdOverlayScroll();
   }
 
   if (document.readyState === 'loading') {

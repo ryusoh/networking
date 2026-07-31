@@ -4,11 +4,6 @@
       "count": 1
     }
   },
-  "clean_adblock/forum-ad-blocker.js": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "clean_adblock/gurufocus-unlocked.js": {
     "complexity": {
       "count": 2
