@@ -10,6 +10,10 @@
     "types": ["chrome"],
     "skipLibCheck": true
   },
-  "include": ["clean_adblock/*.js", "tianditu_bypass/tianditu-defaults.js"],
+  "include": [
+    "clean_adblock/*.js",
+    "tianditu_bypass/tianditu-defaults.js",
+    "tianditu_bypass/offscreen.js"
+  ],
   "exclude": ["node_modules", "clean_adblock/__tests__"]
 }
