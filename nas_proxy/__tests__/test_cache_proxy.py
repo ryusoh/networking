@@ -128,5 +128,66 @@ class TestCacheProxy(unittest.TestCase):
         cache_proxy.run()
         mock_server.serve_forever.assert_called()
 
+
+
+    @patch("nas_proxy.cache_proxy.run")
+    def test_main_block(self, mock_run):
+        import subprocess, sys
+        subprocess.run([sys.executable, "-c", "import sys, patch; sys.modules['nas_proxy.cache_proxy'] = type('module', (), {'load_proxies': lambda: None, 'ThreadedProxy': lambda *a, **kw: type('mock_server', (), {'serve_forever': lambda self: None})()})(); import nas_proxy.cache_proxy"])
+
+
+    @patch("nas_proxy.cache_proxy.select.select")
+    def test_relay_sock2_data(self, mock_select):
+        sock1 = MagicMock()
+        sock2 = MagicMock()
+
+        mock_select.side_effect = [
+            ([sock2], [], []),
+            ([], [], [])
+        ]
+        sock2.recv.side_effect = [b"data2", b""]
+        sock1.recv.side_effect = [b""]
+
+        cache_proxy.relay(sock1, sock2, timeout=0.1)
+        sock1.sendall.assert_called_with(b"data2")
+
+    @patch("nas_proxy.cache_proxy.select.select")
+    def test_relay_sock2_empty(self, mock_select):
+        sock1 = MagicMock()
+        sock2 = MagicMock()
+
+        mock_select.side_effect = [
+            ([sock2], [], []),
+            ([], [], [])
+        ]
+        sock2.recv.side_effect = [b""]
+        sock1.recv.side_effect = [b""]
+
+        cache_proxy.relay(sock1, sock2, timeout=0.1)
+        sock1.sendall.assert_not_called()
+
+    def test_proxy_handler_log_message(self):
+        handler = cache_proxy.ProxyHandler.__new__(cache_proxy.ProxyHandler)
+        handler.log_message("format", "arg1")
+    def test_proxy_handler_exception_in_remote_close(self):
+        handler = cache_proxy.ProxyHandler.__new__(cache_proxy.ProxyHandler)
+        handler.path = "test.com:443"
+        handler.send_error = MagicMock()
+        handler.send_response = MagicMock()
+        handler.end_headers = MagicMock()
+        handler.connection = MagicMock()
+
+        mock_remote = MagicMock()
+        mock_remote.close.side_effect = Exception("test error")
+
+        with patch("nas_proxy.cache_proxy.load_proxies") as mock_load, \
+             patch("nas_proxy.cache_proxy.socks5_connect") as mock_connect, \
+             patch("nas_proxy.cache_proxy.relay"):
+            mock_load.return_value = [("1.1.1.1", 1080)]
+            mock_connect.return_value = mock_remote
+            cache_proxy.ProxyHandler.do_CONNECT(handler)
+            mock_remote.close.assert_called()
+
+
 if __name__ == '__main__':
     unittest.main()
