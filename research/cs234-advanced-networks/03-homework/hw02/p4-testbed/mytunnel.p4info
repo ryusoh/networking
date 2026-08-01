@@ -1,0 +1,42 @@
+tables {
+  preamble {
+    id: 33561683
+    name: "c_ingress.t_drop"
+    alias: "t_drop"
+  }
+  action_refs {
+    id: 16808599
+  }
+  size: 1024
+}
+actions {
+  preamble {
+    id: 16808599
+    name: "c_ingress._drop"
+    alias: "_drop"
+  }
+}
+controller_packet_metadata {
+  preamble {
+    id: 2868941301
+    name: "packet_in"
+    annotations: "@controller_header(\"packet_in\")"
+  }
+  metadata {
+    id: 1
+    name: "ingress_port"
+    bitwidth: 9
+  }
+}
+controller_packet_metadata {
+  preamble {
+    id: 2868916615
+    name: "packet_out"
+    annotations: "@controller_header(\"packet_out\")"
+  }
+  metadata {
+    id: 1
+    name: "egress_port"
+    bitwidth: 9
+  }
+}

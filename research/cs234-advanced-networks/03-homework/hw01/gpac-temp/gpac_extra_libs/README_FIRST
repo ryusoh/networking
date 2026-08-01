@@ -1,0 +1,29 @@
+This package contains all libraries needed to build an almost complete complete version of GPAC.
+To find out more about non included libraries in this package, please refer to GPAC install documentation.
+To unzip all libraries 's source code, run unzip_all.sh
+
+1. For Windows Users:
+	- Compiling with MS VC: open build/msvc/BuildAll_vc10.sln, select build target (Win32 or x64) then do Build -> Build solution
+	- Get FFMPEG libraries from the web (for example, using zeranoe builds)
+	- To copy all libraries and DLLs to GPAC directory: from command line run: CopyLibs2Public.bat [arch] [path_to_gpac_dir]. [arch] should be x86 (for 32 bits) or x64 (for 64 bits).
+	
+2. For GCC Users:
+	- Build PlantinumSDK: cd to PlatinumSDK then run: Build.sh x86-unknown-linux. The libraries are in Build/Targets/x86-unknown-linux/Debug, copy them to gpac/extra_lib/lib/gcc
+	- Build OpenSVC: run build_opensvc_static.sh then copy libOpenSVCDec.a in opensvc/svcsvn to gpac/extra_lib/lib/gcc
+	- Build OpenHEVC: run build_openhevc_static.sh then copy libLibOpenHevcWrapper.a in openhevc to gpac/extra_lib/lib/gcc
+	
+3. For iOS Users: 
+	- Build SDL: cd to SDL_iOS then run generate_SDL.sh
+	- Build FFMPEG for iOS: see README in ffmpeg_ios
+	- Build OpenSSL for iOS: see README in OpenSSL-for-iPhone
+	-	cd to build/xcode_ios the run generate_extra_libs.sh
+	- To copy all libraries to GPAC directory: run CopyLibs2Public4iOS.sh [path_to_gpac_dir]
+
+4. For MacOS Users:
+	- Build PlantinumSDK: cd to PlatinumSDK then run: Build.sh universal-apple-macosx. The libraries are in Build/Targets/universal-apple-macosx/Debug, copy them to gpac/extra_lib/lib/gcc
+	- Build OpenSVC: run build_opensvc_static.sh osx, then copy libOpenSVCDec.a in opensvc/svcsvn to gpac/extra_lib/lib/gcc
+	- Build OpenHEVC: run build_openhevc_static.sh osx, then copy libLibOpenHevcWrapper.a in openhevc to gpac/extra_lib/lib/gcc
+
+5. For Android Users:
+	- cd to build/android/ then run gpac_build_all_extra_libs.sh [path_to_ndk]
+	- All libraries are in lib/android, copy those libraries to gpac/extra_lib/lib/android

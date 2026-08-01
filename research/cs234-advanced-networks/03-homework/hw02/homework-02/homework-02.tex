@@ -1,0 +1,642 @@
+\documentclass{article}%
+\usepackage{amsmath}%
+\usepackage{amsfonts}%
+\usepackage{amssymb}%
+\usepackage{graphicx}
+\usepackage{sectsty}
+\usepackage{listings}
+\usepackage{framed}
+\usepackage{color}
+\usepackage{verbatim}
+\usepackage{graphicx} %插入图片的宏包
+\usepackage{float} %设置图片浮动位置的宏包
+\usepackage{subfigure} %插入多图时用子图显示的宏包
+\definecolor{shadecolor}{rgb}{.9, .9, .9}
+\sectionfont{\fontsize{20}{20}\selectfont}
+%-------------------------------------------
+\newtheorem{theorem}{Theorem}
+\newtheorem{acknowledgement}[theorem]{Acknowledgement}
+\newtheorem{algorithm}[theorem]{Algorithm}
+\newtheorem{axiom}[theorem]{Axiom}
+\newtheorem{case}[theorem]{Case}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{conclusion}[theorem]{Conclusion}
+\newtheorem{condition}[theorem]{Condition}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{criterion}[theorem]{Criterion}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{exercise}[theorem]{Exercise}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{notation}[theorem]{Notation}
+\newtheorem{problem}[theorem]{Problem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{solution}[theorem]{Solution}
+\newtheorem{summary}[theorem]{Summary}
+\newenvironment{proof}[1][Proof]{\textbf{#1.} }{\ \rule{0.5em}{0.5em}}
+\setlength{\textwidth}{7.0in}
+\setlength{\oddsidemargin}{-0.35in}
+\setlength{\topmargin}{-0.5in}
+\setlength{\textheight}{30.0in}
+\setlength{\parindent}{0.3in}
+
+\newenvironment{code}%
+   {\snugshade\verbatim}%
+   {\endverbatim\endsnugshade}
+
+\begin{document}
+
+\begin{flushright}
+\begin{Large}
+
+\textbf{Zhuang Liu \\
+SID: 25727277}
+\end{Large}
+\end{flushright}
+
+\begin{center}
+\begin{huge}
+\textbf{CS 234 Advanced Networks \\
+Programming Assignment 2} \\
+\end{huge}
+\end{center}
+\section{Realizing IP Forwarding in P4}
+\begin{Large}
+\begin{flushleft}
+\begin{LARGE}
+\textbf{1.1 Header Implementation}
+\end{LARGE}
+\end{flushleft}
+
+By observing the header format, we can implement the header as follows:
+\begin{code}
+    header ipv4_t {
+        bit<4>    version;
+        bit<4>    ihl;
+        bit<8>    diffserv;
+        bit<16>   totalLen;
+        bit<16>   identification;
+        bit<3>    flags;
+        bit<13>   fragOffset;
+        bit<8>    ttl;
+        bit<8>    protocol;
+        bit<16>   hdrChecksum;
+        ip4Addr_t srcAddr;
+        ip4Addr_t dstAddr;
+    }
+\end{code}
+
+
+
+\begin{flushleft}
+\begin{LARGE}
+\textbf{1.2 Parser Implementation}
+\end{LARGE}
+\end{flushleft}
+
+In the parser, there are three states. The \texttt{start} state is the initial state of the parser.
+\begin{code}
+    state start {
+        transition parse_ethernet;
+    }
+\end{code}
+Then we transit to parse the ethernet header. If there is an IPv4 header, we transit to the IPv4 parsing state. Otherwise, we use an \texttt{accept} code to end the parser.
+\newpage
+\begin{code}
+    state parse_ethernet {
+        packet.extract(hdr.ethernet);
+        transition select(hdr.ethernet.etherType) {
+            TYPE_IPV4: parse_ipv4;
+            default: accept;
+        }
+    }
+\end{code}
+The IPv4 header parsing state can be implemented as follows:
+\begin{code}
+    state parse_ipv4 {
+        packet.extract(hdr.ipv4);
+        transition accept;
+    }
+\end{code}
+
+\begin{flushleft}
+\begin{LARGE}
+\textbf{1.3 Match and Action Table Implementation}
+\end{LARGE}
+\end{flushleft}
+To forward the IPv4 table, we need to set the egress port to the assigned port, and set the source and destination address properly. So we can implement the IPv4 forwarding action as follows:
+\begin{code}
+    action ipv4_forward(macAddr_t dstAddr, egressSpec_t port) {
+        standard_metadata.egress_spec = port;
+        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
+        hdr.ethernet.dstAddr = dstAddr;
+        hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
+    }
+\end{code}
+Also, we can implement the \texttt{drop} action as follows:
+\begin{code}
+    action drop() {
+        mark_to_drop();
+    }
+\end{code}
+With these two actions, we can utilize them to implement our forwarding table. In the forwarding table, we need the key of Longest Prefix Match(lpm) matches with the longest subnet mask to enter the tunnel. So we can implement the IPv4 forwarding table as follows:
+\newpage
+\begin{code}
+    table ipv4_lpm {
+        key = {
+            hdr.ipv4.dstAddr: lpm;
+        }
+        actions = {
+            ipv4_forward;
+            drop;
+            NoAction;
+        }
+        size = 1024;
+        default_action = drop();
+    }
+\end{code}
+
+\begin{flushleft}
+\begin{LARGE}
+\textbf{1.4 Control Implementation}
+\end{LARGE}
+\end{flushleft}
+If the IPv4 header is valid, we can apply the packet to the control flow:
+\begin{code}
+    apply {
+        if (hdr.ipv4.isValid()) {
+            ipv4_lpm.apply();
+        }
+    }
+\end{code}
+
+\begin{flushleft}
+\begin{LARGE}
+\textbf{1.5 Topology Design}
+\end{LARGE}
+\end{flushleft}
+Here, we keep the default network topology, which is:
+\begin{code}
+    switches 3
+    hosts 6
+    h1 s1
+    s1 h2
+    s1 s2
+    s2 s3
+    s1 s3
+    h3 s2
+    s2 h4
+    h5 s3
+    s3 h6
+\end{code}
+\newpage
+Accordingly, the commands will be like this, which uses the command design in \texttt{command0.txt} file. Also, the MAC address of the hosts should be configured correspondingly.
+\begin{code}
+    table_add ipv4_lpm ipv4_forward 10.0.0.1/32 => 0x00000001 1
+    table_add ipv4_lpm ipv4_forward 10.0.0.2/32 => 0x00000002 2
+    table_add ipv4_lpm ipv4_forward 10.0.0.3/32 => 0x00000003 3
+    table_add ipv4_lpm ipv4_forward 10.0.0.4/32 => 0x00000004 3
+    table_add ipv4_lpm ipv4_forward 10.0.0.5/32 => 0x00000005 4
+    table_add ipv4_lpm ipv4_forward 10.0.0.6/32 => 0x00000006 4
+\end{code}
+\begin{flushleft}
+\begin{LARGE}
+\textbf{1.6 Verifications}
+\end{LARGE}
+\end{flushleft}
+After implemented the \texttt{task1.p4} file, we can test our code. At first, we can go to the \texttt{mininet} by running shell script:
+\begin{code}
+    bash run_demo.sh
+\end{code}
+In the \texttt{mininet}, we can run the following command to test if all the hosts are connected smoothly:
+\begin{code}
+    pingall
+\end{code}
+The \texttt{ping} result capture is showed as follows:
+\begin{center}
+\includegraphics[height=150]{figures/test1.png}
+\end{center}
+It is showed that all the packets are sent and received successfully.
+\newpage
+
+\end{Large}
+
+\section{Implementing IP Tunnel App on ONOS}
+\begin{flushleft}
+\begin{LARGE}
+\textbf{2.1 P4 Implementation}
+\end{LARGE}
+\end{flushleft}
+\begin{Large}
+\begin{flushleft}
+\textbf{2.1.1 Header Implementation}
+\end{flushleft}
+By observing the format of the header, we can see that it has two parts, which are Ethernet Header and IPv4. In the \texttt{task1.p4} file, \texttt{ethernet\_t}, \texttt{packet\_out\_header\_t} and \texttt{packet\_in\_header\_t} are already defined as follows:
+\begin{code}
+    struct headers_t{
+        ethernet_t ethernet;
+        packet_out_header_t packet_out;
+        packet_in_header_t packet_in;
+    }
+\end{code}
+So now we only need to implement the tunneling protocol called \texttt{my\_tunnel\_t} and \texttt{ipv4\_t} protocol in the header. We can add them into the header structure at first:
+\begin{code}
+    struct headers_t {
+        ethernet_t ethernet;
+        my_tunnel_t my_tunnel;
+        ipv4_t ipv4;
+        packet_out_header_t packet_out;
+        packet_in_header_t packet_in;
+    }
+\end{code}
+To implement tunnel in the header, we need tunnel id and protocol ip to identify the tunneling protocol and IPv4 protocol:
+\begin{code}
+    header my_tunnel_t {
+        bit<16> proto_id;
+        bit<32> tun_id;
+    }
+\end{code}
+\newpage
+As we can observe from the header structure in the instruction, if we want to implement a IPv4 header, we need components of \texttt{version}, \texttt{ihl}, \texttt{diffsev}, \texttt{len}, \texttt{identification}, \texttt{flags}, \texttt{flag offset}, \texttt{ttl}, \texttt{protocol}, \texttt{header checksum}, \texttt{src address} and \texttt{dst address}. The number of bits of each component can be inferred from the header table provided by the instructions. So we can implement the \texttt{ipv4\_t} as follows:
+\begin{code}
+    header ipv4_t {
+        bit<4>  version;
+        bit<4>  ihl;
+        bit<8>  diffserv;
+        bit<16> len;
+        bit<16> identification;
+        bit<3>  flags;
+        bit<13> frag_offset;
+        bit<8>  ttl;
+        bit<8>  protocol;
+        bit<16> hdr_checksum;
+        bit<32> src_addr;
+        bit<32> dst_addr;
+    }
+\end{code}
+By now we have successfully implemented the header structure.
+\begin{flushleft}
+\textbf{2.1.2 Parser Implementation}
+\end{flushleft}
+
+After some document reading, we know that a P4 parser is a state machine, it contains several states. The initial state is \texttt{start}, and the final state is \texttt{accept}. Each intermediate state can specify the next state by using a select statement over the header fields extracted. So at first let us implement the \texttt{start} state. In this state, we need to parse the CPU port in the packet header. So in the top of the file, we can construct a \texttt{CPU\_port} like this:
+\begin{code}
+    const port_t CPU_PORT = 255;
+\end{code}
+After that, we need to define another state to parse the CPU port, which is \texttt{parse\_packet\_out}, we can assign this state to the \texttt{CPU\_port} in the \texttt{start} state. Then, we can go to the next step, which is \texttt{parse\_ethernet}, by set \texttt{parse\_ethernet} as the default next state in the \texttt{start} state. So the \texttt{start} state will be like this:
+\newpage
+\begin{code}
+    state start {
+        transition select(standard_metadata.ingress_port) {
+            CPU_PORT: parse_packet_out;
+            default: parse_ethernet;
+        }
+    }
+\end{code}
+In the \texttt{parse\_packet\_out} state, we need to parse the \texttt{packet\_out} attribution in the packet header, and assign it to the \texttt{CPU\_port} attribution. Then transit to the next state.
+\begin{code}
+    state parse_packet_out {
+        packet.extract(hdr.packet_out);
+        transition parse_ethernet;
+    }
+\end{code}
+In the \texttt{parse\_ethernet} state, we need to parse \texttt{my\_tunnel} and \texttt{ipv4} attributions in the packet header. In this case, we need to define the attribution that we want the parsed values to be assigned to, which are \texttt{ETH\_TYPE\_MYTUNNEL} and \texttt{ETH\_TYPE\_IPV4}. We can define them on the top of the file like this(\texttt{ETH\_TYPE\_IPV4} is already defined):
+\begin{code}
+    const bit<16> ETH_TYPE_MYTUNNEL = 0x1212;
+    const bit<16> ETH_TYPE_IPV4 = 0x800;
+\end{code}
+To parse these two attributions, we can use another two states \texttt{parse\_my\_tunnel} and \texttt{parse\_ipv4} to accomplish that. So by now we can implement the \texttt{parse\_ethernet} state as follows:
+\begin{code}
+    state parse_ethernet {
+        packet.extract(hdr.ethernet);
+        transition select(hdr.ethernet.ether_type) {
+            ETH_TYPE_MYTUNNEL: parse_my_tunnel;
+            ETH_TYPE_IPV4: parse_ipv4;
+            default: accept;
+        }
+    }
+\end{code}
+To parse \texttt{my\_tunnel} attribution in the packet header, we can use the state as follows:
+\newpage
+\begin{code}
+    state parse_my_tunnel {
+        packet.extract(hdr.my_tunnel);
+        transition select(hdr.my_tunnel.proto_id) {
+            ETH_TYPE_IPV4: parse_ipv4;
+            default: accept;
+        }
+    }
+\end{code}
+To parse \texttt{ipv4} attribution in the packet header, we can use the state as follows:
+\begin{code}
+    state parse_ipv4 {
+        packet.extract(hdr.ipv4);
+        transition accept;
+    }
+\end{code}
+By now we can say that the parser has been implemented. However, accordingly, we should not forget to implement \texttt{my\_tunnel} and \texttt{ipv4} deparsing in the \texttt{c\_deparser} function of this file:
+\begin{code}
+    packet.emit(hdr.my_tunnel);
+    packet.emit(hdr.ipv4);
+\end{code}
+
+\begin{flushleft}
+\begin{Large}
+\textbf{2.1.3 Match and Action Tables Implementation}
+\end{Large}
+\end{flushleft}
+
+In \texttt{c\_ingress} function, we need to implement three match and action tables, which are layer 2 forwarding table, tunnel ingress table and tunnel forwarding table.
+
+In layer 2(AKA l2) forwarding, on receiving a frame via. an input port, after updating the ARL table, the next task of the L2 Switch is to forward the frame onto the correct output port on which the frame’s destination end node is present. 
+
+To find this out, the L2 Switch does a ARL table lookup to find a matching entry for  the destination MAC address of the incoming frame. If a match is found, then the frame is forwarded only to that port, provided that the destination port is different than the one on which the frame arrived. If the destination port is the same port through which the frame was received, then the L2 Switch does not do anything, as it knows that the destination end node would have already received this frame.
+
+From this, we can see that a l2 forwarding table needs keys of ingress port, destination port, source port and ethernet type, and actions of setting packet out port, sending packet to CPU and dropping packet, which will be implemented later.
+\newpage
+Also, we need a l2 forwarding counter to count packets and bytes matched by each entry of the table:
+\begin{code}
+    direct_counter(CounterType.packets_and_bytes) l2_fwd_counter;
+\end{code}
+With the information provided above, we can implement the l2 forwarding table as follows, it provides basic L2 forwarding capabilities and actions to send packets to the controller:
+\begin{code}
+    table t_l2_fwd {
+        key = {
+            standard_metadata.ingress_port  : ternary;
+            hdr.ethernet.dst_addr           : ternary;
+            hdr.ethernet.src_addr           : ternary;
+            hdr.ethernet.ether_type         : ternary;
+        }
+        actions = {
+            set_out_port;
+            send_to_cpu;
+            _drop;
+            NoAction;
+        }
+        default_action = NoAction();
+        counters = l2_fwd_counter;
+    }
+\end{code}
+
+In the tunnel ingress table, we need the key of Longest Prefix Match(lpm) matches with the longest subnet mask to enter the tunnel. Also we need the action of tunnel ingress(\texttt{my\_tunnel\_ingress}) to enter the tunnel, which will be implemented later. So we can implement the tunnel ingress table as follows:
+\begin{code}
+    table t_tunnel_ingress {
+        key = { hdr.ipv4.dst_addr: lpm; }
+        actions = {
+            my_tunnel_ingress;
+            _drop;
+        }
+        default_action = _drop();
+    }
+\end{code}
+\newpage
+In the tunnel forwarding table, we need the field value which is exactly the same as the table value(\texttt{Exact}). Also we need the action of tunnel egress(\texttt{my\_tunnel\_egress}) to exit the tunnel after forwarding, which will be implemented later. So we can implement the tunnel forwarding table as follows:
+\begin{code}
+    table t_tunnel_fwd {
+        key = {
+            hdr.my_tunnel.tun_id: exact;
+        }
+        actions = {
+            set_out_port;
+            my_tunnel_egress;
+            _drop;
+        }
+        default_action = _drop();
+    }
+\end{code}
+
+After implementing the tables, we can work on implementing the actions inside the tables. At first, in the \texttt{t\_12\_fwd} table, there are three actions, \texttt{send\_to\_cpu}, \texttt{set\_out\_port} and \texttt{\_drop}.
+
+For \texttt{send\_to\_cpu}, we need to set the egress port to the \texttt{CPU\_port}, and set the ingress port properly with the standard metadata. Also, we need to set \texttt{packet\_in} attribution in the header as valid, because packets sent to the controller needs to be prepended with the packet-in header. By setting it valid we make sure it will be deparsed on the wire. So we can implement this action as follows:
+\begin{code}
+    action send_to_cpu() {
+        standard_metadata.egress_spec = CPU_PORT;
+        hdr.packet_in.setValid();
+        hdr.packet_in.ingress_port = standard_metadata.ingress_port;
+    }
+\end{code}
+For action \texttt{set\_out\_port}, we specifies the output port for this packet by setting the corresponding metadata as follows:
+\begin{code}
+    action set_out_port(port_t port) {
+        standard_metadata.egress_spec = port;
+    }
+\end{code}
+\newpage
+For action \texttt{\_drop}, we can simply mark the packet to drop:
+\begin{code}
+    action _drop() {
+        mark_to_drop();
+    }
+\end{code}
+As is shown in the \texttt{t\_tunnel\_ingress} table, there would be an action called \texttt{my\_tunnel\_ingress}. We utilize this action to set the tunnel valid, select the right tunnel by assigning tunnel id, and set the ethernet type and protocol.
+\begin{code}
+     action my_tunnel_ingress(bit<32> tun_id) {
+        hdr.my_tunnel.setValid();
+        hdr.my_tunnel.tun_id = tun_id;
+        hdr.my_tunnel.proto_id = hdr.ethernet.ether_type;
+        hdr.ethernet.ether_type = ETH_TYPE_MYTUNNEL;
+    }
+\end{code}
+As we can see from the \texttt{t\_tunnel\_egress} table, there would be an action called \texttt{my\_tunnel\_egress}, we use it to set the egress port, change ethernet type to original protocol id, and finally, of course, set the tunnel to invalid.
+\begin{code}
+    action my_tunnel_egress(bit<9> port) {
+        standard_metadata.egress_spec = port;
+        hdr.ethernet.ether_type = hdr.my_tunnel.proto_id;
+        hdr.my_tunnel.setInvalid();
+    }
+\end{code}
+\begin{flushleft}
+\begin{Large}
+\textbf{2.1.4 Control Implementation}
+\end{Large}
+\end{flushleft}
+Now it is the time to design the control flow. We can apply this control function to every packet received by this switch.
+
+At first, we should judge if the packet is from the \texttt{CPU\_port}. If it is, this is a packet-out sent by the controller. So we just skip table processing and set the egress port as requested by the controller (packet\_out header) and remove the \texttt{packet\_out} header(set it as invalid).
+\begin{code}
+    if (standard_metadata.ingress_port == CPU_PORT) {
+        standard_metadata.egress_spec = hdr.packet_out.egress_port;
+        hdr.packet_out.setInvalid();
+    }
+\end{code}
+\newpage
+Else, if the packet is not from the \texttt{CPU\_port}, which means the packet is received from the data plane port, we should apply table \texttt{t\_l2\_fwd} to the packet. If packet hit an entry in \texttt{t\_l2\_fwd} table, a forwarding action has already been taken. So there is no need to apply other tables, we can just then exit this control block.
+
+Then, if while the IPv4 is valid but the tunnel is invalid, we just process only non-tunneled IPv4 packets. If the tunnel is valid, we process all tunneled packets.
+
+So this complete if-else loop would be like this:
+\begin{code}
+    if (standard_metadata.ingress_port == CPU_PORT) {
+        standard_metadata.egress_spec = hdr.packet_out.egress_port;
+        hdr.packet_out.setInvalid();
+    } else {
+        if (t_l2_fwd.apply().hit) {
+            return;
+        }
+
+        if (hdr.ipv4.isValid() && !hdr.my_tunnel.isValid()) {
+            t_tunnel_ingress.apply();
+        }
+
+        if (hdr.my_tunnel.isValid()) {
+            t_tunnel_fwd.apply();
+        }
+    }
+\end{code}
+Finally, the ingress port and egress should be no larger than the \texttt{MAX\_PORTS}, which can be defined on the top of the file:
+\begin{code}
+    #define MAX_PORTS 255
+\end{code}
+Also, we need two counters to count packets/bytes received/sent on each port. For each counter we instantiate a number of cells equal to \texttt{MAX\_PORTS}.
+\begin{code}
+    counter(MAX_PORTS, CounterType.packets_and_bytes) 
+        tx_port_counter;
+    counter(MAX_PORTS, CounterType.packets_and_bytes) 
+        rx_port_counter;
+\end{code}
+\newpage
+With these, we can update port counters at index = ingress or egress port after the previous if-else loop.
+\begin{code}
+    if (standard_metadata.egress_spec < MAX_PORTS) {
+        tx_port_counter.count((bit<32>) 
+            standard_metadata.egress_spec);
+    }
+    if (standard_metadata.ingress_port < MAX_PORTS) {
+        rx_port_counter.count((bit<32>) 
+            standard_metadata.ingress_port);
+    }
+\end{code}
+So this whole control flow will be like this:
+\begin{code}
+    apply {
+        if (standard_metadata.ingress_port == CPU_PORT) {
+            standard_metadata.egress_spec = 
+                hdr.packet_out.egress_port;
+            hdr.packet_out.setInvalid();
+        } else {
+            if (t_l2_fwd.apply().hit) return;
+            if (hdr.ipv4.isValid() && !hdr.my_tunnel.isValid()) {
+                t_tunnel_ingress.apply();
+            }
+            if (hdr.my_tunnel.isValid()) t_tunnel_fwd.apply();
+        }
+
+        if (standard_metadata.egress_spec < MAX_PORTS) {
+            tx_port_counter.count((bit<32>) 
+                standard_metadata.egress_spec);
+        }
+        if (standard_metadata.ingress_port < MAX_PORTS) {
+            rx_port_counter.count((bit<32>) 
+                standard_metadata.ingress_port);
+        }
+    }
+\end{code}
+\newpage
+
+
+\begin{flushleft}
+\begin{LARGE}
+\textbf{2.2 MyTunnelApp Implementation} 
+\end{LARGE}
+\end{flushleft}
+\begin{flushleft}
+\begin{Large}
+\textbf{2.2.1 Insert Flow Rules} 
+\end{Large}
+\end{flushleft}
+At first, we can retrieve tunnel ingress table ID from the given tunnel ID by:
+\begin{code}
+    PiTableId tunnelIngressTableId = 
+        PiTableId.of("c_ingress.t_tunnel_ingress");
+\end{code}
+Next, we can get the longest prefix match on IPv4 destination address by:
+\begin{code}
+    PiMatchFieldId ipDestMatchFieldId = 
+        PiMatchFieldId.of("hdr.ipv4.dst_addr");
+    PiCriterion match = PiCriterion.builder()
+            .matchLpm(ipDestMatchFieldId, dstIpAddr.toOctets(), 32)
+            .build();
+\end{code}
+Then, we can build the action to add to the ingress table by:
+\begin{code}
+    PiActionParam tunIdParam = 
+        new PiActionParam(PiActionParamId.of("tun_id"), tunId);
+    PiActionId ingressActionId = 
+        PiActionId.of("c_ingress.my_tunnel_ingress");
+    PiAction action = PiAction.builder()
+            .withId(ingressActionId)
+            .withParameter(tunIdParam)
+            .build();
+\end{code}
+To better maintain the program, we can add logs of the ingress rule information by:
+\begin{code}
+    log.info("Inserting INGRESS rule on switch {}: 
+        table={}, match={}, action={}",
+        switchId, tunnelIngressTableId, match, action);
+\end{code}
+Finally, we can insert the flow rules to finish this subtask.
+\begin{code}
+    insertPiFlowRule(switchId, tunnelIngressTableId, match, action);
+\end{code}
+
+\newpage
+\begin{flushleft}
+\begin{Large}
+\textbf{2.2.2 Insert Flow Rules} 
+\end{Large}
+\end{flushleft}
+Now we are implementing the action which depends on the isEgress parameter. If it is true, perform tunnel egress action on the given outPort, otherwise simply forward packet as is (\texttt{set\_out\_port} action).
+
+Here is the implement of \texttt{true} case:
+\begin{code}
+    PiActionId egressActionId = 
+        PiActionId.of("c_ingress.my_tunnel_egress");
+        action = PiAction.builder()
+                .withId(egressActionId)
+                .withParameter(portParam)
+                .build();
+\end{code}
+Similarly, for the transit case, we can check the \texttt{t\_tunnel\_fwd} table in the p4 program to get the action name to set the output port, which is \texttt{set\_out\_port}. It can be used to create the \texttt{PiActionId} object.
+\begin{code}
+    PiActionId egressActionId = 
+        PiActionId.of("c_ingress.set_out_port");
+        action = PiAction.builder()
+            .withId(egressActionId)
+            .withParameter(portParam)
+            .build();
+\end{code}
+\begin{flushleft}
+\begin{Large}
+\textbf{2.2.3 Insert PI Flow Rules} 
+\end{Large}
+\end{flushleft}
+For systems that use PI criterion and action, we can implement rules like this:
+\begin{code}
+    FlowRule rule = DefaultFlowRule.builder()
+        .forDevice(switchId)
+        .forTable(tableId)
+        .fromApp(appId)
+        .withPriority(FLOW_RULE_PRIORITY)
+        .makePermanent()
+        .withSelector(DefaultTrafficSelector.builder()
+        .matchPi(piCriterion).build())
+        .withTreatment(DefaultTrafficTreatment.builder()
+        .piTableAction(piAction).build())
+        .build();
+\end{code}
+\newpage
+\begin{flushleft}
+\begin{LARGE}
+\textbf{2.3 Testing Commands} 
+\end{LARGE}
+\end{flushleft}
+After running \texttt{pingall} command on \texttt{mininet}, we can see the reachability of the network:
+\newline
+\begin{center}
+\includegraphics[height=150]{figures/test2.png}
+\end{center}
+\end{Large}
+
+\end{document}

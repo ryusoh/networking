@@ -1,0 +1,147 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{517DBF13-32DB-41AC-9D8A-DB24D71854D6}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Platform)\$(Configuration)\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Platform)\$(Configuration)\</IntDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\</IntDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)\..\..\lib\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(Platform)\$(Configuration)\</IntDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)\..\..\lib\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;OPJ_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+    </ClCompile>
+    <Lib>
+      <OutputFile>..\lib\$(Platform)\$(Configuration)\$(ProjectName)d.lib</OutputFile>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Lib>
+      <OutputFile>..\lib\$(Platform)\$(Configuration)\$(ProjectName)d.lib</OutputFile>
+      <TargetMachine>MachineX64</TargetMachine>
+    </Lib>
+    <ClCompile>
+      <PreprocessorDefinitions>_WIN64</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;OPJ_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    </ClCompile>
+    <Lib>
+      <OutputFile>..\lib\$(Platform)\$(Configuration)\$(ProjectName).lib</OutputFile>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Lib>
+      <OutputFile>..\lib\$(Platform)\$(Configuration)\$(ProjectName).lib</OutputFile>
+    </Lib>
+    <ClCompile>
+      <PreprocessorDefinitions>_WIN64</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="libopenjpeg\bio.c" />
+    <ClCompile Include="libopenjpeg\cio.c" />
+    <ClCompile Include="libopenjpeg\dwt.c" />
+    <ClCompile Include="libopenjpeg\event.c" />
+    <ClCompile Include="libopenjpeg\image.c" />
+    <ClCompile Include="libopenjpeg\j2k.c" />
+    <ClCompile Include="libopenjpeg\j2k_lib.c" />
+    <ClCompile Include="libopenjpeg\jp2.c" />
+    <ClCompile Include="libopenjpeg\jpt.c" />
+    <ClCompile Include="libopenjpeg\mct.c" />
+    <ClCompile Include="libopenjpeg\mqc.c" />
+    <ClCompile Include="libopenjpeg\openjpeg.c" />
+    <ClCompile Include="libopenjpeg\pi.c" />
+    <ClCompile Include="libopenjpeg\raw.c" />
+    <ClCompile Include="libopenjpeg\t1.c" />
+    <ClCompile Include="libopenjpeg\t2.c" />
+    <ClCompile Include="libopenjpeg\tcd.c" />
+    <ClCompile Include="libopenjpeg\tgt.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="libopenjpeg\bio.h" />
+    <ClInclude Include="libopenjpeg\cio.h" />
+    <ClInclude Include="libopenjpeg\dwt.h" />
+    <ClInclude Include="libopenjpeg\event.h" />
+    <ClInclude Include="libopenjpeg\fix.h" />
+    <ClInclude Include="libopenjpeg\image.h" />
+    <ClInclude Include="libopenjpeg\int.h" />
+    <ClInclude Include="libopenjpeg\j2k.h" />
+    <ClInclude Include="libopenjpeg\j2k_lib.h" />
+    <ClInclude Include="libopenjpeg\jp2.h" />
+    <ClInclude Include="libopenjpeg\jpt.h" />
+    <ClInclude Include="libopenjpeg\mct.h" />
+    <ClInclude Include="libopenjpeg\mqc.h" />
+    <ClInclude Include="libopenjpeg\openjpeg.h" />
+    <ClInclude Include="libopenjpeg\opj_includes.h" />
+    <ClInclude Include="libopenjpeg\pi.h" />
+    <ClInclude Include="libopenjpeg\raw.h" />
+    <ClInclude Include="libopenjpeg\t1.h" />
+    <ClInclude Include="libopenjpeg\t2.h" />
+    <ClInclude Include="libopenjpeg\tcd.h" />
+    <ClInclude Include="libopenjpeg\tgt.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

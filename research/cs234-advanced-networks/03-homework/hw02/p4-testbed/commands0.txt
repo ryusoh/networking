@@ -1,0 +1,13 @@
+table_add t_l2_fwd set_out_port 0x0a000001 => 1
+table_add t_l2_fwd set_out_port 0x0a000002 => 2
+table_add t_l2_fwd set_out_port 0x0a000003 => 3
+table_add t_l2_fwd set_out_port 0x0a000004 => 3
+table_add t_l2_fwd set_out_port 0x0a000005 => 4
+table_add t_l2_fwd set_out_port 0x0a000006 => 4 
+
+table_add t_arp_fwd set_out_port 0x0a000001 => 1
+table_add t_arp_fwd set_out_port 0x0a000002 => 2
+table_add t_arp_fwd set_out_port 0x0a000003 => 3
+table_add t_arp_fwd set_out_port 0x0a000004 => 3
+table_add t_arp_fwd set_out_port 0x0a000005 => 4
+table_add t_arp_fwd set_out_port 0x0a000006 => 4

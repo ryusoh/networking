@@ -1,0 +1,219 @@
+\documentclass{article}%
+\usepackage{amsmath}%
+\usepackage{amsfonts}%
+\usepackage{amssymb}%
+\usepackage{graphicx}
+\usepackage{sectsty}
+\usepackage{listings}
+\usepackage{framed}
+\usepackage{color}
+\usepackage{verbatim}
+\usepackage{graphicx} %插入图片的宏包
+\usepackage{float} %设置图片浮动位置的宏包
+\usepackage{subfigure} %插入多图时用子图显示的宏包
+\definecolor{shadecolor}{rgb}{.9, .9, .9}
+\sectionfont{\fontsize{20}{20}\selectfont}
+%-------------------------------------------
+\newtheorem{theorem}{Theorem}
+\newtheorem{acknowledgement}[theorem]{Acknowledgement}
+\newtheorem{algorithm}[theorem]{Algorithm}
+\newtheorem{axiom}[theorem]{Axiom}
+\newtheorem{case}[theorem]{Case}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{conclusion}[theorem]{Conclusion}
+\newtheorem{condition}[theorem]{Condition}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{criterion}[theorem]{Criterion}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{exercise}[theorem]{Exercise}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{notation}[theorem]{Notation}
+\newtheorem{problem}[theorem]{Problem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{solution}[theorem]{Solution}
+\newtheorem{summary}[theorem]{Summary}
+\newenvironment{proof}[1][Proof]{\textbf{#1.} }{\ \rule{0.5em}{0.5em}}
+\setlength{\textwidth}{7.0in}
+\setlength{\oddsidemargin}{-0.35in}
+\setlength{\topmargin}{-0.5in}
+\setlength{\textheight}{30.0in}
+\setlength{\parindent}{0.3in}
+
+\newenvironment{code}%
+   {\snugshade\verbatim}%
+   {\endverbatim\endsnugshade}
+
+\begin{document}
+
+\begin{flushright}
+\begin{LARGE}
+
+\textbf{Zhuang Liu \\
+SID: 25727277}
+\end{LARGE}
+\end{flushright}
+
+\begin{center}
+\begin{huge}
+\textbf{CS 234 Advanced Networks \\
+Programming Assignment 1} \\
+\end{huge}
+\end{center}
+
+\section{Mp4Client Model Parsing}
+\begin{Large}
+At first, since there is no \texttt{model} attribution inside the MPD, we should add it to the MPD data structure. We can find MPD's head file in the following directory:
+\begin{code}
+    ~/gpac/include/gpac/internal/mpd.h
+\end{code}
+In this file, we can see a structure called \texttt{GF\_MPD\_AdaptationSet}, which contains all the attributions in the adaptation set. Since the \texttt{model} is represented by a number, we can add it to the structure as follows(in actuality it is already here):
+\begin{code}
+    int model;
+\end{code}
+
+After studying the structure of the \texttt{gpac}, we can find the file that Mp4Client uses to parse MPD is in the following directory:
+\begin{code}
+    ~/gpac/src/media_tools/mpd.c
+\end{code}
+When digging into the \texttt{mpd.c} file, we can see that this program parse adaptation set in this function:
+\begin{code}
+    static GF_Err gf_mpd_parse_adaptation_set(GF_MPD *mpd, 
+        GF_List *container, GF_XMLNode *root)
+\end{code}
+By observing this function, we can see that it use \texttt{strcmp} to get the attribution name, then set the corresponding attribution with the value of that attribution name.
+For example, if you want to parse \texttt{maxHeight}, it will do it by:
+\begin{code}
+    else if (!strcmp(att->name, "minHeight")) 
+        set->min_height = gf_mpd_parse_int(att->value);
+\end{code}
+If you want to parse \texttt{segmentAlignment}, it will do it by:
+\begin{code}
+    else if (!strcmp(att->name, "segmentAlignment")) 
+        set->segment_alignment = gf_mpd_parse_bool(att->value);
+\end{code}
+\newpage
+So now we get the pattern that the \texttt{mpd.c} parses XML files. If we want to parse \texttt{model}, we can easily imitate the snippets above to accomplish it. We can add this snippet inside the method:
+\begin{code}
+    else if (!strcmp(att->name, "model")) 
+        set->model = gf_mpd_parse_int(att->value);
+\end{code}
+
+To print the \texttt{model} in the adaptation set, we can find another function inside the \texttt{mpd.c} file:
+\begin{code}
+    static void gf_mpd_print_adaptation_set
+        (GF_MPD_AdaptationSet const * const as, FILE *out)
+\end{code}
+
+Inside this function, we can see that if you want to print the attribution of \texttt{maxWidth}, the function will do it by:
+\begin{code}
+    	if (as->max_width) 
+    	    fprintf(out, " maxWidth=\"%d\"", as->max_width);
+\end{code}
+By imitation, we can print the attribution of \texttt{model} by:
+\begin{code}
+    if (as->model) fprintf(out, " model=\"%d\"", as->model);
+\end{code}
+To print the \texttt{model} when the new segment has been downloaded, we should implement DASH client, which is in:
+\begin{code}
+    ~/gpac/src/media_tools/dash_client.c
+\end{code}
+Inside this file, we can find a function called:
+\begin{code}
+    static void dash_do_rate_adaptation(GF_DashClient *dash, 
+        GF_DASH_Group *group, int adaptation_set_num)
+\end{code}
+At this statge, we can implement a few lines of code to print the final result:
+\begin{code}
+    printf("adaptation_set_num: %d, model: %d\n", 
+        adaptation_set_num, group->adaptation_set->model);
+\end{code}
+
+\end{Large}
+\newpage
+\section{Multiple Periods MPD Support}
+\begin{Large}
+
+Can the current MP4Client handle multiple Periods in an MPD file? Well, in my opinion, the answer is positive. At first, we can look into the \texttt{mpd.h} file. Because this head file defined the structure of the MPD, which will be applied in  \texttt{mpd.c}, \texttt{dash\_client.c} and so on. The \texttt{mpd.h} file is in this directory:
+\begin{code}
+    ~/gpac/include/gpac/internal/mpd.h
+\end{code}
+In this file, we can see a structure called \texttt{GF\_MPD}. Inside this structure, it has an attribution called \texttt{periods}, which stands for a list of periods:
+\begin{code}
+    GF_List *periods;
+\end{code}
+At this point, we've known that a MPD can consist multiple periods.
+
+Now we can go and see how \texttt{dash\_client.c} support multiple period MPD. We can find the \texttt{dash\_client.c} at:
+\begin{code}
+    ~/gpac/src/media_tools/dash_client.c
+\end{code}
+This program uses a function called \texttt{gf\_list\_get} to handle the \texttt{period} list. The function \texttt{gf\_list\_get} is imported from:
+\begin{code}
+    ~/gpac/include/gpac/list.h
+\end{code}
+In this head file, we can see its usage clearly. This function is defined as follows:
+\begin{code}
+    void *gf_list_get(GF_List *ptr, u32 position);
+\end{code}
+It helps to get an item from the list given its position. So back to the \texttt{dash\_client.c} file, for example, there is a function called \texttt{gf\_dash\_seek\_groups}:
+\begin{code}
+    static void gf_dash_seek_groups(GF_DashClient *dash, 
+        Double seek_time, Bool is_dynamic)
+\end{code}
+Inside this function, we can look at the following code snippet:
+\begin{code}
+    for (i=0; i<dash->active_period_index; i++) {
+        GF_MPD_Period *period = gf_list_get(dash->mpd->periods, 
+            dash->active_period_index-1);
+        dur += period->duration/1000.0;
+    }
+\end{code}
+\newpage
+It add duration of all active periods inside a MPD up. It proved that the client can handle multiple periods MPD.
+
+\end{Large}
+\section{Assign Tile Quality Levels}
+\begin{Large}
+In this section, we will focus on the following file:
+\begin{code}
+    ~/gpac/src/media_tools/dash_client.c
+\end{code}
+In this file, we are focusing on modifying the following function:
+\begin{code}
+    static void dash_do_rate_adaptation(GF_DashClient *dash, 
+        GF_DASH_Group *group, int adaptation_set_num)
+\end{code}
+As we can see from the instruction of this assignment, different value of models refers to different representations.
+
+At first, in this function, we get the initial representation by getting the active representation inside the \texttt{group}:
+\begin{code}
+    	rep = gf_list_get(group->adaptation_set->representations, 
+            group->active_rep_index);
+\end{code}
+As we can observe from the source code, the function gets new representation by assigning a new index of representation:
+\begin{code}
+    new_rep = gf_list_get(group->adaptation_set->representations, 
+        (u32)new_index);
+\end{code}
+So, to get different representations, we only need to change the value of \texttt{new\_index}. If we want to get the representation of specific model, we only need to change the \texttt{new\_index} to the model value.
+
+As we can see, the \texttt{new\_index} is initialized by:
+\begin{code}
+    new_index = 0;
+\end{code}
+So the default model is 0. In this case, we only need to change the \texttt{new\_index} to \texttt{model - 1} to switch the representation:
+\begin{code}
+    new_index = group->adaptation_set->model - 1;
+\end{code}
+
+\end{Large}
+\newpage
+\section{Call Time for Downloading Segments}
+\begin{Large}
+In a 3X3 tiled segment, it would be called at least 9 times. In a 5X5 tiled segment, it would be called at least 25 times.
+
+\end{Large}
+\end{document}

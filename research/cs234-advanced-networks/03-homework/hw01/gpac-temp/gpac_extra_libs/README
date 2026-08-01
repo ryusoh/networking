@@ -1,0 +1,20 @@
+﻿README for GPAC EXTRA LIBS
+==========================
+
+GPAC is a multimedia framework oriented towards rich media and distributed
+under the LGPL license.
+
+The GPAC EXTRA LIBS package provides you with the external dependencies
+required to compile GPAC.
+
+Each official release of GPAC has its corresponding GPAC EXTRA LIBS release
+package. You shouldn't use GPAC and GPAC EXTRA LIBS packages which don't hold
+the same version number. If you are a developper, you should consider getting
+the latest GPAC EXTRA LIBS package from Subversion.
+
+The latest GPAC EXTRA LIBS package can be found within the GPAC Subversion
+repository. To retrieve it, please execute:
+    svn co https://gpac.svn.sourceforge.net/svnroot/gpac/trunk/gpac_extra_libs/
+
+For more information, visit the GPAC website on sourceforge:
+	http://gpac.sourceforge.net
