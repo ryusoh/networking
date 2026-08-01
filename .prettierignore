@@ -19,3 +19,4 @@ mutants/
 # Research course materials
 research/
 research/.chunks_manifest.json
+research/.durable_memory.json

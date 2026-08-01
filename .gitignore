@@ -9,6 +9,7 @@ nas_proxy/config/proxies.json
 *.bin
 !research/**/*.bin
 research/.chunks_manifest.json
+research/.durable_memory.json
 *.so
 *.dylib
 tile_storage

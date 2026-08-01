@@ -36,7 +36,19 @@ To validate line-anchored citations in generated Markdown answers:
 python3 tools/research/citation_engine.py "{{args}}"
 ```
 
-### 4. Re-index Courseware Chunks (if files changed)
+### 4. Track Student Durable Memory & Mastery Matrix
+
+To record topic mastery scores or view student progress reports:
+
+```bash
+# View student mastery report:
+python3 tools/research/memory_host.py --student "default_user"
+
+# Record a topic mastery score:
+python3 tools/research/memory_host.py --student "default_user" --record --module "cs234" --topic "b4_traffic_engineering" --score 0.95
+```
+
+### 5. Re-index Courseware Chunks (if files changed)
 
 If Markdown sidecars, slides, or code files in `research/` have been updated:
 
