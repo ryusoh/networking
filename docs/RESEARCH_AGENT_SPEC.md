@@ -199,3 +199,52 @@ The system architecture integrates directly into existing repository quality gat
 
 1. **Pre-commit Gating (`make precommit`):** Ensures that all added scripts, configuration files, and documentation pass formatting (Prettier), linting (ESLint, Flake8), and type checking (`make type`).
 2. **Deterministic Test Suites:** Unit tests in `__tests__/` validate `SceneBuilder` context construction, `CitationEngine` URL verification, and `MemoryHost` serialization.
+
+---
+
+## 7. Implementation Roadmap and Phased Rollout
+
+```mermaid
+flowchart TD
+    Step1["Step 1: Structural Parsing & Line Mapping Engine"] --> Step2["Step 2: Hybrid Search Indexer (BM25 + Dense Vectors)"]
+    Step2 --> Step3["Step 3: Host SceneBuilder & Token Governor MVP"]
+    Step3 --> Step4["Step 4: Citation Verification & Post-Processing Engine"]
+    Step4 --> Step5["Step 5: Durable Memory & Mastery Matrix Integration"]
+```
+
+### 7.1 Phase 1: Structural Parsing & Line Mapping Engine
+
+- **Objective:** Ingest `.md` sidecars, slides, and source code while establishing accurate line-number offset maps.
+- **Key Deliverables:**
+  - Heading-aware parser splitting text at Markdown header boundaries (`#`, `##`) and slide separators (`<!-- slide -->`).
+  - Line-offset mapping data structure linking every text segment to its start line and end line in the source file.
+  - Code block integrity handler preserving P4, Python, C, and GNS3 topology configs without mid-block truncation.
+
+### 7.2 Phase 2: Hybrid Search Indexer Construction
+
+- **Objective:** Build dual lexical and vector search indices over parsed structural chunks.
+- **Key Deliverables:**
+  - BM25 Lexical Index targeting exact technical terms, protocol RFC numbers, packet fields, and function symbols.
+  - Dense Vector Embedding Index representing semantic conceptual similarity across course modules.
+  - Reciprocal Rank Fusion (RRF) ranker combining lexical and semantic scores into a unified top-K result set.
+
+### 7.3 Phase 3: Host SceneBuilder & Token Governor MVP
+
+- **Objective:** Construct the Host-side context assembly pipeline.
+- **Key Deliverables:**
+  - `SceneBuilder` context bundler assembling primary readings, prerequisite slide excerpts, and lab code.
+  - `ResourceGovernor` token tracking ensuring compiled scenes remain within model context window limits.
+
+### 7.4 Phase 4: Citation Verification & Post-Processing Engine
+
+- **Objective:** Enforce auditable line-anchored citations on all generated outputs.
+- **Key Deliverables:**
+  - `CitationEngine` URL validator checking file existence, line bounds, and snippet matching.
+  - Auto-retry loop rejecting unverified or hallucinated file references before delivery to Layer 1.
+
+### 7.5 Phase 5: Durable Memory & Mastery Matrix Integration
+
+- **Objective:** Persist student progress and mastery state across evaluation sessions.
+- **Key Deliverables:**
+  - Working Memory buffer and Durable Episode Store JSON serializer.
+  - Mastery Matrix updating engine calculating topic proficiency scores based on student performance.
