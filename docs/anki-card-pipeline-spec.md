@@ -181,3 +181,52 @@ Generated notes must conform to the structural format discovered in target decks
 
 1. **Pre-commit Integration (`make precommit`):** `test_anki_generator.py` verifies coverage tracking, SQLite inspection, card formatting, and AnkiConnect JSON payload construction.
 2. **Citation Verification:** All line references embedded in card Back fields are validated via `CitationEngine` prior to package export.
+
+---
+
+## 7. Systematic Implementation Roadmap and Phased Rollout
+
+```mermaid
+flowchart TD
+    Step1["Step 1: Coverage Tracking & Unvisited Chunk Selector"] --> Step2["Step 2: SQLite & AnkiConnect Deduplication Inspector"]
+    Step2 --> Step3["Step 3: Card Formatter & Scene Assembly Engine"]
+    Step3 --> Step4["Step 4: Dual-Channel Ingestion Engine"]
+    Step4 --> Step5["Step 5: CLI Entrypoint & Agent Skill Integration"]
+```
+
+### 7.1 Phase 1: Coverage Tracking and Unvisited Chunk Selector
+
+- **Objective:** Track processed files/chunks and select unvisited candidates from `research/.chunks_manifest.json`.
+- **Deliverables:**
+  - `CoverageTracker` module reading and persisting `research/.anki_coverage.json`.
+  - Chunk selector filtering out previously memorized files and returning top candidate chunks.
+
+### 7.2 Phase 2: SQLite and AnkiConnect Deduplication Inspector
+
+- **Objective:** Guarantee zero duplicate note creation in the target Anki deck.
+- **Deliverables:**
+  - `SQLiteInspector` performing non-locking SQLite queries on temporary copies of `collection.anki2`.
+  - `AnkiConnectChecker` querying `findNotes` over HTTP (`http://127.0.0.1:8765`) when Anki is active.
+  - Candidate filter rejecting concepts already present in the target deck.
+
+### 7.3 Phase 3: Card Formatter and Scene Assembly Engine
+
+- **Objective:** Render high-density Anki cards conforming to target HTML and LaTeX standards.
+- **Deliverables:**
+  - `SceneBuilder` integration assembling token-bounded context payloads for chosen topics.
+  - `CardFormatter` converting raw technical context into styled Front (`Field 0`) and Back (`Field 1`) HTML (`<ul><li><div>`, `<strong>`, `\(...\)`).
+  - `CitationEngine` integration verifying line-anchored Markdown links embedded in Back fields.
+
+### 7.4 Phase 4: Dual-Channel Ingestion Engine
+
+- **Objective:** Provide automated note ingestion whether Anki is active or closed.
+- **Deliverables:**
+  - `AnkiConnectClient` sending `addNotes` JSON requests to `http://127.0.0.1:8765`.
+  - `TSVExporter` writing UTF-8 tab-separated package files (`research/anki_import.txt`) with `#separator:Tab` and `#html:true` headers.
+
+### 7.5 Phase 5: CLI Entrypoint and Agent Skill Integration
+
+- **Objective:** Expose unified command interface and agent skill.
+- **Deliverables:**
+  - CLI executable `python3 tools/research/anki_generator.py --count 5 --deck "<target_deck>"`.
+  - Updated agent skill `.agents/skills/research-agent/SKILL.md` and synchronized command `.claude/commands/research-agent.md`.
