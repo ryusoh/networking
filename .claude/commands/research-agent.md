@@ -27,7 +27,15 @@ To build a token-bounded prompt context with mandatory line-anchored Markdown ci
 python3 tools/research/scene_builder.py "$ARGUMENTS" --max-tokens 8192
 ```
 
-### 3. Re-index Courseware Chunks (if files changed)
+### 3. Verify Generated Citations
+
+To validate line-anchored citations in generated Markdown answers:
+
+```bash
+python3 tools/research/citation_engine.py "$ARGUMENTS"
+```
+
+### 4. Re-index Courseware Chunks (if files changed)
 
 If Markdown sidecars, slides, or code files in `research/` have been updated:
 
