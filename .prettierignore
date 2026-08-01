@@ -15,3 +15,7 @@ clean_adblock/dist/
 reports/
 mutants/
 .mutmut-cache/
+
+# Research course materials
+research/
+

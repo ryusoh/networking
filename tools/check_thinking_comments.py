@@ -27,7 +27,7 @@ from pathlib import Path
 SCAN_EXTENSIONS = (".py", ".js", ".cjs", ".mjs", ".css", ".c", ".h", ".sh")
 
 # Third-party / dependency trees are not ours to police.
-EXCLUDED_PARTS = ("node_modules/",)
+EXCLUDED_PARTS = ("node_modules/", "research/")
 
 # Extensions using C-style comments (// and /* */). The same block-comment
 # scanner covers JS, CSS, C, and C headers.

@@ -5,7 +5,8 @@ module.exports = [
       '**/_metadata/**',
       '**/coverage/**',
       '**/dist/**',
-      '**/*.min.js'
+      '**/*.min.js',
+      '**/research/**'
     ]
   },
   {
