@@ -1,0 +1,389 @@
+\documentclass{article}%
+\usepackage{amsmath}%
+\usepackage{amsfonts}%
+\usepackage{amssymb}%
+\usepackage{graphicx}
+\usepackage{sectsty}
+\usepackage{listings}
+\usepackage{framed}
+\usepackage{color}
+\usepackage{verbatim}
+\usepackage{graphicx} %插入图片的宏包
+\usepackage{float} %设置图片浮动位置的宏包
+\usepackage{subfigure} %插入多图时用子图显示的宏包
+\definecolor{shadecolor}{rgb}{.9, .9, .9}
+\sectionfont{\fontsize{20}{20}\selectfont}
+%-------------------------------------------
+\newtheorem{theorem}{Theorem}
+\newtheorem{acknowledgement}[theorem]{Acknowledgement}
+\newtheorem{algorithm}[theorem]{Algorithm}
+\newtheorem{axiom}[theorem]{Axiom}
+\newtheorem{case}[theorem]{Case}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{conclusion}[theorem]{Conclusion}
+\newtheorem{condition}[theorem]{Condition}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{criterion}[theorem]{Criterion}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{exercise}[theorem]{Exercise}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{notation}[theorem]{Notation}
+\newtheorem{problem}[theorem]{Problem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{solution}[theorem]{Solution}
+\newtheorem{summary}[theorem]{Summary}
+\newenvironment{proof}[1][Proof]{\textbf{#1.} }{\ \rule{0.5em}{0.5em}}
+\setlength{\textwidth}{7.0in}
+\setlength{\oddsidemargin}{-0.35in}
+\setlength{\topmargin}{-0.5in}
+\setlength{\textheight}{30.0in}
+\setlength{\parindent}{0.3in}
+
+\newenvironment{code}%
+   {\snugshade\verbatim}%
+   {\endverbatim\endsnugshade}
+
+\begin{document}
+
+\begin{flushright}
+\begin{LARGE}
+
+\textbf{Zhuang Liu \\
+SID: 25727277}
+\end{LARGE}
+\end{flushright}
+
+\begin{center}
+\begin{huge}
+\textbf{CS 230 Distributed Computer Systems \\
+Homework 3} \\
+\end{huge}
+\end{center}
+
+\section{Six Nested Loop Cases}
+\begin{Large}
+
+Here, I used a Java program to simulate the process. I choose \texttt{n} of 3. At first, I defined three matrices: \texttt{a}, \texttt{b} and \texttt{c} as follows:
+\begin{code}
+    int[][] a = {
+            {1, 2, 3},
+            {3, 1, 2},
+            {2, 3, 1}
+    };
+
+    int[][] b = {
+            {1, 1, 1},
+            {2, 2, 2},
+            {3, 3, 3}
+    };
+
+    int[][] c = {
+            {1, 2, 3},
+            {1, 2, 3},
+            {1, 2, 3}
+    };
+\end{code}
+Next, we can use a nested loop to print every step in the matrix manipulation. This is how we mimic the \texttt{(i, j, k)} case:
+\begin{code}
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            for (int k = 0; k < 3; k++) {
+                c[i][j] = c[i][j] + a[i][k] * b[k][j];
+                System.out.println("c" + i + j + " = " + c[i][j]);
+            }
+        }
+    }
+\end{code}
+\newpage
+By changing the order of the loops, we can mimic other cases. For example, this is how we mimic the \texttt{(i, k, j)} case:
+\begin{code}
+    for (int i = 0; i < 3; i++) {
+        for (int k = 0; k < 3; k++) {
+            for (int j = 0; j < 3; j++) {
+                c[i][j] = c[i][j] + a[i][k] * b[k][j];
+                System.out.println("c" + i + j + " = " + c[i][j]);
+            }
+        }
+    }
+\end{code}
+In the output of the program, we can get the execution order of the process.
+\begin{LARGE}
+\begin{flushleft}
+\textbf{1.1 (i, j, k) Case}
+\end{flushleft}
+\end{LARGE}
+
+In this case, the execution order is as follows:
+\begin{code}
+    c00 c00 c00 c01 c01 c01 c02 c02 c02 
+    c10 c10 c10 c11 c11 c11 c12 c12 c12
+    c20 c20 c20 c21 c21 c21 c22 c22 c22
+\end{code}
+As we can see from the order, since \texttt{k} is in the most inner loop, every \texttt{c(i, j)} computation will stay on current \texttt{c(i, j)} until \texttt{k} increased from 0 to \texttt{n - 1}. As the \texttt{i} increases from 0 to \texttt{n - 1}, in each \texttt{i}, \texttt{j} increases from 0 to \texttt{n - 1}.
+\begin{LARGE}
+\begin{flushleft}
+\textbf{1.2 (i, k, j) Case}
+\end{flushleft}
+\end{LARGE}
+
+In this case, the execution order is as follows:
+\begin{code}
+    c00 c01 c02 c00 c01 c02 c00 c01 c02 
+    c10 c11 c12 c10 c11 c12 c10 c11 c12
+    c20 c21 c22 c20 c21 c22 c20 c21 c22
+\end{code}
+We can regard every 3 \texttt{c(i, j)} as one unit, inside every unit, \texttt{j} increases from 0 to \texttt{n - 1}, since \texttt{j} is in the most inner loop. The computation will stay on the unit until \texttt{k} increased from 0 to \texttt{n - 1}, since the \texttt{k} is on the outer loop of \texttt{j}. The \texttt{i} increases every 3 computation unit from 0 to \texttt{n - 1}.
+\newpage
+\begin{LARGE}
+\begin{flushleft}
+\textbf{1.3 (j, i, k) Case}
+\end{flushleft}
+\end{LARGE}
+
+In this case, the execution order is as follows:
+\begin{code}
+    c00 c00 c00 c10 c10 c10 c20 c20 c20 
+    c01 c01 c01 c11 c11 c11 c21 c21 c21
+    c02 c02 c02 c12 c12 c12 c22 c22 c22
+\end{code}
+As we can see from the order, since \texttt{k} is in the most inner loop, every \texttt{c(i, j)} computation will stay on current \texttt{c(i, j)} until \texttt{k} increased from 0 to \texttt{n - 1}. As the \texttt{j} increases from 0 to \texttt{n - 1}, in each \texttt{j}, \texttt{i} increases from 0 to \texttt{n - 1}.
+
+\begin{LARGE}
+\begin{flushleft}
+\textbf{1.4 (j, k, i) Case}
+\end{flushleft}
+\end{LARGE}
+
+In this case, the execution order is as follows:
+\begin{code}
+    c00 c10 c20 c00 c10 c20 c00 c10 c20 
+    c01 c11 c21 c01 c11 c21 c01 c11 c21
+    c02 c12 c22 c02 c12 c22 c02 c12 c22
+\end{code}
+We can regard every 3 \texttt{c(i, j)} as one unit, inside every unit, \texttt{i} increases from 0 to \texttt{n - 1}, since \texttt{i} is in the most inner loop. The computation will stay on the unit until \texttt{k} increased from 0 to \texttt{n - 1}, since the \texttt{k} is on the outer loop of \texttt{i}. The \texttt{j} increases every 3 computation unit from 0 to \texttt{n - 1}.
+\begin{LARGE}
+\begin{flushleft}
+\textbf{1.5 (k, i, j) Case}
+\end{flushleft}
+\end{LARGE}
+
+In this case, the execution order is as follows:
+\begin{code}
+    c00 c01 c02 c10 c11 c12 c20 c21 c22 
+    c00 c01 c02 c10 c11 c12 c20 c21 c22
+    c00 c01 c02 c10 c11 c12 c20 c21 c22
+\end{code}
+We can regard every 9 \texttt{c(i, j)} as a computation unit. When an unit is finished, the \texttt{k} increments, then start a new unit, this process last until \texttt{k} increases from 0 to \texttt{n - 1}. In side every unit, the \texttt{i} increases from 0 to \texttt{n - 1}. In every \texttt{i}, \texttt{j} increases from 0 to \texttt{n - 1}.
+\newpage
+\begin{LARGE}
+\begin{flushleft}
+\textbf{1.6 (k, j, i) Case}
+\end{flushleft}
+\end{LARGE}
+
+In this case, the execution order is as follows:
+\begin{code}
+    c00 c10 c20 c01 c11 c21 c02 c12 c22 
+    c00 c10 c20 c01 c11 c21 c02 c12 c22
+    c00 c10 c20 c01 c11 c21 c02 c12 c22
+\end{code}
+We can regard every 9 \texttt{c(i, j)} as a computation unit. When an unit is finished, the \texttt{k} increments, then start a new unit, this process last until \texttt{k} increases from 0 to \texttt{n - 1}. In side every unit, the \texttt{j} increases from 0 to \texttt{n - 1}. In every \texttt{j}, \texttt{i} increases from 0 to \texttt{n - 1}.
+
+\end{Large}
+
+\section{N-Processor Ring Mapping}
+\begin{Large}
+
+\begin{LARGE}
+\begin{flushleft}
+\textbf{2.1 (i, j, k) Case}
+\end{flushleft}
+\end{LARGE}
+The SPMD program of this case becomes:
+\begin{code}
+    Do All P(i = 0, n - 1):
+        For j = i, do n times:
+            For k = 0, n - 1, do:
+                c(i, j) = c(i, j) + a(i, k) + b(k, j)
+            endfor
+        Every Processor i sends its current 
+        column of B to processor (i + 1) mod (n)
+        endfor
+    enddoall
+\end{code}
+Now let's see the execution order of this program again:
+\begin{code}
+    c00 c00 c00 c01 c01 c01 c02 c02 c02 
+    c10 c10 c10 c11 c11 c11 c12 c12 c12
+    c20 c20 c20 c21 c21 c21 c22 c22 c22
+\end{code}
+We can see that the first row's \texttt{i} is all 0, while the second row's \texttt{i} and third row's \texttt{i} is 1 and 2. It means we can unfold the program on \texttt{i}. Each row is a processor. In each processor, we only need to store \texttt{a(i, 0 ... n - 1)}, \texttt{b(i, 0 ... n - 1)} and \texttt{c(i, 0 ... n - 1)}, since it's paralleled by i, all the \texttt{i} in the processor is the same.
+\newpage
+\begin{code}
+Time = O(n2) Multiplication
+Memory = O(n)
+Communication = O(n2) Network Cycles
+\end{code}
+\begin{LARGE}
+\begin{flushleft}
+\textbf{2.2 (i, k, j) Case}
+\end{flushleft}
+\end{LARGE}
+The SPMD program of this case becomes:
+\begin{code}
+    Do All P(i = 0, n - 1):
+        For k = i, do n times:
+            For j = 0, n - 1, do:
+                c(i, j) = c(i, j) + a(i, k) + b(k, j)
+            endfor
+        Every Processor i sends its current 
+        column of B to processor (i + 1) mod (n)
+        endfor
+    enddoall
+\end{code}
+Now let's see the execution order of this program again:
+\begin{code}
+    c00 c01 c02 c00 c01 c02 c00 c01 c02 
+    c10 c11 c12 c10 c11 c12 c10 c11 c12
+    c20 c21 c22 c20 c21 c22 c20 c21 c22
+\end{code}
+It is similar to the \texttt{(i, j, k)} case, since the very outer loop is also i, so it also can be paralleled by \texttt{i}. Each row is a processor. In each processor, the \texttt{i} remains unchanged in the process. The storage scheme remains the same. However, because the order of \texttt{j} loop and \texttt{k} loop is swapped, the execution order inside the processor will change too.
+\begin{code}
+Time = O(n2) Multiplication
+Memory = O(n)
+Communication = O(n2) Network Cycles
+\end{code}
+
+\begin{LARGE}
+
+\begin{flushleft}
+\textbf{2.3 (j, i, k) Case}
+\end{flushleft}
+\end{LARGE}
+The SPMD program of this case becomes:
+\newpage
+
+\begin{code}
+    Do All P(j = 0, n - 1):
+        For i = j, do n times:
+            For k = 0, n - 1, do:
+                c(i, j) = c(i, j) + a(i, k) + b(k, j)
+            endfor
+        Every Processor j sends its current 
+        column of A to processor (j + 1) mod (n)
+        endfor
+    enddoall
+\end{code}
+Now let's see the execution order of this program again:
+\begin{code}
+    c00 c00 c00 c10 c10 c10 c20 c20 c20 
+    c01 c01 c01 c11 c11 c11 c21 c21 c21
+    c02 c02 c02 c12 c12 c12 c22 c22 c22
+\end{code}
+We can see that, in each row, the \texttt{j} remains the same. For example, in the first row, the \texttt{j}s are all zero. So we can parallel the program by \texttt{j}. We can regard each row as a processor. In each processor, we only store data of \texttt{a(0 ... n - 1, j)}, \texttt{b(0 ... n - 1, j)} and \texttt{c(0 ... n - 1, j)}, since in every processor, \texttt{j} remains the same inside.
+
+\begin{code}
+Time = O(n2) Multiplication
+Memory = O(n)
+Communication = O(n2) Network Cycles
+\end{code}
+
+\begin{LARGE}
+\begin{flushleft}
+\textbf{2.4 (j, k, i) Case}
+\end{flushleft}
+\end{LARGE}
+The SPMD program of this case becomes:
+
+\begin{code}
+    Do All P(j = 0, n - 1):
+        For k = j, do n times:
+            For i = 0, n - 1, do:
+                c(i, j) = c(i, j) + a(i, k) + b(k, j)
+            endfor
+        Every Processor j sends its current 
+        column of A to processor (j + 1) mod (n)
+        endfor
+    enddoall
+\end{code}
+\newpage
+Now let's see the execution order of this program again:
+\begin{code}
+    c00 c10 c20 c00 c10 c20 c00 c10 c20 
+    c01 c11 c21 c01 c11 c21 c01 c11 c21
+    c02 c12 c22 c02 c12 c22 c02 c12 c22
+\end{code}
+This case is similar to the case \texttt{(j, i, k)}. In this case, we can also parallel the process by \texttt{j}. Each row is a processor. Inside each processor, \texttt{j} remains the same. The storage scheme is same with the case \texttt{(j, i, k)}, though the execution order inside the processor differs from the case \texttt{(j, i, k)}.
+\begin{code}
+Time = O(n2) Multiplication
+Memory = O(n)
+Communication = O(n2) Network Cycles
+\end{code}
+\begin{LARGE}
+\begin{flushleft}
+\textbf{2.5 (k, i, j) Case}
+\end{flushleft}
+\end{LARGE}
+The SPMD program of this case becomes:
+
+\begin{code}
+    Do All P(k = 0, n - 1):
+        For i = k, do n times:
+            For j = 0, n - 1, do:
+                c(i, j) = c(i, j) + a(i, k) + b(k, j)
+            endfor
+        Every Processor k sends its current 
+        column of A to processor (i + 1) mod (n)
+        endfor
+    enddoall
+\end{code}
+Now let's see the execution order of this program again:
+\begin{code}
+    c00 c01 c02 c10 c11 c12 c20 c21 c22 
+    c00 c01 c02 c10 c11 c12 c20 c21 c22
+    c00 c01 c02 c10 c11 c12 c20 c21 c22
+\end{code}
+In this case, we unfold the program on \texttt{k}. As we can see from the order above, three rows are identical. It is because inside every processor, there is always \texttt{i - j} nested loop. In each processor, we need to store all matrix \texttt{a} and matrix \texttt{b}. However, since the \texttt{k} inside one single processor is unchanged, we don't need to store the whole matrix \texttt{c} inside the processor.
+\newpage
+\begin{code}
+Time = O(n2) Multiplication
+Memory = O(n)
+Communication = 0 Network Cycles
+\end{code}
+\begin{LARGE}
+\begin{flushleft}
+\textbf{2.6 (k, j, i) Case}
+\end{flushleft}
+\end{LARGE}
+The SPMD program of this case becomes:
+
+\begin{code}
+    Do All P(k = 0, n - 1):
+        For j = k, do n times:
+            For i = 0, n - 1, do:
+                c(i, j) = c(i, j) + a(i, k) + b(k, j)
+            endfor
+        Every Processor k sends its current 
+        column of B to processor (j + 1) mod (n)
+        endfor
+    enddoall
+\end{code}
+Now let's see the execution order of this program again:
+\begin{code}
+    c00 c10 c20 c01 c11 c21 c02 c12 c22 
+    c00 c10 c20 c01 c11 c21 c02 c12 c22
+    c00 c10 c20 c01 c11 c21 c02 c12 c22
+\end{code}
+In this case, we also unfold the program on \texttt{k}. The storage scheme is the same as case \texttt{(k, i, j)}. However, the execution order inside the processor is different from the case \texttt{(k, i, j)}.
+\begin{code}
+Time = O(n2) Multiplication
+Memory = O(n)
+Communication = 0 Network Cycles
+\end{code}
+\end{Large}
+
+
+\end{document}

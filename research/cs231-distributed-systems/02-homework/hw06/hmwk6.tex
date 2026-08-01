@@ -1,0 +1,130 @@
+\documentclass{article}%
+\usepackage{amsmath}%
+\usepackage{amsfonts}%
+\usepackage{amssymb}%
+\usepackage{graphicx}
+\usepackage{sectsty}
+\usepackage{listings}
+\usepackage{framed}
+\usepackage{color}
+\usepackage{verbatim}
+\usepackage{graphicx} %插入图片的宏包
+\usepackage{float} %设置图片浮动位置的宏包
+\usepackage{subfigure} %插入多图时用子图显示的宏包
+\definecolor{shadecolor}{rgb}{.9, .9, .9}
+\sectionfont{\fontsize{20}{20}\selectfont}
+%-------------------------------------------
+\newtheorem{theorem}{Theorem}
+\newtheorem{acknowledgement}[theorem]{Acknowledgement}
+\newtheorem{algorithm}[theorem]{Algorithm}
+\newtheorem{axiom}[theorem]{Axiom}
+\newtheorem{case}[theorem]{Case}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{conclusion}[theorem]{Conclusion}
+\newtheorem{condition}[theorem]{Condition}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{criterion}[theorem]{Criterion}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{exercise}[theorem]{Exercise}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{notation}[theorem]{Notation}
+\newtheorem{problem}[theorem]{Problem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{solution}[theorem]{Solution}
+\newtheorem{summary}[theorem]{Summary}
+\newenvironment{proof}[1][Proof]{\textbf{#1.} }{\ \rule{0.5em}{0.5em}}
+\setlength{\textwidth}{7.0in}
+\setlength{\oddsidemargin}{-0.35in}
+\setlength{\topmargin}{-0.5in}
+\setlength{\textheight}{30.0in}
+\setlength{\parindent}{0.3in}
+
+\newenvironment{code}%
+   {\snugshade\verbatim}%
+   {\endverbatim\endsnugshade}
+
+\begin{document}
+
+\begin{flushright}
+\begin{LARGE}
+
+\textbf{Zhuang Liu \\
+SID: 25727277}
+\end{LARGE}
+\end{flushright}
+
+\begin{center}
+\begin{huge}
+\textbf{CS 230 Distributed Computer Systems \\
+Homework 6} \\
+\end{huge}
+\end{center}
+
+\section{Primary Spatial Schedule}
+\begin{Large}
+At first, we can propose a 0\% idling ratio spacial schedule as follows:
+
+\begin{center}
+\begin{tabular}{ |c|c|c|c|c|c| } 
+ \hline
+ 
+ 6 & 6 & 6 & 6 & 6 \\ 
+ 5 & 5 & 2 & 5 & 5 \\
+ 5 & 5 & 2 & 5 & 5 \\
+ 1 & 1 & 2 & 1 & 1 \\
+ 3 & 3 & 4 & 3 & 3 \\
+ \pi1 & \pi2 & \pi3 & \pi4 & \pi5 \\
+ \hline
+\end{tabular}
+\end{center}
+
+\end{Large}
+\section{New Spatial Schedule}
+\begin{Large}
+If the processor 3 has broken, we can propose a brand new spatial schedule with 0\% idling ratio as follows:
+
+\begin{center}
+\begin{tabular}{ |c|c|c|c|c|c| } 
+ \hline
+
+ 1 & 1 &   & 1 & 1 \\ 
+ 3 & 3 &   & 3 & 3 \\
+ 5 & 5 &   & 5 & 5 \\
+ 5 & 5 &   & 5 & 6 \\
+ 2 & 2 &   & 2 & 6 \\
+ 4 & 4 &   & 4 & 4 \\
+ \pi1 & \pi2 & \pi3 & \pi4 & \pi5 \\
+ \hline
+\end{tabular}
+\end{center}
+
+If the new schedule is based on the original one, by re-assigning the VPs of the processor 3, it would be as follows:
+
+\begin{center}
+\begin{tabular}{ |c|c|c|c|c|c| } 
+ \hline
+ 6 & 6 &   & 6 & 6 \\ 
+ 5 & 5 &   & 5 & 5 \\
+ 5 & 5 &   & 5 & 5 \\
+ 1 & 1 &   & 1 & 1 \\
+ 3 & 3 &   & 3 & 3 \\
+ 2 & 2 &   & 2 & 4 \\
+ \pi1 & \pi2 & \pi3 & \pi4 & \pi5 \\
+
+ \hline
+\end{tabular}
+\end{center}
+
+\end{Large}
+\newpage
+\section{Migrating Cost}
+\begin{Large}
+By counting the different VPs of each two new schedules with the original schedule except the defunct processor, we can see that the different between the first new schedule and the original schedule is 20 VPs.
+
+By the mean time, the different between the second new schedule and the original schedule is 4 VPs. We can conclude that the migrating cost in the second option is much lower than the first one.
+
+\end{Large}
+\end{document}

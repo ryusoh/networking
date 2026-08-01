@@ -1,0 +1,151 @@
+\documentclass{article}%
+\usepackage{amsmath}%
+\usepackage{amsfonts}%
+\usepackage{amssymb}%
+\usepackage{graphicx}
+\usepackage{sectsty}
+\usepackage{listings}
+\usepackage{framed}
+\usepackage{color}
+\usepackage{verbatim}
+\usepackage{graphicx} %插入图片的宏包
+\usepackage{float} %设置图片浮动位置的宏包
+\usepackage{subfigure} %插入多图时用子图显示的宏包
+\definecolor{shadecolor}{rgb}{.9, .9, .9}
+\sectionfont{\fontsize{20}{20}\selectfont}
+%-------------------------------------------
+\newtheorem{theorem}{Theorem}
+\newtheorem{acknowledgement}[theorem]{Acknowledgement}
+\newtheorem{algorithm}[theorem]{Algorithm}
+\newtheorem{axiom}[theorem]{Axiom}
+\newtheorem{case}[theorem]{Case}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{conclusion}[theorem]{Conclusion}
+\newtheorem{condition}[theorem]{Condition}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{criterion}[theorem]{Criterion}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{exercise}[theorem]{Exercise}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{notation}[theorem]{Notation}
+\newtheorem{problem}[theorem]{Problem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{solution}[theorem]{Solution}
+\newtheorem{summary}[theorem]{Summary}
+\newenvironment{proof}[1][Proof]{\textbf{#1.} }{\ \rule{0.5em}{0.5em}}
+\setlength{\textwidth}{7.0in}
+\setlength{\oddsidemargin}{-0.35in}
+\setlength{\topmargin}{-0.5in}
+\setlength{\textheight}{30.0in}
+\setlength{\parindent}{0.3in}
+
+\newenvironment{code}%
+   {\snugshade\verbatim}%
+   {\endverbatim\endsnugshade}
+
+\begin{document}
+
+\begin{flushright}
+\begin{LARGE}
+
+\textbf{Zhuang Liu \\
+SID: 25727277}
+\end{LARGE}
+\end{flushright}
+
+\begin{center}
+\begin{huge}
+\textbf{CS 230 Distributed Computer Systems \\
+Homework 4} \\
+\end{huge}
+\end{center}
+
+\section{Why the Schedule is Legal}
+\begin{Large}
+At first, we should figure out what is a legal schedule. From the course slide, we can see that a legal scheduling strategy will always choose any trailing VP before any non-trailing VP.
+
+Then, we can write down all the allocation functions of all processors:
+\begin{code}
+    A(J1) = (2, 0, 1, 1, 0)
+    A(J2) = (0, 1, 0, 0, 2)
+    A(J3) = (1, 1, 0, 1, 1)
+    A(J4) = (0, 1, 0, 0, 0)
+    A(J5) = (1, 1, 2, 1, 2)
+    A(J6) = (1, 0, 0, 0, 1)
+\end{code}
+
+Based on the initial allocation, we can propose a time schedule as follows:
+
+\begin{center}
+\begin{tabular}{ |c|c|c|c|c|c| } 
+ \hline
+ Time/PE & pi1 & pi2 & pi3 & pi4 & pi5 \\ 
+ 1 & 1 & 2 & 1 & 1 & 2 \\ 
+ 2 & 1 & 3 & 5 & 3 & 2 \\
+ 3 & 3 & 4 & 5 & 5 & 3 \\
+ 4 & 5 & 5 &   &   & 5 \\
+ 5 & 6 &   &   &   & 5 \\
+ 6 &   &   &   &   & 6 \\
+ \hline
+\end{tabular}
+\end{center}
+It is very obvious that this schedule is legal, because it is the simplest one which shares the same matrix topology with the allocation matrix. All temporarily neighboring VPs inside the processor are adjacent spatially. So all VP of the processor is ahead of any other VP of the same processor by more than one global communication step. And trailing VPs are ahead of non-trailing VPs.
+
+As we can infer from the number of time slices, there are 6 cycles in its period.
+
+The idling ratio of this schedule is \texttt{9 / 30 = 30\%}.
+
+\end{Large}
+\newpage
+\section{New Schedule}
+\begin{Large}
+At this stage, we can modify the previous schedule. As we can see, processor \texttt{pi3} and \texttt{p4} still get a full time window within the period whose length is equal to its cycle.
+
+So we can simply dub \texttt{pi3} and \texttt{pi4} to reduce idling rate. The scheduling matrix is as follows:
+\begin{center}
+\begin{tabular}{ |c|c|c|c|c|c| } 
+ \hline
+ Time/PE & pi1 & pi2 & pi3 & pi4 & pi5 \\ 
+ 1 & 1 & 2 & 1 & 1 & 2 \\ 
+ 2 & 1 & 3 & 5 & 3 & 2 \\
+ 3 & 3 & 4 & 5 & 5 & 3 \\
+ 4 & 5 & 5 & 1 & 1 & 5 \\
+ 5 & 6 &   & 5 & 3 & 5 \\
+ 6 &   &   & 5 & 5 & 6 \\
+ \hline
+\end{tabular}
+\end{center}
+In this schedule, we can calculate that the idling rate is \texttt{3 / 30 = 10\%}.
+
+\end{Large}
+\section{Optimal Schedule}
+\begin{Large}
+I think there is a best schedule. It is modified on the schedule in section 2. We can dub the table to see it more clearly:
+\begin{center}
+\begin{tabular}{ |c|c|c|c|c|c| } 
+ \hline
+ Time/PE & pi1 & pi2 & pi3 & pi4 & pi5 \\ 
+ 1 & 1 & 2 & 1 & 1 & 2 \\ 
+ 2 & 1 & 3 & 5 & 3 & 2 \\
+ 3 & 3 & 4 & 5 & 5 & 3 \\
+ 4 & 5 & 5 & 1 & 1 & 5 \\
+ 5 & 6 & 4 & 5 & 3 & 5 \\
+ 6 &   & 3 & 5 & 5 & 6 \\
+ 7 & 1 & 2 & 1 & 1 & 2 \\ 
+ 8 & 1 & 3 & 5 & 3 & 2 \\
+ 9 & 3 & 4 & 5 & 5 & 3 \\
+ 10 & 5 & 5 & 1 & 1 & 5 \\
+ 11 & 6 & 4 & 5 & 3 & 5 \\
+ 12 &   & 3 & 5 & 5 & 6 \\
+ \hline
+\end{tabular}
+\end{center}
+We can see that it's legal because in \texttt{pi2}, \texttt{4} is adjacent to \texttt{5}, \texttt{3} is adjacent to \texttt{4} and \texttt{2}.
+
+And the idling rate is \texttt{1 / 30 = 1/30}.
+
+\end{Large}
+\end{document}
