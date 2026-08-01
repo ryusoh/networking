@@ -256,5 +256,105 @@ class TestTileCache(unittest.TestCase):
         subprocess.run([sys.executable, "-c", "import sys, patch; sys.modules['nas_proxy.tile_cache'] = type('module', (), {'init_tile_storage': lambda: None, 'load_proxies': lambda: None, 'ThreadedTileServer': lambda *a, **kw: type('mock_server', (), {'serve_forever': lambda self: None})()})(); import nas_proxy.tile_cache"])
 
 
+    def test_parse_http_response_no_headers(self):
+        with self.assertRaises(Exception) as context:
+            tile_cache._parse_http_response(b"no headers here")
+        self.assertTrue("No HTTP headers" in str(context.exception))
+
+    @patch("nas_proxy.tile_cache.load_proxies")
+    def test_fetch_via_socks5_no_proxies(self, mock_load):
+        mock_load.return_value = []
+        with self.assertRaises(Exception) as context:
+            tile_cache.fetch_via_socks5("http://example.com")
+        self.assertTrue("No SOCKS5 proxies" in str(context.exception))
+
+    @patch("nas_proxy.tile_cache.load_proxies")
+    @patch("nas_proxy.tile_cache.socks5_connect")
+    def test_fetch_via_socks5_https(self, mock_connect, mock_load):
+        mock_load.return_value = [("1.1.1.1", 1080)]
+        mock_sock = MagicMock()
+        mock_connect.return_value = mock_sock
+
+        with patch("ssl.create_default_context") as mock_ssl:
+            mock_ctx = MagicMock()
+            mock_ssl.return_value = mock_ctx
+            mock_ctx.wrap_socket.return_value = mock_sock
+            mock_sock.recv.side_effect = [b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ndata", b""]
+            status, data = tile_cache.fetch_via_socks5("https://example.com")
+            self.assertEqual(status, 200)
+            self.assertEqual(data, b"data")
+            mock_ssl.assert_called_once()
+
+    def test_decode_chunked_empty_chunk(self):
+        data = b"0\r\n\r\n"
+        self.assertEqual(tile_cache._decode_chunked(data), b"")
+
+    def test_decode_chunked_no_line_end(self):
+        data = b"abc"
+        self.assertEqual(tile_cache._decode_chunked(data), b"")
+
+    def test_handler_missing_url(self):
+        from io import BytesIO
+        class MockRequest:
+            def __init__(self):
+                self.rfile = BytesIO(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                self.wfile = BytesIO()
+            def makefile(self, *args, **kwargs):
+                if args[0] == 'rb': return self.rfile
+                return self.wfile
+            def sendall(self, data):
+                self.wfile.write(data)
+            def close(self): pass
+
+        mock_req = MockRequest()
+        handler = tile_cache.TileCacheHandler(mock_req, ("127.0.0.1", 12345), MagicMock())
+        self.assertIn(b"400", mock_req.wfile.getvalue())
+        self.assertIn(b"Missing 'url' parameter", mock_req.wfile.getvalue())
+
+    @patch("nas_proxy.tile_cache.storage_get")
+    @patch("nas_proxy.tile_cache.fetch_via_pool")
+    def test_handler_exception_during_fetch(self, mock_fetch, mock_storage_get):
+        from io import BytesIO
+        class MockRequest:
+            def __init__(self):
+                self.rfile = BytesIO(b"GET /?url=http://example.com HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                self.wfile = BytesIO()
+            def makefile(self, *args, **kwargs):
+                if args[0] == 'rb': return self.rfile
+                return self.wfile
+            def sendall(self, data):
+                self.wfile.write(data)
+            def close(self): pass
+
+        mock_req = MockRequest()
+        mock_storage_get.return_value = None
+        mock_fetch.side_effect = Exception("pool crash")
+        with patch("nas_proxy.tile_cache.fetch_via_socks5") as mock_socks:
+            mock_socks.side_effect = Exception("socks crash")
+            handler = tile_cache.TileCacheHandler(mock_req, ("127.0.0.1", 12345), MagicMock())
+            self.assertIn(b"502", mock_req.wfile.getvalue())
+
+    @patch("nas_proxy.tile_cache.storage_get")
+    @patch("nas_proxy.tile_cache.fetch_via_pool")
+    def test_handler_non_200_response(self, mock_fetch, mock_storage_get):
+        from io import BytesIO
+        class MockRequest:
+            def __init__(self):
+                self.rfile = BytesIO(b"GET /?url=http://example.com HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                self.wfile = BytesIO()
+            def makefile(self, *args, **kwargs):
+                if args[0] == 'rb': return self.rfile
+                return self.wfile
+            def sendall(self, data):
+                self.wfile.write(data)
+            def close(self): pass
+
+        mock_req = MockRequest()
+        mock_storage_get.return_value = None
+        mock_fetch.return_value = (404, b"not found")
+        handler = tile_cache.TileCacheHandler(mock_req, ("127.0.0.1", 12345), MagicMock())
+        self.assertIn(b"404", mock_req.wfile.getvalue())
+        self.assertIn(b"not found", mock_req.wfile.getvalue())
+
 if __name__ == '__main__':
     unittest.main()
