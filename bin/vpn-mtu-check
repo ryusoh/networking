@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+# vpn-mtu-check — diagnose and optionally fix MTU/path-MTU issues on macOS VPN
+# tunnels (utun*).
+#
+# Symptoms this catches:
+#   - ping and DNS work, but HTTPS/TLS handshakes fail
+#   - Large packets silently dropped, small packets pass
+#
+# Usage:
+#   vpn-mtu-check           diagnose only (no changes, no sudo needed)
+#   vpn-mtu-check --fix     auto-adjust MTU to the working ceiling (needs sudo)
+#
+# Exit code: 0 = no MTU issue detected, 1 = MTU issue found.
+
+set -uo pipefail
+
+FIX=0
+[[ "${1:-}" == "--fix" ]] && FIX=1
+
+if [[ "$OSTYPE" != darwin* ]]; then
+    echo "vpn-mtu-check: this script targets macOS (Darwin) only." >&2
+    exit 1
+fi
+
+SUDO=""
+if [[ $FIX -eq 1 && $EUID -ne 0 ]]; then
+    SUDO="sudo"
+fi
+
+say()   { echo "$@"; }
+warn()  { echo "$@" >&2; }
+
+# ---------------------------------------------------------------------------
+# Find active utun interfaces carrying default routes.
+find_vpn_ifs() {
+    netstat -rn -f inet | awk '$1 == "default" {print $NF}' | sort -u | grep '^utun'
+}
+
+# Get current MTU for an interface.
+get_mtu() {
+    local ifname="$1"
+    ifconfig "$ifname" 2>/dev/null | awk '/mtu / {print $NF}' | head -1
+}
+
+# Ping with DF bit and specific payload size.
+# macOS: ping -D -s <payload> <host>
+# Returns 0 if ping succeeds, 1 if fails.
+ping_with_size() {
+    local size="$1"
+    ping -D -c 1 -t 2 -s "$size" 1.1.1.1 >/dev/null 2>&1
+}
+
+# Binary-search the highest working payload size.
+# macOS ping -s is the payload; add 28 (IP+ICMP) for total packet size.
+find_mtu_ceiling() {
+    local lo=500    # known working
+    local hi=1472   # typical Ethernet max payload
+
+    # First, do a coarse check — if 1472 works, no MTU issue.
+    if ping_with_size $hi; then
+        echo "$hi"
+        return 0
+    fi
+
+    # Binary search for the boundary.
+    while [[ $((lo + 1)) -lt $hi ]]; do
+        local mid=$(( (lo + hi) / 2 ))
+        if ping_with_size $mid; then
+            lo=$mid
+        else
+            hi=$mid
+        fi
+    done
+    echo "$lo"
+}
+
+# ---------------------------------------------------------------------------
+say "== 1. active VPN tunnel interfaces =="
+
+VPN_IFS=$(find_vpn_ifs)
+if [[ -z "$VPN_IFS" ]]; then
+    say "no utun interfaces found in default routes"
+    say "verdict: no VPN tunnel active, nothing to diagnose."
+    exit 0
+fi
+
+say "default-route utun interface(s): $(echo "$VPN_IFS" | tr '\n' ' ')"
+
+# ---------------------------------------------------------------------------
+say
+say "== 2. interface MTU =="
+
+for ifn in $VPN_IFS; do
+    mtu=$(get_mtu "$ifn")
+    say "  $ifn: current MTU = ${mtu:-unknown}"
+done
+
+# Pick the first utun interface for probing (they usually share a tunnel).
+TARGET_IF=$(echo "$VPN_IFS" | head -1)
+say "  (using $TARGET_IF for path-MTU probe)"
+
+# ---------------------------------------------------------------------------
+say
+say "== 3. path-MTU probe (ping with Don't-Fragment) =="
+
+say "  testing payload sizes against 1.1.1.1 with DF bit..."
+
+# Quick coarse checks
+for payload in 1472 1392 1352 1280 1024; do
+    total=$((payload + 28))
+    if ping_with_size "$payload"; then
+        say "    payload $payload (total $total bytes): OK"
+        COARSE_OK=$payload
+    else
+        say "    payload $payload (total $total bytes): FAIL"
+        COARSE_FAIL=$payload
+        break
+    fi
+done
+
+if [[ -n "${COARSE_OK:-}" && -z "${COARSE_FAIL:-}" ]]; then
+    say "  all tested sizes up to 1500 bytes succeeded"
+    say "  no MTU ceiling detected — problem is elsewhere."
+    MTU_ISSUE=0
+else
+    say "  ceiling somewhere below ${COARSE_FAIL:-1472} bytes payload"
+    say "  running binary search for exact boundary..."
+    CEILING=$(find_mtu_ceiling)
+    TOTAL_CEILING=$((CEILING + 28))
+    say "  highest working payload: $CEILING (total packet: $TOTAL_CEILING bytes)"
+    MTU_ISSUE=1
+fi
+
+# ---------------------------------------------------------------------------
+say
+say "== 4. curl connectivity tests =="
+
+curl_ok() {
+    local label="$1"; shift
+    if curl -sS --max-time 10 -o /dev/null "$@" 2>&1; then
+        say "  $label: OK"
+        return 0
+    else
+        say "  $label: FAIL"
+        return 1
+    fi
+}
+
+# Baseline
+CURL_FAIL=0
+curl_ok "HTTPS ipinfo.io"     https://ipinfo.io     || CURL_FAIL=1
+curl_ok "HTTPS cloudflare.com" https://cloudflare.com || CURL_FAIL=1
+
+# If HTTPS fails, try TCP-only and small-packet tricks
+if [[ $CURL_FAIL -eq 1 ]]; then
+    say
+    say "  HTTPS failed — trying workarounds..."
+
+    # TCP connectivity without TLS
+    if nc -G 5 -z ipinfo.io 443 2>/dev/null; then
+        say "  TCP 443 to ipinfo.io: OK (TLS layer is the problem)"
+    else
+        say "  TCP 443 to ipinfo.io: FAIL (total TCP blackhole)"
+    fi
+
+    # TLS with small record size (forces smaller packets)
+    curl_ok "HTTPS with -tls-max 1.2" https://ipinfo.io --tls-max 1.2 || true
+
+    # Explicit IPv4 to rule out v6
+    curl_ok "HTTPS via IPv4" https://104.16.249.249 -H "Host: ipinfo.io" --insecure || true
+fi
+
+# ---------------------------------------------------------------------------
+say
+say "== 5. verdict & recommendation =="
+
+if [[ "${MTU_ISSUE:-0}" -eq 0 && "$CURL_FAIL" -eq 0 ]]; then
+    say "verdict: no MTU issue detected. Network looks healthy."
+    exit 0
+fi
+
+if [[ "${MTU_ISSUE:-0}" -eq 0 && "$CURL_FAIL" -eq 1 ]]; then
+    say "verdict: HTTPS fails but MTU looks fine. Likely TLS/cert/proxy issue."
+    say "  - check if a proxy (Clash, Surge, etc.) is intercepting TLS"
+    say "  - check 'networksetup -getsecurewebproxy Wi-Fi'"
+    exit 1
+fi
+
+# MTU issue confirmed
+RECOMMENDED=$((TOTAL_CEILING - 8))
+[[ $RECOMMENDED -lt 1280 ]] && RECOMMENDED=1280
+
+say "verdict: MTU issue detected on $TARGET_IF."
+say "  current MTU: $(get_mtu "$TARGET_IF")"
+say "  working ceiling: ${TOTAL_CEILING} bytes"
+say "  recommended MTU: $RECOMMENDED (leaving headroom for protocol overhead)"
+
+if [[ $FIX -eq 1 ]]; then
+    say
+    say "  applying fix: setting $TARGET_IF MTU to $RECOMMENDED"
+    $SUDO ifconfig "$TARGET_IF" mtu "$RECOMMENDED"
+    say "  verifying..."
+    NEW_MTU=$(get_mtu "$TARGET_IF")
+    say "  $TARGET_IF MTU now: $NEW_MTU"
+    if curl -sS --max-time 10 -o /dev/null https://ipinfo.io 2>/dev/null; then
+        say "  post-fix HTTPS test: OK"
+        say "verdict: fixed."
+        exit 0
+    else
+        say "  post-fix HTTPS test: still FAIL"
+        say "verdict: MTU adjusted but connectivity still broken."
+        exit 1
+    fi
+else
+    say
+    say "to auto-fix, run:  $0 --fix"
+    say "or manually:        sudo ifconfig $TARGET_IF mtu $RECOMMENDED"
+    exit 1
+fi

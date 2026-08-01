@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# vpn-recover — recover networking after Astrill (wireguard/stealthvpn) teardown
-# breaks a subsequently-started SS/vmess client (Clash Verge, mihomo, etc.).
+# vpn-recover — recover networking after Astrill (wireguard/stealthvpn) or
+# proxy-VPN (Shadowrocket, Clash Verge, mihomo, etc.) teardown leaves stale
+# routes / dead tunnels behind.
 #
 # What it fixes (macOS):
 #   1. Stale `default` routes still pointing at dead utun interfaces left by the
 #      previous VPN — new VPN traffic blackholes into them.
 #   2. Dead tunnel-DNS servers (e.g. 198.18.x.x fake-ip) left in the resolver
 #      list — DNS for the proxy server times out for minutes.
-#   3. Poisoned DNS/ARP caches that keep the failures alive long after the
+#   3. Zombie proxy tunnels: the utun interface answers ping but the backing
+#      process (MacPacketTunnel, neagent, etc.) has zero upstream connections,
+#      so all HTTPS traffic silently fails (SSL_ERROR_SYSCALL).
+#   4. Poisoned DNS/ARP caches that keep the failures alive long after the
 #      routes/DNS are fixed.
 #
 # Usage:
@@ -43,6 +47,28 @@ if_alive() {
     ping -c 1 -t 2 -b "$ifname" 223.5.5.5 >/dev/null 2>&1
 }
 
+# Count outbound TCP connections from a given process name that leave the
+# local machine (exclude loopback and private ranges).
+external_connections() {
+    local pname="$1"
+    lsof -i -n -P 2>/dev/null | grep "$pname" | grep ESTABLISHED | grep -v '127\.0\.0\.1' | grep -vE '192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|10\.' | wc -l | tr -d ' '
+}
+
+# Detect whether a utun interface is backed by a proxy/VPN process that
+# actually has upstream connectivity.  A tunnel that answers ping but has
+# zero external connections is a "zombie" — the local TUN endpoint is up
+# but the upstream node is dead (common with Shadowrocket, Clash, etc.).
+utun_has_upstream() {
+    local procs="MacPacketTunnel neagent nesessionmanager packettunnel"
+    local total=0
+    for p in $procs; do
+        local n
+        n=$(external_connections "$p")
+        total=$((total + n))
+    done
+    [[ $total -gt 0 ]]
+}
+
 # ---------------------------------------------------------------------------
 say "== 1. default routes / stale utun =="
 
@@ -56,7 +82,13 @@ for ifn in $DEFAULT_IFS; do
     case "$ifn" in
         utun*)
             if if_alive "$ifn"; then
-                say "  $ifn: tunnel answers ping, keeping"
+                if utun_has_upstream; then
+                    say "  $ifn: tunnel answers ping and has upstream connections, keeping"
+                else
+                    say "  $ifn: ZOMBIE — tunnel answers ping but has zero upstream connections (dead proxy node)"
+                    stale_ifs+=("$ifn")
+                    problems=1
+                fi
             else
                 say "  $ifn: STALE — default route into a dead tunnel (typical Astrill leftover)"
                 stale_ifs+=("$ifn")
@@ -166,7 +198,8 @@ fi
 
 say "verdict: repairs applied but connectivity still failing."
 say "next steps:"
-say "  - quit and relaunch the SS/vmess client (Clash Verge), or toggle its TUN mode"
+say "  - quit and relaunch the SS/vmess client (Clash Verge, Shadowrocket), or toggle its TUN mode"
+say "  - if Shadowrocket: check that your JMS/subscription node is actually online (not expired)"
 say "  - if Astrill is fully quit but utun interfaces keep accumulating, reboot once"
-say "  - run 'bin/check-ss <local-socks-port>' to test the proxy itself"
+say "  - run 'bin/check-ss <local-socks-port>' or 'bin/vpn-proxy-check' to test the proxy itself"
 exit 1

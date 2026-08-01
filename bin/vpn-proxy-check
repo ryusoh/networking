@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+# vpn-proxy-check — detect and recover from dead Shadowrocket/clash local-proxy
+# blackholes on macOS.
+#
+# Symptoms this catches:
+#   - System proxy / TUN is active but has no upstream connectivity
+#   - DNS works to local resolver but times out to external resolvers
+#   - curl returns SSL_ERROR_SYSCALL or proxy 503 errors
+#   - Browser works for nothing, yet Wi-Fi shows "connected"
+#
+# Usage:
+#   vpn-proxy-check         diagnose only
+#   vpn-proxy-check --fix   clear dead proxy settings (needs sudo)
+#
+# Exit code: 0 = proxy healthy, 1 = dead proxy detected.
+
+set -uo pipefail
+
+FIX=0
+[[ "${1:-}" == "--fix" ]] && FIX=1
+
+if [[ "$OSTYPE" != darwin* ]]; then
+    echo "vpn-proxy-check: macOS only." >&2
+    exit 1
+fi
+
+SUDO=""
+if [[ $FIX -eq 1 && $EUID -ne 0 ]]; then
+    SUDO="sudo"
+fi
+
+say()   { echo "$@"; }
+warn()  { echo "$@" >&2; }
+
+# ---------------------------------------------------------------------------
+# Detect active system proxy settings.
+# ---------------------------------------------------------------------------
+get_system_proxy() {
+    scutil --proxy
+}
+
+proxy_enabled() {
+    local key="$1"
+    scutil --proxy | awk -v k="$key" '$1 == k {print $NF}' | grep -q '1'
+}
+
+# ---------------------------------------------------------------------------
+# Check if a port is listening locally.
+# ---------------------------------------------------------------------------
+is_listening() {
+    local port="$1"
+    lsof -i :"$port" -sTCP:LISTEN -n -P >/dev/null 2>&1
+}
+
+# ---------------------------------------------------------------------------
+# Count outbound connections from a given process name.
+# ---------------------------------------------------------------------------
+external_connections() {
+    local pname="$1"
+    lsof -i -n -P 2>/dev/null | grep "$pname" | grep ESTABLISHED | grep -v '127.0.0.1' | grep -vE '192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|10\.' | wc -l | tr -d ' '
+}
+
+# ---------------------------------------------------------------------------
+# Test DNS bypassing local resolver.
+# ---------------------------------------------------------------------------
+dns_works() {
+    nslookup -timeout=2 google.com 8.8.8.8 >/dev/null 2>&1
+}
+
+# ---------------------------------------------------------------------------
+# Test HTTPS with and without proxy.
+# ---------------------------------------------------------------------------
+https_direct() {
+    curl -sS --max-time 8 --connect-timeout 5 -o /dev/null https://ipinfo.io 2>/dev/null
+}
+
+https_via_proxy() {
+    local proxy="$1"
+    curl -sS --max-time 8 --connect-timeout 5 -x "$proxy" -o /dev/null https://ipinfo.io 2>/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# Identify proxy app from port ownership.
+# ---------------------------------------------------------------------------
+proxy_owner() {
+    local port="$1"
+    lsof -i :"$port" -sTCP:LISTEN -n -P 2>/dev/null | tail -n +2 | awk '{print $1}' | sort -u | tr '\n' ' ' | sed 's/ $//'
+}
+
+# ---------------------------------------------------------------------------
+say "== 1. system proxy state =="
+
+HTTP_ENABLED=0
+HTTPS_ENABLED=0
+SOCKS_ENABLED=0
+proxy_port=""
+proxy_app=""
+
+if proxy_enabled HTTPEnable; then
+    HTTP_ENABLED=1
+    proxy_port=$(scutil --proxy | awk '$1 == "HTTPPort" {print $NF}')
+    say "  HTTP proxy:  127.0.0.1:$proxy_port"
+fi
+if proxy_enabled HTTPSEnable; then
+    HTTPS_ENABLED=1
+    proxy_port=$(scutil --proxy | awk '$1 == "HTTPSPort" {print $NF}')
+    say "  HTTPS proxy: 127.0.0.1:$proxy_port"
+fi
+if proxy_enabled SOCKSEnable; then
+    SOCKS_ENABLED=1
+    proxy_port=$(scutil --proxy | awk '$1 == "SOCKSPort" {print $NF}')
+    say "  SOCKS proxy: 127.0.0.1:$proxy_port"
+fi
+
+if [[ $HTTP_ENABLED -eq 0 && $HTTPS_ENABLED -eq 0 && $SOCKS_ENABLED -eq 0 ]]; then
+    say "  no system proxy enabled"
+    say
+    say "verdict: no proxy active. If network is broken, problem is elsewhere."
+    exit 0
+fi
+
+proxy_app=$(proxy_owner "$proxy_port")
+say "  proxy process(es): ${proxy_app:-unknown}"
+
+# ---------------------------------------------------------------------------
+say
+say "== 2. proxy process health =="
+
+if [[ -n "$proxy_app" ]]; then
+    for app in $proxy_app; do
+        conns=$(external_connections "$app")
+        say "  $app external connections: $conns"
+    done
+else
+    say "  WARNING: proxy port $proxy_port is NOT actively listening!"
+fi
+
+# ---------------------------------------------------------------------------
+say
+say "== 3. upstream connectivity tests =="
+
+DIRECT_OK=0
+PROXY_OK=0
+DNS_OK=0
+
+if dns_works; then
+    say "  external DNS (8.8.8.8): OK"
+    DNS_OK=1
+else
+    say "  external DNS (8.8.8.8): FAIL / TIMEOUT"
+fi
+
+if https_direct; then
+    say "  HTTPS direct (no proxy): OK"
+    DIRECT_OK=1
+else
+    say "  HTTPS direct (no proxy): FAIL"
+fi
+
+proxy_url=""
+[[ $SOCKS_ENABLED -eq 1 ]] && proxy_url="socks5h://127.0.0.1:$proxy_port"
+[[ $HTTP_ENABLED -eq 1 ]] && proxy_url="http://127.0.0.1:$proxy_port"
+
+if [[ -n "$proxy_url" ]]; then
+    if https_via_proxy "$proxy_url"; then
+        say "  HTTPS via proxy ($proxy_url): OK"
+        PROXY_OK=1
+    else
+        say "  HTTPS via proxy ($proxy_url): FAIL"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+say
+say "== 4. diagnosis =="
+
+DEAD_PROXY=0
+
+if [[ $DIRECT_OK -eq 1 && $PROXY_OK -eq 0 ]]; then
+    say "  direct HTTPS works, but proxy HTTPS fails"
+    say "  → proxy is running but cannot reach its upstream server"
+    DEAD_PROXY=1
+elif [[ $DIRECT_OK -eq 0 && $DNS_OK -eq 0 ]]; then
+    say "  both direct HTTPS and external DNS fail"
+    say "  → network is fully offline, or DNS is hijacked by a dead tunnel"
+    DEAD_PROXY=1
+elif [[ -z "$proxy_app" ]]; then
+    say "  proxy is configured but nothing is listening on the port"
+    say "  → proxy process crashed or was quit"
+    DEAD_PROXY=1
+else
+    say "  proxy appears functional (or failure is ambiguous)"
+fi
+
+# ---------------------------------------------------------------------------
+say
+say "== 5. verdict =="
+
+if [[ $DEAD_PROXY -eq 0 ]]; then
+    say "verdict: proxy appears healthy or issue is elsewhere."
+    exit 0
+fi
+
+say "verdict: DEAD PROXY DETECTED."
+say "  ${proxy_app:-Proxy} is configured but cannot forward traffic."
+say
+say "common causes:"
+say "  • JMS / SS node expired or password changed"
+say "  • Shadowrocket/clash crashed or tunnel extension hung"
+say "  • Proxy is in TUN mode but upstream node is disconnected"
+say
+
+if [[ $FIX -eq 1 ]]; then
+    say "== applying fix: clearing system proxy =="
+    $SUDO networksetup -setwebproxy "Wi-Fi" "" "" 2>/dev/null || true
+    $SUDO networksetup -setwebproxystate "Wi-Fi" off 2>/dev/null || true
+    $SUDO networksetup -setsecurewebproxy "Wi-Fi" "" "" 2>/dev/null || true
+    $SUDO networksetup -setsecurewebproxystate "Wi-Fi" off 2>/dev/null || true
+    $SUDO networksetup -setsocksfirewallproxystate "Wi-Fi" off 2>/dev/null || true
+    # Also try via scutil for completeness
+    $SUDO scutil --proxy <<'EOF' >/dev/null 2>&1
+get State:/Network/Global/IPv4
+d.add ProxyAutoConfigEnable 0
+d.add HTTPEnable 0
+d.add HTTPSEnable 0
+d.add SOCKSEnable 0
+set State:/Network/Global/IPv4
+EOF
+    say "  system proxy cleared."
+    say
+    say "verifying direct connectivity..."
+    if https_direct; then
+        say "  post-fix HTTPS direct: OK"
+        say
+        say "verdict: fixed. Your raw internet is back."
+        say "next steps:"
+        say "  1. Open Shadowrocket and check your JMS node status"
+        say "  2. If node shows red/offline, the JMS subscription may have expired"
+        say "  3. After fixing the node, re-enable proxy in Shadowrocket"
+        exit 0
+    else
+        say "  post-fix HTTPS direct: still FAIL"
+        say "  the problem may be deeper than the proxy alone."
+        exit 1
+    fi
+else
+    say "to auto-clear the dead proxy:  $0 --fix"
+    say "or manually quit Shadowrocket and disable proxy in System Settings."
+    exit 1
+fi
