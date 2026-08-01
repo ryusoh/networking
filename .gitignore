@@ -8,6 +8,7 @@ nas_proxy/config/proxies.json
 *.o
 *.bin
 !research/**/*.bin
+research/.chunks_manifest.json
 *.so
 *.dylib
 tile_storage
