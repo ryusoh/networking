@@ -598,17 +598,22 @@
                   }
                   const selectors = result?.customSelectors ? result.customSelectors[host] : null;
                   if (selectors && Array.isArray(selectors)) {
-                    selectors.forEach((selector) => {
+                    const numSelectors = selectors.length;
+                    for (let i = 0; i < numSelectors; i++) {
+                      const selector = selectors[i];
                       try {
-                        document.querySelectorAll(selector).forEach((el) => {
+                        const els = document.querySelectorAll(selector);
+                        const numEls = els.length;
+                        for (let j = 0; j < numEls; j++) {
+                          const el = els[j];
                           if (el instanceof HTMLElement) {
                             el.style.setProperty('display', 'none', 'important');
                           }
-                        });
+                        }
                       } catch {
                         log('Invalid custom selector:', selector);
                       }
-                    });
+                    }
                   }
                 } catch (e) {
                   log('Local storage callback failed:', e);
