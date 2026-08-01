@@ -24,9 +24,9 @@ primary sources to prefer, and the output location decided below.
   APIs** — not secondary interpretations, blog posts, or Q&A sites. Trace every
   claim to its authoritative origin.
 - For questions about this repo's own subsystems, the primary source is the code
-  under the relevant subproject (`clean_adblock/`, `nas_proxy/`, `nas_tools/`,
-  `retriever/`, `vps_kernel_proxy/`, `vps_user_proxy/`, `tianditu_bypass/`, etc.)
-  plus the governing doc under `docs/` (`EBPF_RESEARCH.md`, `NAS_STRATEGY.md`) —
+  under the relevant subproject (`adblock/`, `nas_proxy/`, `nas_tools/`,
+  `retriever/`, `vps_kernel_proxy/`, `vps_user_proxy/`, `gov_bypass/`, etc.)
+  plus the governing doc under `docs/` (`ebpf-research.md`, `nas-strategy.md`) —
   see `AGENTS.md` for the full layout and conventions.
 - For anything about Claude / the Anthropic API, the `claude-api` skill is the
   primary source — use it rather than answering from memory.
@@ -41,7 +41,7 @@ what I couldn't verify" section.
 ## Store
 
 Save following this repo's convention: durable subsystem knowledge lives under
-`docs/` (the same place `EBPF_RESEARCH.md` and `NAS_STRATEGY.md` live). If the
+`docs/` (the same place `ebpf-research.md` and `nas-strategy.md` live). If the
 finding maps to an existing doc, extend it rather than creating a duplicate; if
 it's a genuinely new area, add a new `docs/<topic>.md` and note the location in
 your reply. For throwaway investigation that doesn't belong in version control,

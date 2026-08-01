@@ -195,7 +195,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   Tests in `stall_guard/tests/` — **not** `__tests__/`,
   because Chrome refuses to load extensions containing `_`-prefixed dirs. See
   the `add-extension` skill for the full new-extension checklist.
-- `docs/` — `EBPF_RESEARCH.md`, `NAS_STRATEGY.md`. `bin/coverage_rank.py` — the
+- `docs/` — `ebpf-research.md`, `nas-strategy.md`. `bin/coverage_rank.py` — the
   coverage ranking helper.
 
 ### Shell scripts in `bin/` (macOS bash 3.2 gotchas)
