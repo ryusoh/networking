@@ -8,10 +8,5 @@
     "complexity": {
       "count": 2
     }
-  },
-  "clean_adblock/nytimes-unlocked.js": {
-    "complexity": {
-      "count": 1
-    }
   }
 }
