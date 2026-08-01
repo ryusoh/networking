@@ -217,7 +217,9 @@ def iter_tracked_sources():
         text=True,
         check=True,
     )
-    for path in result.stdout.split():
+    for path in result.stdout.splitlines():
+        if not path:
+            continue
         if path.endswith(".min.js") or any(part in path for part in EXCLUDED_PARTS):
             continue
         yield path
