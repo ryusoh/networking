@@ -1,11 +1,11 @@
 """Unit tests for Phase 2 BM25 Search Engine (tools/search_research_chunks.py)."""
 
 from pathlib import Path
-from tools import search_research_chunks
+from tools.research import search_chunks
 
 
 def test_tokenize():
-    tokens = search_research_chunks.tokenize("BGP Route-Reflector 100% OK! #paxos")
+    tokens = search_chunks.tokenize("BGP Route-Reflector 100% OK! #paxos")
     assert tokens == ["bgp", "route", "reflector", "100", "ok", "paxos"]
 
 
@@ -37,7 +37,7 @@ def test_bm25_indexer_ranks_matching_documents():
         },
     ]
 
-    indexer = search_research_chunks.BM25Indexer(chunks)
+    indexer = search_chunks.BM25Indexer(chunks)
 
     # Search for Paxos
     results_paxos = indexer.score("paxos consensus")
@@ -51,6 +51,6 @@ def test_bm25_indexer_ranks_matching_documents():
 
 
 def test_format_file_link(tmp_path: Path):
-    link = search_research_chunks.format_file_link(tmp_path, "research/cs234/b4.md", 10, 50)
+    link = search_chunks.format_file_link(tmp_path, "research/cs234/b4.md", 10, 50)
     assert link.startswith("[research/cs234/b4.md#L10-L50](file://")
     assert "#L10-L50" in link

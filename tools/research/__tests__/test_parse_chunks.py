@@ -1,7 +1,7 @@
 """Unit tests for Phase 1 Structural Chunking Engine (tools/parse_research_chunks.py)."""
 
 from pathlib import Path
-from tools import parse_research_chunks
+from tools.research import parse_chunks
 
 
 def test_parse_markdown_file_splits_on_headers_and_tracks_lines(tmp_path: Path):
@@ -19,7 +19,7 @@ def test_parse_markdown_file_splits_on_headers_and_tracks_lines(tmp_path: Path):
         "Line 10 section content.\n"
     )
 
-    chunks = parse_research_chunks.parse_markdown_file(sample_md, tmp_path)
+    chunks = parse_chunks.parse_markdown_file(sample_md, tmp_path)
     assert len(chunks) == 2
 
     # Chunk 1: Title Header
@@ -38,7 +38,7 @@ def test_parse_source_code_file(tmp_path: Path):
     code_file = tmp_path / "test.p4"
     code_file.write_text("header Ethernet {\n    bit<48> dstAddr;\n}\n")
 
-    chunks = parse_research_chunks.parse_source_code_file(code_file, tmp_path)
+    chunks = parse_chunks.parse_source_code_file(code_file, tmp_path)
     assert len(chunks) == 1
     assert chunks[0]["start_line"] == 1
     assert chunks[0]["end_line"] == 3
@@ -50,7 +50,7 @@ def test_build_chunks_manifest(tmp_path: Path):
     research_dir.mkdir()
     (research_dir / "note.md").write_text("# Note\nContent here.\n")
 
-    manifest = parse_research_chunks.build_chunks_manifest(research_dir, tmp_path)
+    manifest = parse_chunks.build_chunks_manifest(research_dir, tmp_path)
     assert manifest["metadata"]["total_files_parsed"] == 1
     assert manifest["metadata"]["total_chunks"] == 1
     assert manifest["chunks"][0]["heading"] == "Note"

@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 from typing import Any, Sequence
 
-DEFAULT_RESEARCH_DIR = Path(__file__).resolve().parent.parent / "research"
+DEFAULT_RESEARCH_DIR = Path(__file__).resolve().parent.parent.parent / "research"
 DEFAULT_MANIFEST_PATH = DEFAULT_RESEARCH_DIR / ".chunks_manifest.json"
 
 WORD_PATTERN = re.compile(r"\b\w+\b")
@@ -158,7 +158,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if not manifest_path.exists():
         parser.error(
-            f"Manifest file not found at {manifest_path}. Run 'python3 tools/parse_research_chunks.py' first."
+            f"Manifest file not found at {manifest_path}. Run 'python3 tools/research/parse_chunks.py' first."
         )
 
     manifest_data = load_manifest(manifest_path)

@@ -19,7 +19,7 @@ from typing import Any, Sequence
 HEADER_PATTERN = re.compile(r"^(#{1,6})\s+(.+)$")
 SLIDE_PATTERN = re.compile(r"^\s*<!--\s*slide\s*-->\s*$", re.IGNORECASE)
 
-DEFAULT_RESEARCH_DIR = Path(__file__).resolve().parent.parent / "research"
+DEFAULT_RESEARCH_DIR = Path(__file__).resolve().parent.parent.parent / "research"
 DEFAULT_MANIFEST_PATH = DEFAULT_RESEARCH_DIR / ".chunks_manifest.json"
 
 CODE_EXTENSIONS = {".p4", ".py", ".c", ".h", ".gns3", ".json", ".sh"}
