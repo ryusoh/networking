@@ -174,44 +174,54 @@
   }
 
   /**
-   * Restore full article from __preloadedData.sprinkledBody.content
+   * Extract NYT data from window
+   * @returns {{ sprinkledBody?: { content?: import("./types/nytimes").NYTBlock[] } } | null}
    */
-  let restored = false;
-  function restoreArticle() {
-    if (restored) {
-      return;
-    }
+  function getArticleData() {
     const data = /** @type {Record<string, import("./types/nytimes").NYTData | undefined>} */ (
       /** @type {unknown} */ (window)
     )['__preloadedData'];
     if (!data || !data.initialData || !data.initialData.data) {
-      return;
+      return null;
     }
-
     const article = data.initialData.data.article;
     if (!article || !article.sprinkledBody || !article.sprinkledBody.content) {
-      return;
+      return null;
     }
+    return article;
+  }
 
-    const articleBody = document.querySelector(
-      'section[name="articleBody"], section.meteredContent'
-    );
-    if (!articleBody) {
-      return;
+  /**
+   * Format a single inline block of text
+   * @param {import("./types/nytimes").NYTInline} inline
+   * @returns {{ text: string, html: string }}
+   */
+  function formatInlineText(inline) {
+    if (inline.__typename !== 'TextInline') {
+      return { text: '', html: '' };
     }
-
-    // Collect existing paragraph texts to avoid duplicates
-    const existingTexts = new Set();
-    articleBody.querySelectorAll('p').forEach((p) => {
-      const t = p.textContent.trim();
-      if (t) {
-        existingTexts.add(t);
+    let t = inline.text || '';
+    if (inline.formats && inline.formats.length > 0) {
+      for (const fmt of inline.formats) {
+        if (fmt.__typename === 'BoldFormat') {
+          t = '<strong>' + t + '</strong>';
+        } else if (fmt.__typename === 'ItalicFormat') {
+          t = '<em>' + t + '</em>';
+        }
       }
-    });
+    }
+    return { text: inline.text || '', html: t };
+  }
 
-    // Extract paragraphs from sprinkledBody
+  /**
+   * Process and extract new paragraphs from sprinkledBody
+   * @param {import("./types/nytimes").NYTBlock[]} content
+   * @param {Set<string>} existingTexts
+   * @returns {string[]}
+   */
+  function extractNewParagraphs(content, existingTexts) {
     const newParagraphs = [];
-    for (const block of article.sprinkledBody.content) {
+    for (const block of content) {
       if (block.__typename !== 'ParagraphBlock' || !block.content) {
         continue;
       }
@@ -219,20 +229,9 @@
       let text = '';
       let html = '';
       for (const inline of block.content) {
-        if (inline.__typename === 'TextInline') {
-          let t = inline.text || '';
-          if (inline.formats && inline.formats.length > 0) {
-            for (const fmt of inline.formats) {
-              if (fmt.__typename === 'BoldFormat') {
-                t = '<strong>' + t + '</strong>';
-              } else if (fmt.__typename === 'ItalicFormat') {
-                t = '<em>' + t + '</em>';
-              }
-            }
-          }
-          html += t;
-          text += inline.text || '';
-        }
+        const fmt = formatInlineText(inline);
+        text += fmt.text;
+        html += fmt.html;
       }
 
       text = text.trim();
@@ -241,7 +240,15 @@
         existingTexts.add(text);
       }
     }
+    return newParagraphs;
+  }
 
+  /**
+   * Insert extracted paragraphs into the companion column
+   * @param {string[]} newParagraphs
+   * @param {Element} articleBody
+   */
+  function insertNewParagraphs(newParagraphs, articleBody) {
     if (newParagraphs.length === 0) {
       return;
     }
@@ -267,6 +274,40 @@
         companion.appendChild(p);
       }
     }
+  }
+
+  /**
+   * Restore full article from __preloadedData.sprinkledBody.content
+   */
+  let restored = false;
+  function restoreArticle() {
+    if (restored) {
+      return;
+    }
+
+    const article = getArticleData();
+    if (!article || !article.sprinkledBody || !article.sprinkledBody.content) {
+      return;
+    }
+
+    const articleBody = document.querySelector(
+      'section[name="articleBody"], section.meteredContent'
+    );
+    if (!articleBody) {
+      return;
+    }
+
+    // Collect existing paragraph texts to avoid duplicates
+    const existingTexts = new Set();
+    articleBody.querySelectorAll('p').forEach((p) => {
+      const t = p.textContent.trim();
+      if (t) {
+        existingTexts.add(t);
+      }
+    });
+
+    const newParagraphs = extractNewParagraphs(article.sprinkledBody.content, existingTexts);
+    insertNewParagraphs(newParagraphs, articleBody);
 
     restored = true;
   }
