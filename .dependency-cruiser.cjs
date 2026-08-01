@@ -12,10 +12,10 @@ module.exports = {
       name: 'no-cross-subproject-imports',
       comment:
         'AGENTS.md non-negotiable #2: subprojects are independent — ' +
-        'clean_adblock and tianditu_bypass must not import each other',
+        'adblock and gov_bypass must not import each other',
       severity: 'error',
-      from: { path: '^(clean_adblock|tianditu_bypass)/' },
-      to: { path: '^(clean_adblock|tianditu_bypass)/', pathNot: '^$1/' }
+      from: { path: '^(adblock|gov_bypass)/' },
+      to: { path: '^(adblock|gov_bypass)/', pathNot: '^$1/' }
     },
     {
       name: 'prod-not-to-tests',
@@ -37,8 +37,8 @@ module.exports = {
     // repo has v7) and print a spurious "missing-typescript-transpiler"
     // warning every run.
     doNotFollow: { path: 'node_modules' },
-    // _metadata/__pycache__: generated. clean_adblock/types: .d.ts
+    // _metadata/__pycache__: generated. adblock/types: .d.ts
     // declarations only (JSDoc type-check surface, no runtime imports).
-    exclude: { path: '(_metadata|__pycache__|clean_adblock/types)' }
+    exclude: { path: '(_metadata|__pycache__|adblock/types)' }
   }
 };

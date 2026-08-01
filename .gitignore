@@ -1,7 +1,7 @@
 node_modules/
 .DS_Store
 _metadata/
-clean_adblock/dist/
+adblock/dist/
 nas_proxy/tiles/
 nas_proxy/config/proxies.json
 .env

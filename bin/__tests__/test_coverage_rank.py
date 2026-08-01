@@ -15,9 +15,9 @@ _spec.loader.exec_module(coverage_rank)
 
 JEST_SUMMARY = {
     "total": {"lines": {"pct": 80}},
-    "clean_adblock/perfect.js": {"lines": {"pct": 100}, "branches": {"pct": 100}},
-    "clean_adblock/worst.js": {"lines": {"pct": 12.5}, "branches": {"pct": 40}},
-    "clean_adblock/middle.js": {"lines": {"pct": 75}, "branches": {"pct": 10}},
+    "adblock/perfect.js": {"lines": {"pct": 100}, "branches": {"pct": 100}},
+    "adblock/worst.js": {"lines": {"pct": 12.5}, "branches": {"pct": 40}},
+    "adblock/middle.js": {"lines": {"pct": 75}, "branches": {"pct": 10}},
 }
 
 COVERAGE_PY = {
@@ -39,16 +39,16 @@ def test_detects_coverage_py_vs_jest():
 def test_rank_jest_sorts_ascending_and_drops_total():
     ranked = coverage_rank.rank(JEST_SUMMARY, "lines")
     assert [f for f, _ in ranked] == [
-        "clean_adblock/worst.js",
-        "clean_adblock/middle.js",
-        "clean_adblock/perfect.js",
+        "adblock/worst.js",
+        "adblock/middle.js",
+        "adblock/perfect.js",
     ]
     assert all(f != "total" for f, _ in ranked)
 
 
 def test_rank_jest_honours_metric():
     ranked = coverage_rank.rank(JEST_SUMMARY, "branches")
-    assert ranked[0][0] == "clean_adblock/middle.js"
+    assert ranked[0][0] == "adblock/middle.js"
 
 
 def test_rank_coverage_py_uses_percent_covered():
@@ -74,7 +74,7 @@ def test_cli_json_skips_full_files_and_respects_limit(tmp_path):
     fixture.write_text(json.dumps(JEST_SUMMARY))
     result = _run(["--summary", str(fixture), "--limit", "1", "--json"])
     assert result.returncode == 0
-    assert json.loads(result.stdout) == [{"file": "clean_adblock/worst.js", "pct": 12.5}]
+    assert json.loads(result.stdout) == [{"file": "adblock/worst.js", "pct": 12.5}]
 
 
 def test_cli_missing_summary_exits_2_with_hint():

@@ -10,7 +10,7 @@ percent while the worst files at the top are ignored every run.
 
 Usage::
 
-    # JavaScript (clean_adblock)
+    # JavaScript (adblock)
     npx jest --coverage --coverageReporters=json-summary --coverageReporters=text
     python3 bin/coverage_rank.py --summary coverage/coverage-summary.json --limit 5
 
