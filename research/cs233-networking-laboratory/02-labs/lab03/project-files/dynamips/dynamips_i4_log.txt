@@ -1,0 +1,31 @@
+Jan 28 18:58:17.550 HYPERVISOR: Release 0.2.17-amd64/Darwin (tag 2017072410)
+Jan 28 18:58:17.551 HYPERVISOR: Started on IP = 127.0.0.1, TCP port = 58586.
+Jan 28 18:58:17.564 HYPERVISOR: exec_cmd: hypervisor version 
+Jan 28 18:58:17.564 HYPERVISOR: exec_cmd: hypervisor working_dir /Users/lz/GNS3/projects/lab3/project-files/dynamips 
+Jan 28 18:58:17.564 GENERAL: working_dir=/Users/lz/GNS3/projects/lab3/project-files/dynamips
+Jan 28 18:58:17.564 HYPERVISOR: exec_cmd: hypervisor working_dir /Users/lz/GNS3/projects/lab3/project-files/dynamips/1a7b7d48-13dd-4539-985a-d0145fdd460d 
+Jan 28 18:58:17.565 GENERAL: working_dir=/Users/lz/GNS3/projects/lab3/project-files/dynamips/1a7b7d48-13dd-4539-985a-d0145fdd460d
+Jan 28 18:58:17.565 HYPERVISOR: exec_cmd: vm create R3 1 c3600 
+Jan 28 18:58:17.566 VM: VM R3 created.
+Jan 28 18:58:17.566 HYPERVISOR: exec_cmd: vm set_con_tcp_port R3 5000 
+Jan 28 18:58:17.566 HYPERVISOR: exec_cmd: c3600 get_mac_addr R3 
+Jan 28 18:58:17.567 HYPERVISOR: exec_cmd: vm get_status R3 
+Jan 28 18:58:17.567 HYPERVISOR: exec_cmd: vm set_idle_pc R3 0x604f8344 
+Jan 28 18:58:17.567 HYPERVISOR: exec_cmd: vm set_ios R3 /Users/lz/GNS3/images/IOS/c3640-a3js-mz.124-19b.image 
+Jan 28 18:58:17.567 HYPERVISOR: exec_cmd: vm set_nvram R3 256 
+Jan 28 18:58:17.568 HYPERVISOR: exec_cmd: vm get_status R3 
+Jan 28 18:58:17.568 HYPERVISOR: exec_cmd: vm slot_add_binding R3 0 0 NM-1FE-TX 
+Jan 28 18:58:17.568 HYPERVISOR: exec_cmd: vm get_status R3 
+Jan 28 18:58:17.568 HYPERVISOR: exec_cmd: vm slot_add_binding R3 1 0 NM-1FE-TX 
+Jan 28 18:58:17.569 HYPERVISOR: exec_cmd: vm get_status R3 
+Jan 28 18:58:17.569 HYPERVISOR: exec_cmd: vm slot_add_binding R3 2 0 NM-1FE-TX 
+Jan 28 18:58:17.569 HYPERVISOR: exec_cmd: vm get_status R3 
+Jan 28 18:58:17.569 HYPERVISOR: exec_cmd: vm slot_add_binding R3 3 0 NM-1FE-TX 
+Jan 28 18:58:17.630 HYPERVISOR: exec_cmd: vm set_ios R3 /Users/lz/GNS3/images/IOS/c3640-a3js-mz.124-19b.image 
+Jan 28 19:00:12.440 HYPERVISOR: exec_cmd: vm get_status R3 
+Jan 28 19:00:12.440 HYPERVISOR: exec_cmd: vm extract_config R3 
+Jan 28 19:00:12.444 HYPERVISOR: exec_cmd: vm delete R3 
+Jan 28 19:00:12.445 VM: VM R3 destroyed.
+Jan 28 19:00:12.450 HYPERVISOR: exec_cmd: hypervisor stop 
+Jan 28 19:00:12.787 HYPERVISOR: Stopped.
+Jan 28 19:00:12.789 GENERAL: reset done.

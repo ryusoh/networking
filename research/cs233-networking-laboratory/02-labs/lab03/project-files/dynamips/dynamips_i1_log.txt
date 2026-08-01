@@ -1,0 +1,32 @@
+Jan 28 18:44:42.671 HYPERVISOR: Release 0.2.17-amd64/Darwin (tag 2017072410)
+Jan 28 18:44:42.672 HYPERVISOR: Started on IP = 127.0.0.1, TCP port = 58009.
+Jan 28 18:44:42.675 HYPERVISOR: exec_cmd: hypervisor version 
+Jan 28 18:44:42.675 HYPERVISOR: exec_cmd: hypervisor working_dir /Users/lz/GNS3/projects/lab3/project-files/dynamips 
+Jan 28 18:44:42.675 GENERAL: working_dir=/Users/lz/GNS3/projects/lab3/project-files/dynamips
+Jan 28 18:44:42.676 HYPERVISOR: exec_cmd: hypervisor working_dir /Users/lz/GNS3/projects/lab3/project-files/dynamips/69b4d8a4-44f1-407c-ae33-d178c255c228 
+Jan 28 18:44:42.676 GENERAL: working_dir=/Users/lz/GNS3/projects/lab3/project-files/dynamips/69b4d8a4-44f1-407c-ae33-d178c255c228
+Jan 28 18:44:42.676 HYPERVISOR: exec_cmd: vm create R1 1 c3600 
+Jan 28 18:44:42.677 VM: VM R1 created.
+Jan 28 18:44:42.678 HYPERVISOR: exec_cmd: vm set_con_tcp_port R1 5000 
+Jan 28 18:44:42.678 HYPERVISOR: exec_cmd: c3600 get_mac_addr R1 
+Jan 28 18:44:42.679 HYPERVISOR: exec_cmd: vm get_status R1 
+Jan 28 18:44:42.679 HYPERVISOR: exec_cmd: vm set_idle_pc R1 0x604f8344 
+Jan 28 18:44:42.680 HYPERVISOR: exec_cmd: vm set_ios R1 /Users/lz/GNS3/images/IOS/c3640-a3js-mz.124-19b.image 
+Jan 28 18:44:42.680 HYPERVISOR: exec_cmd: vm set_nvram R1 256 
+Jan 28 18:44:42.681 HYPERVISOR: exec_cmd: vm get_status R1 
+Jan 28 18:44:42.681 HYPERVISOR: exec_cmd: vm slot_add_binding R1 0 0 NM-1FE-TX 
+Jan 28 18:44:42.681 HYPERVISOR: exec_cmd: vm get_status R1 
+Jan 28 18:44:42.682 HYPERVISOR: exec_cmd: vm slot_add_binding R1 1 0 NM-1FE-TX 
+Jan 28 18:44:42.682 HYPERVISOR: exec_cmd: vm get_status R1 
+Jan 28 18:44:42.682 HYPERVISOR: exec_cmd: vm slot_add_binding R1 2 0 NM-1FE-TX 
+Jan 28 18:44:42.683 HYPERVISOR: exec_cmd: vm get_status R1 
+Jan 28 18:44:42.683 HYPERVISOR: exec_cmd: vm slot_add_binding R1 3 0 NM-1FE-TX 
+Jan 28 18:44:42.763 HYPERVISOR: exec_cmd: vm set_ios R1 /Users/lz/GNS3/images/IOS/c3640-a3js-mz.124-19b.image 
+Jan 28 18:44:45.210 HYPERVISOR: exec_cmd: vm set_ios R1 /Users/lz/GNS3/images/IOS/c3640-a3js-mz.124-19b.image 
+Jan 28 18:51:09.822 HYPERVISOR: exec_cmd: vm get_status R1 
+Jan 28 18:51:09.825 HYPERVISOR: exec_cmd: vm extract_config R1 
+Jan 28 18:51:09.828 HYPERVISOR: exec_cmd: vm delete R1 
+Jan 28 18:51:09.828 VM: VM R1 destroyed.
+Jan 28 18:51:09.830 HYPERVISOR: exec_cmd: hypervisor stop 
+Jan 28 18:51:09.973 HYPERVISOR: Stopped.
+Jan 28 18:51:09.975 GENERAL: reset done.
