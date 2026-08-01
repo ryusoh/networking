@@ -149,17 +149,23 @@ WHERE c.did = ? AND n.flds LIKE ?;
 
 Generated notes must conform to the structural format discovered in target decks:
 
-### 4.1 Front Field (Field 0) Standard
+### 4.1 Primary Language & Terminology Translation Contract
 
-- Concise concept title, mechanism name, or architectural tradeoff.
+- **Primary Language:** Card text MUST be written primarily in Chinese (Simplified Chinese).
+- **Bilingual Technical Terminology:** All technical terms, protocol names, hardware modules, and domain concepts MUST include their original English names or acronyms alongside the Chinese term.
+- **Example:** `网络地址转换 (Network Address Translation, NAT)`, `弹性计算服务 (Elastic Compute Service, ECS)`, `共识协议 (Consensus Protocol)`.
+
+### 4.2 Front Field (Field 0) Standard
+
+- Concise concept title, mechanism name, or architectural tradeoff in Chinese with English term annotations.
 - Inline bolding (`<strong>`) or LaTeX math notation (`\(...\)`).
 - Example: `<strong>ArBGP 遥测 (Telemetry) 的实时性</strong> —— AI 运维的眼睛`
 
-### 4.2 Back Field (Field 1) Standard
+### 4.3 Back Field (Field 1) Standard
 
 - Clean, non-nested HTML structure using `<div>`, `<ul>`, `<li>`, `<strong>`, `<b>`, `<blockquote>`.
 - Mathematical expressions formatted using LaTeX delimiters: `\( ... \)` for inline math, `\[ ... \]` for display math.
-- Structured technical breakdown:
+- Structured technical breakdown written in Chinese with English terminology:
   - **Motivation & Pain Point (背景 / 痛点)**
   - **Core Mechanism & Execution Flow (核心机制 & 流程)**
   - **Architectural Tradeoff & Citation (架构对比 & 源码引用)**
