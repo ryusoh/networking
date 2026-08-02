@@ -50,11 +50,19 @@ python3 tools/research/memory_host.py --student "default_user" --record --module
 
 ### 5. Generate & Ingest Anki Flashcards
 
-To generate non-duplicate, bilingual (Chinese primary with English technical terminology) Anki cards from unvisited `research/` courseware:
+To generate high-quality, bilingual (Chinese primary with English technical terminology) Anki cards from unvisited `research/` courseware:
 
 ```bash
 python3 tools/research/anki_generator.py --count 5 --deck "<target_deck>"
 ```
+
+#### Agent Judgment & Internet Enhancement Protocol:
+
+When invoking the Anki pipeline or reviewing candidate flashcards:
+
+1. **Non-Deterministic Quality Gate:** Use agent judgment to reject any trivial slides, administrative text, course schedule outlines, or low-value notes.
+2. **Web Search Enhancement:** For brief or high-density technical concepts (e.g., `B4 WAN`, `Paxos Consensus`, `NAPI`, `Clos Topology`), perform a targeted web search (`search_web`) to retrieve production engineering context, RFC specs, or practical pain points.
+3. **Card Enhancement:** Enrich the Back field with synthesized web search insights under **背景与痛点 (Motivation & Pain Points)** and **核心机制 (Core Mechanism)** alongside the primary courseware line citations.
 
 ### 6. Re-index Courseware Chunks (if files changed)
 
