@@ -47,7 +47,15 @@ python3 tools/research/memory_host.py --student "default_user"
 python3 tools/research/memory_host.py --student "default_user" --record --module "cs234" --topic "b4_traffic_engineering" --score 0.95
 ```
 
-### 5. Re-index Courseware Chunks (if files changed)
+### 5. Generate & Ingest Anki Flashcards
+
+To generate non-duplicate, bilingual (Chinese primary with English technical terminology) Anki cards from unvisited `research/` courseware:
+
+```bash
+python3 tools/research/anki_generator.py --count 5 --deck "<target_deck>"
+```
+
+### 6. Re-index Courseware Chunks (if files changed)
 
 If Markdown sidecars, slides, or code files in `research/` have been updated:
 
