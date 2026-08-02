@@ -228,9 +228,15 @@ class CoverageTracker:
         self.save()
 
     def select_unvisited_chunks(
-        self, manifest_chunks: list[dict[str, Any]], count: int = 5
+        self,
+        manifest_chunks: list[dict[str, Any]],
+        count: int = 5,
+        graph_bridge: AnkiGraphBridge | None = None,
     ) -> list[dict[str, Any]]:
-        """Select up to `count` high-quality, unvisited chunks from manifest."""
+        """Select up to `count` high-quality, unvisited chunks from manifest.
+
+        When graph_bridge is supplied, ranks candidates by PageRank hub relevance (Vector 1).
+        """
         unvisited = []
         skipped_low_quality = []
         for chunk in manifest_chunks:
@@ -245,13 +251,14 @@ class CoverageTracker:
                 continue
 
             unvisited.append(chunk)
-            if len(unvisited) >= count:
-                break
 
         if skipped_low_quality:
             self.mark_chunks_skipped(skipped_low_quality, reason="skipped_low_quality")
 
-        return unvisited
+        if graph_bridge:
+            unvisited.sort(key=lambda c: graph_bridge.score_chunk_pagerank(c), reverse=True)
+
+        return unvisited[:count]
 
 
 class SQLiteInspector:
@@ -679,8 +686,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
     chunks = manifest_data.get("chunks", [])
 
+    graph_bridge = AnkiGraphBridge(target_deck=args.deck)
     tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
-    unvisited = tracker.select_unvisited_chunks(chunks, count=args.count * 3)
+    unvisited = tracker.select_unvisited_chunks(
+        chunks, count=args.count * 3, graph_bridge=graph_bridge
+    )
 
     selected_chunks = filter_duplicate_chunks(unvisited, args.deck)[: args.count]
 
@@ -688,7 +698,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("No unvisited, high-quality, non-duplicate chunks found to process into Anki cards.")
         return 0
 
-    formatter = AnkiCardFormatter(repo_root=DEFAULT_RESEARCH_DIR.parent)
+    formatter = AnkiCardFormatter(
+        repo_root=DEFAULT_RESEARCH_DIR.parent, graph_bridge=graph_bridge
+    )
     cards = [formatter.format_card(c) for c in selected_chunks]
 
     connect_checker = AnkiConnectChecker()

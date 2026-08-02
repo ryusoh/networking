@@ -322,3 +322,55 @@ def test_anki_generator_status_flag(tmp_path: Path, capsys):
     captured = capsys.readouterr().out
     assert "Memorization Progress Report" in captured
 
+
+def test_select_unvisited_chunks_pagerank_guided(tmp_path: Path):
+    import json
+    from tools.research.anki_generator import CoverageTracker
+    from tools.research.anki_graph_bridge import AnkiGraphBridge
+
+    graph_dir = tmp_path / "graph"
+    graph_dir.mkdir(parents=True, exist_ok=True)
+    graph_data = {
+        "nodes": [
+            {"id": "n1", "l": "Paxos", "d": "金融", "p": 0.85},
+            {"id": "n2", "l": "Vector Clocks", "d": "金融", "p": 0.95},
+        ],
+    }
+    (graph_dir / "graph_data.json").write_text(json.dumps(graph_data), encoding="utf-8")
+    bridge = AnkiGraphBridge(target_deck="金融", repo_root=tmp_path)
+
+    coverage_path = tmp_path / ".anki_coverage.json"
+    tracker = CoverageTracker(coverage_path=coverage_path)
+
+    manifest_chunks = [
+        {
+            "chunk_id": "c1",
+            "file_path": "research/cs231/seq.md",
+            "heading": "Sequential Order Chunk",
+            "content": "Sequential chunk with no hub links or extra technical annotations present.",
+            "token_count": 100,
+        },
+        {
+            "chunk_id": "c2",
+            "file_path": "research/cs231/paxos.md",
+            "heading": "Paxos Consensus",
+            "content": "Paxos consensus algorithm and replicated state machine implementation for distributed locks.",
+            "token_count": 100,
+        },
+        {
+            "chunk_id": "c3",
+            "file_path": "research/cs231/vc.md",
+            "heading": "Vector Clocks",
+            "content": "Vector Clocks for tracking logical time and causality ordering in distributed storage.",
+            "token_count": 100,
+        },
+    ]
+
+    # Without graph bridge (sequential order)
+    seq_selected = tracker.select_unvisited_chunks(manifest_chunks, count=2)
+    assert [c["chunk_id"] for c in seq_selected] == ["c1", "c2"]
+
+    # With PageRank-guided graph bridge (Vector Clocks 0.95 > Paxos 0.85 > Sequential 0.0)
+    pr_selected = tracker.select_unvisited_chunks(manifest_chunks, count=2, graph_bridge=bridge)
+    assert [c["chunk_id"] for c in pr_selected] == ["c3", "c2"]
+

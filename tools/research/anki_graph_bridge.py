@@ -66,3 +66,13 @@ class AnkiGraphBridge:
 
         matches.sort(key=lambda x: x[1], reverse=True)
         return matches[:top_n]
+
+    def score_chunk_pagerank(self, chunk: dict[str, Any]) -> float:
+        """Calculate max PageRank score for concept hubs matching a chunk (Vector 1)."""
+        heading = chunk.get("heading", "")
+        content = chunk.get("content", "")
+        text = f"{heading} {content}"
+        hubs = self.get_related_hubs(text, top_n=5)
+        if not hubs:
+            return 0.0
+        return max(h[1] for h in hubs)
