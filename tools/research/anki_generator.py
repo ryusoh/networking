@@ -196,7 +196,7 @@ def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
     if re.match(r"^(of|for|in|by|with|to|from|on|at|and|or)\b", heading_lower):
         return False
 
-    if re.match(r"^\d+\s+[a-z]", heading_lower) or SLIDE_MARKER_PATTERN.match(raw_heading) or PAGE_NUM_PATTERN.match(raw_heading):
+    if SLIDE_MARKER_PATTERN.match(raw_heading):
         return False
 
     # Reject raw simulation graphs, build/run commands, and test logs
@@ -312,6 +312,11 @@ class CoverageTracker:
         """Check if a file path or chunk ID has already been converted to an Anki card."""
         visited_chunks = self.data.get("visited_chunk_ids", {})
         if chunk_id in visited_chunks:
+            status = visited_chunks[chunk_id].get("status")
+            if status == "generated":
+                return True
+            if status == "skipped_low_quality":
+                return False
             return True
         visited_files = self.data.get("visited_files", {})
         return file_path in visited_files
