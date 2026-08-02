@@ -158,7 +158,11 @@ def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
     if any(k in heading_lower for k in JUNK_KEYWORDS):
         return False
 
-    if SLIDE_MARKER_PATTERN.match(raw_heading) or PAGE_NUM_PATTERN.match(raw_heading):
+    # Reject short fragmented words or bullet markers as headings (e.g. 'bytes', 'answer RRs')
+    if heading_lower in {"bytes", "bits", "answer rrs", "answer", "rrs", "question", "questions", "part", "slide"}:
+        return False
+
+    if re.match(r"^\d+\s+[a-z]", heading_lower) or SLIDE_MARKER_PATTERN.match(raw_heading) or PAGE_NUM_PATTERN.match(raw_heading):
         return False
 
     # 2. Reject Table of Contents pages containing dotted lines
@@ -528,6 +532,9 @@ class AnkiCardFormatter:
             re.match(r"^page\s+\d+$", clean_heading, re.IGNORECASE)
             or re.match(r"^\d+[\/\.-]\d+[\/\.-]\d+$", clean_heading)
             or clean_heading.lower() in JUNK_KEYWORDS
+            or clean_heading.lower() in {"bytes", "bits", "answer rrs", "answer", "rrs", "question", "questions"}
+            or re.match(r"^\d+\s+", clean_heading)
+            or len(clean_heading) < 6
         )
 
         term = clean_heading
@@ -541,18 +548,29 @@ class AnkiCardFormatter:
                     and not re.match(r"^\d+[\/\.-]\d+[\/\.-]\d+$", line_str)
                     and not re.match(r"^\d+$", line_str)
                 ):
-                    clean_line = re.sub(r"^[-*•\s]+", "", line_str).strip()
-                    if len(clean_line) > 5 and not clean_line.lower() in JUNK_KEYWORDS:
+                    clean_line = re.sub(r"^[-*•\d\.\s]+", "", line_str).strip()
+                    if len(clean_line) > 8 and not clean_line.lower() in JUNK_KEYWORDS:
                         term = clean_line[:60]
                         break
-            if term == clean_heading:
+            if term == clean_heading or len(term) < 5:
                 term = Path(file_path).stem.replace("-", " ").title()
 
         content_lower = content.lower()
-        if "erlang" in content_lower or "poisson" in content_lower:
+        if "dns" in content_lower and ("rr" in content_lower or "resource record" in content_lower or "authority" in content_lower):
+            term = "DNS Protocol & Resource Records (RR)"
+            question = "DNS 报文首部 16 位标志位、4 大 RR 记录类型 (A, NS, CNAME, MX) 与 4 个 Length 字段的物理意义与解析机制是什么？"
+        elif "erlang" in content_lower or "poisson" in content_lower:
+            term = "Erlang B vs Erlang C Queueing Models"
             question = "在呼叫/数据包阻塞系统中，Erlang B 公式与 Poisson 到达模型如何计算拒绝概率 (Blocking Probability)？"
         elif "sliding window" in content_lower or "sendbase" in content_lower or "rcvbase" in content_lower:
+            term = "TCP Sliding Window & Flow Control"
             question = "滑动窗口协议（Sliding Window Protocol）中发送方与接收方在 ACK 确认与 Timer 重传时的状态转换逻辑是什么？"
+        elif "chord" in content_lower or "finger table" in content_lower:
+            term = "Chord DHT Finger Table & Node Join"
+            question = "Chord 环中路由表 Finger Table 的索引计算公式、O(log N) 查询复杂度与节点动态加入 (Stabilization) 机制是什么？"
+        elif "bgp" in content_lower or "as-path" in content_lower:
+            term = "BGP Path Vector Protocol & Routing Policy"
+            question = "边界网关协议 (BGP) 的关键属性 (AS-PATH, NEXT-HOP, Local-Pref, MED) 及 4 级选路优先级决策链逻辑是什么？"
         elif "bandwidth" in content_lower and "harmonics" in content_lower:
             question = "模拟带宽 (Analog Bandwidth in Hz) 与数字信道最大数据率 (Digital Bandwidth in bps) 在物理层中是如何关联的？"
         elif file_path.endswith(".py"):
