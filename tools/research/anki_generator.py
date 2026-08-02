@@ -27,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from tools.research.anki_graph_bridge import AnkiGraphBridge
 from tools.research.citation_engine import CitationEngine
 from tools.research.parse_chunks import estimate_tokens
 from tools.research.scene_builder import SceneBuilder
@@ -52,6 +53,64 @@ def format_progress_bar(visited: int, total: int, width: int = PROGRESS_BAR_WIDT
     filled = int(width * visited // total) if total else 0
     empty = width - filled
     return f"[{'━' * filled}{'─' * empty}] {pct:5.1f}% ({visited}/{total} chunks)"
+
+
+class CoverageProgressReporter:
+    """Computes and renders multi-level coverage progress bars."""
+
+    @staticmethod
+    def render_bar(visited: int, total: int, width: int = PROGRESS_BAR_WIDTH) -> str:
+        """Renders a progress bar string."""
+        return format_progress_bar(visited, total, width=width)
+
+    @classmethod
+    def print_report(
+        cls,
+        manifest_chunks: list[dict[str, Any]],
+        visited_chunk_ids: set[str],
+        active_file_path: str | None = None,
+    ) -> None:
+        """Calculates and prints Submodule, Course, and Global progress bars."""
+        if not manifest_chunks:
+            return
+
+        global_total = len(manifest_chunks)
+        global_visited = sum(1 for c in manifest_chunks if c["chunk_id"] in visited_chunk_ids)
+
+        course_dir = ""
+        submodule_dir = ""
+        if active_file_path:
+            parts = Path(active_file_path).parts
+            if len(parts) >= 2:
+                course_dir = str(Path(*parts[:2]))
+            if len(parts) >= 3:
+                submodule_dir = str(Path(*parts[:3]))
+
+        print("\n" + "=" * 80)
+        print("📊 Anki Courseware Memorization Progress Report")
+        print("=" * 80)
+
+        if submodule_dir:
+            sub_chunks = [c for c in manifest_chunks if c["file_path"].startswith(submodule_dir)]
+            sub_vis = sum(1 for c in sub_chunks if c["chunk_id"] in visited_chunk_ids)
+            sub_label = (
+                Path(submodule_dir).relative_to("research")
+                if submodule_dir.startswith("research")
+                else submodule_dir
+            )
+            print(f"  Submodule : {sub_label}")
+            print(f"              {cls.render_bar(sub_vis, len(sub_chunks))}\n")
+
+        if course_dir:
+            crs_chunks = [c for c in manifest_chunks if c["file_path"].startswith(course_dir)]
+            crs_vis = sum(1 for c in crs_chunks if c["chunk_id"] in visited_chunk_ids)
+            crs_label = Path(course_dir).name
+            print(f"  Course    : {crs_label}")
+            print(f"              {cls.render_bar(crs_vis, len(crs_chunks))}\n")
+
+        print("  Global    : research/ (cs231, cs232, cs233, cs234)")
+        print(f"              {cls.render_bar(global_visited, global_total)}")
+        print("=" * 80 + "\n")
 
 
 @dataclass
@@ -354,8 +413,13 @@ def filter_duplicate_chunks(
 class AnkiCardFormatter:
     """Formats research chunks into high-density (800-1800 char), multi-section Anki cards."""
 
-    def __init__(self, repo_root: Path = REPO_ROOT):
+    def __init__(
+        self,
+        repo_root: Path = REPO_ROOT,
+        graph_bridge: AnkiGraphBridge | None = None,
+    ):
         self.repo_root = repo_root
+        self.graph_bridge = graph_bridge or AnkiGraphBridge()
 
     def _extract_concept_term(self, raw_heading: str, content: str, file_path: str) -> tuple[str, str]:
         """Extract (english_term, chinese_question) from chunk heading and content."""
@@ -434,8 +498,16 @@ class AnkiCardFormatter:
             f"<tr><td style=\"border: 1px solid #ccc; padding: 6px;\">性能 / 延迟</td><td style=\"border: 1px solid #ccc; padding: 6px;\">高延迟 / 开销大</td><td style=\"border: 1px solid #ccc; padding: 6px;\">低延迟 / 高吞吐</td></tr>"
             f"<tr><td style=\"border: 1px solid #ccc; padding: 6px;\">复杂度 / 代价</td><td style=\"border: 1px solid #ccc; padding: 6px;\">简单直接</td><td style=\"border: 1px solid #ccc; padding: 6px;\">资源轮询 / 状态维护</td></tr>"
             f"</tbody></table>"
-            f"<div><b>源码与文档引用 (Source Citation):</b> {link_markdown}</div>"
         )
+
+        hubs = self.graph_bridge.get_related_hubs(content)
+        if hubs:
+            hub_labels = ", ".join(h[0] for h in hubs)
+            back_html += (
+                f'<div class="related-concepts"><b>关联知识图谱 Hub (Related Concepts):</b> {hub_labels}</div>'
+            )
+
+        back_html += f"<div><b>源码与文档引用 (Source Citation):</b> {link_markdown}</div>"
 
         tags = ["research", module_name.replace("-", "_")]
 
@@ -531,7 +603,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         default="research networking",
         help="Space-separated tags for custom card export.",
     )
+    parser.add_argument(
+        "--status",
+        action="store_true",
+        help="Print multi-level courseware memorization progress report and exit.",
+    )
     args = parser.parse_args(argv)
+
+    if args.status:
+        manifest_path = Path(args.manifest).resolve()
+        if not manifest_path.exists():
+            parser.error(
+                f"Manifest file not found at {manifest_path}. Run 'python3 tools/research/parse_chunks.py' first."
+            )
+        manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        chunks = manifest_data.get("chunks", [])
+        tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
+        visited_ids = set(tracker.data.get("visited_chunk_ids", {}).keys())
+        CoverageProgressReporter.print_report(chunks, visited_ids)
+        return 0
 
     # Custom Q&A card direct ingestion path
     if args.front and args.back:
@@ -639,6 +729,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"Updated coverage tracking for {len(selected_chunks)} chunks in {tracker.coverage_path.name}"
     )
 
+    visited_ids = set(tracker.data.get("visited_chunk_ids", {}).keys())
+    active_path = selected_chunks[0]["file_path"] if selected_chunks else None
+    CoverageProgressReporter.print_report(chunks, visited_ids, active_file_path=active_path)
 
     return 0
 

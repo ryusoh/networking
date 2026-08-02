@@ -123,6 +123,24 @@ class BM25Indexer:
         return results
 
 
+def reciprocal_rank_fusion(
+    rankings_list: list[list[tuple[dict[str, Any], float]]], k: float = 60.0
+) -> list[tuple[dict[str, Any], float]]:
+    """Reciprocal Rank Fusion (RRF) combining multiple ranked result lists."""
+    rrf_map: dict[str, float] = {}
+    chunk_map: dict[str, dict[str, Any]] = {}
+
+    for ranking in rankings_list:
+        for rank_idx, (chunk, _score) in enumerate(ranking, start=1):
+            cid = chunk["chunk_id"]
+            chunk_map[cid] = chunk
+            rrf_map[cid] = rrf_map.get(cid, 0.0) + (1.0 / (k + rank_idx))
+
+    combined = [(chunk_map[cid], round(score, 6)) for cid, score in rrf_map.items()]
+    combined.sort(key=lambda item: item[1], reverse=True)
+    return combined
+
+
 def load_manifest(manifest_path: Path) -> dict[str, Any]:
     """Load structural chunks manifest JSON."""
     with open(manifest_path, encoding="utf-8") as handle:
@@ -151,6 +169,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Maximum search results to return.",
     )
     parser.add_argument(
+        "--rrf",
+        action="store_true",
+        help="Enable Reciprocal Rank Fusion (RRF) ranker.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit JSON output instead of text.",
@@ -172,7 +195,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     chunks = manifest_data.get("chunks", [])
 
     indexer = BM25Indexer(chunks)
-    ranked_results = indexer.score(args.query)[: args.limit]
+    if args.rrf:
+        # Perform multi-pass BM25 token ranking and fuse using RRF
+        tokens = tokenize(args.query)
+        passes = [indexer.score(t) for t in tokens] if len(tokens) > 1 else [indexer.score(args.query)]
+        ranked_results = reciprocal_rank_fusion(passes)[: args.limit]
+    else:
+        ranked_results = indexer.score(args.query)[: args.limit]
 
     if args.json:
         output = [

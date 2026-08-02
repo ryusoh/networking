@@ -54,3 +54,15 @@ def test_format_file_link(tmp_path: Path):
     link = search_chunks.format_file_link(tmp_path, "research/cs234/b4.md", 10, 50)
     assert link.startswith("[research/cs234/b4.md#L10-L50](file://")
     assert "#L10-L50" in link
+
+
+def test_reciprocal_rank_fusion():
+    c1 = {"chunk_id": "c1"}
+    c2 = {"chunk_id": "c2"}
+    rank1 = [(c1, 1.0), (c2, 0.5)]
+    rank2 = [(c2, 2.0), (c1, 0.1)]
+
+    fused = search_chunks.reciprocal_rank_fusion([rank1, rank2])
+    assert len(fused) == 2
+    # c2 is rank 2 in first and rank 1 in second, c1 is rank 1 in first and rank 2 in second -> equal sum
+    assert fused[0][1] > 0

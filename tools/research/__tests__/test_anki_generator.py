@@ -280,3 +280,45 @@ def test_custom_qa_card_ankiconnect(monkeypatch, tmp_path: Path):
     )
     assert ret == 0
 
+
+def test_coverage_progress_reporter(capsys):
+    from tools.research.anki_generator import CoverageProgressReporter
+
+    manifest_chunks = [
+        {"chunk_id": "c1", "file_path": "research/cs231/00-materials/paxos.md"},
+        {"chunk_id": "c2", "file_path": "research/cs231/00-materials/raft.md"},
+        {"chunk_id": "c3", "file_path": "research/cs234/b4.md"},
+    ]
+    visited_ids = {"c1"}
+
+    CoverageProgressReporter.print_report(
+        manifest_chunks, visited_ids, active_file_path="research/cs231/00-materials/paxos.md"
+    )
+    captured = capsys.readouterr().out
+    assert "Anki Courseware Memorization Progress Report" in captured
+    assert "Submodule : cs231/00-materials" in captured
+    assert "Course    : cs231" in captured
+    assert "Global    : research/" in captured
+    assert "50.0%" in captured
+
+
+def test_anki_generator_status_flag(tmp_path: Path, capsys):
+    import json
+    from tools.research.anki_generator import main
+
+    manifest_file = tmp_path / "manifest.json"
+    coverage_file = tmp_path / "coverage.json"
+
+    manifest_file.write_text(
+        json.dumps({"chunks": [{"chunk_id": "c1", "file_path": "research/cs231/paxos.md"}]}),
+        encoding="utf-8",
+    )
+    coverage_file.write_text(
+        json.dumps({"visited_chunk_ids": {"c1": {"status": "generated"}}}), encoding="utf-8"
+    )
+
+    ret = main(["--manifest", str(manifest_file), "--coverage", str(coverage_file), "--status"])
+    assert ret == 0
+    captured = capsys.readouterr().out
+    assert "Memorization Progress Report" in captured
+
