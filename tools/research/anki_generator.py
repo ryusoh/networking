@@ -90,15 +90,34 @@ class CoverageProgressReporter:
     def print_report(
         cls,
         manifest_chunks: list[dict[str, Any]],
-        visited_chunk_ids: set[str],
+        visited_chunk_ids: set[str] | dict[str, Any],
         active_file_path: str | None = None,
+        skipped_chunk_ids: set[str] | None = None,
     ) -> None:
         """Calculates and prints Submodule, Course, and Global progress bars."""
         if not manifest_chunks:
             return
 
+        # If passed a dict mapping cid -> info, split generated vs skipped
+        if isinstance(visited_chunk_ids, dict):
+            gen_set = {
+                cid
+                for cid, info in visited_chunk_ids.items()
+                if info.get("status") == "generated" or "status" not in info
+            }
+            skip_set = {
+                cid
+                for cid, info in visited_chunk_ids.items()
+                if info.get("status") == "skipped_low_quality"
+            }
+        else:
+            gen_set = visited_chunk_ids
+            skip_set = skipped_chunk_ids or set()
+
         global_total = len(manifest_chunks)
-        global_visited = sum(1 for c in manifest_chunks if c["chunk_id"] in visited_chunk_ids)
+        global_generated = sum(1 for c in manifest_chunks if c["chunk_id"] in gen_set)
+        global_skipped = sum(1 for c in manifest_chunks if c["chunk_id"] in skip_set)
+        global_unvisited = global_total - global_generated - global_skipped
 
         course_dir = ""
         submodule_dir = ""
@@ -115,7 +134,7 @@ class CoverageProgressReporter:
 
         if submodule_dir:
             sub_chunks = [c for c in manifest_chunks if c["file_path"].startswith(submodule_dir)]
-            sub_vis = sum(1 for c in sub_chunks if c["chunk_id"] in visited_chunk_ids)
+            sub_vis = sum(1 for c in sub_chunks if c["chunk_id"] in gen_set)
             sub_label = (
                 Path(submodule_dir).relative_to("research")
                 if submodule_dir.startswith("research")
@@ -126,13 +145,18 @@ class CoverageProgressReporter:
 
         if course_dir:
             crs_chunks = [c for c in manifest_chunks if c["file_path"].startswith(course_dir)]
-            crs_vis = sum(1 for c in crs_chunks if c["chunk_id"] in visited_chunk_ids)
+            crs_vis = sum(1 for c in crs_chunks if c["chunk_id"] in gen_set)
             crs_label = Path(course_dir).name
             print(f"  Course    : {crs_label}")
             print(f"              {cls.render_bar(crs_vis, len(crs_chunks))}\n")
 
         print("  Global    : research/ (cs231, cs232, cs233, cs234)")
-        print(f"              {cls.render_bar(global_visited, global_total)}")
+        print(f"              {cls.render_bar(global_generated, global_total)}")
+        print(
+            f"              [Generated: {global_generated} cards ({global_generated / global_total * 100:.2f}%) | "
+            f"Audited/Skipped: {global_skipped} chunks ({global_skipped / global_total * 100:.1f}%) | "
+            f"Unvisited: {global_unvisited} chunks ({global_unvisited / global_total * 100:.1f}%)]"
+        )
         print("=" * 80 + "\n")
 
 
@@ -808,8 +832,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
         chunks = manifest_data.get("chunks", [])
         tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
-        visited_ids = set(tracker.data.get("visited_chunk_ids", {}).keys())
-        CoverageProgressReporter.print_report(chunks, visited_ids)
+        visited_dict = tracker.data.get("visited_chunk_ids", {})
+        CoverageProgressReporter.print_report(chunks, visited_dict)
         return 0
 
     # Custom Q&A card direct ingestion path
@@ -864,8 +888,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
                 chunks = manifest_data.get("chunks", [])
                 tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
-                visited_ids = set(tracker.data.get("visited_chunk_ids", {}).keys())
-                CoverageProgressReporter.print_report(chunks, visited_ids)
+                visited_dict = tracker.data.get("visited_chunk_ids", {})
+                CoverageProgressReporter.print_report(chunks, visited_dict)
             except Exception:
                 pass
         return 0
@@ -938,9 +962,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"Updated coverage tracking for {len(selected_chunks)} chunks in {tracker.coverage_path.name}"
     )
 
-    visited_ids = set(tracker.data.get("visited_chunk_ids", {}).keys())
+    visited_dict = tracker.data.get("visited_chunk_ids", {})
     active_path = selected_chunks[0]["file_path"] if selected_chunks else None
-    CoverageProgressReporter.print_report(chunks, visited_ids, active_file_path=active_path)
+    CoverageProgressReporter.print_report(chunks, visited_dict, active_file_path=active_path)
 
     return 0
 
