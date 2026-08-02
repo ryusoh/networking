@@ -386,6 +386,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Force export to TSV package file instead of AnkiConnect API.",
     )
+    parser.add_argument(
+        "--auto-launch",
+        action="store_true",
+        help="Automatically launch Anki.app if closed to enable 100% automated AnkiConnect ingestion.",
+    )
     args = parser.parse_args(argv)
 
     manifest_path = Path(args.manifest).resolve()
@@ -410,12 +415,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     cards = [formatter.format_card(c) for c in selected_chunks]
 
     connect_checker = AnkiConnectChecker()
+
+    # If Anki is closed and --auto-launch is requested, start Anki.app
+    if args.auto_launch and not connect_checker.is_available():
+        print("Anki GUI is closed. Launching /Applications/Anki.app in background...")
+        os.system("open -a Anki")
+        # Wait up to 5 seconds for AnkiConnect endpoint to start
+        import time
+        for _ in range(10):
+            time.sleep(0.5)
+            if connect_checker.is_available():
+                break
+
     imported_via_api = False
 
     if not args.tsv and connect_checker.is_available():
         try:
             note_ids = connect_checker.add_notes(cards, deck_name=args.deck)
-            print(f"Successfully imported {len(cards)} cards directly into Anki deck '{args.deck}' via AnkiConnect!")
+            print(f"🎉 100% AUTOMATED INGESTION SUCCESSFUL!")
+            print(f"Directly imported {len(cards)} cards into Anki deck '{args.deck}' via AnkiConnect API.")
             print(f"Anki Note IDs: {note_ids}")
             imported_via_api = True
         except Exception as err:
@@ -424,9 +442,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not imported_via_api:
         exporter = TSVExporter()
         tsv_path = exporter.export(cards)
-        print(f"Successfully exported {len(cards)} cards to TSV package file:")
+        print(f"Exported {len(cards)} cards to TSV package file:")
         print(f"  Path: {tsv_path}")
-        print(f"  Instructions: Open Anki -> File -> Import -> Select {tsv_path.name}")
+        print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
 
     # Mark chunks as visited in coverage tracker
     tracker.mark_chunks_visited(selected_chunks, deck_name=args.deck)
