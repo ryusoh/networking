@@ -38,7 +38,30 @@ DEFAULT_MANIFEST_PATH = DEFAULT_RESEARCH_DIR / ".chunks_manifest.json"
 DEFAULT_COVERAGE_PATH = DEFAULT_RESEARCH_DIR / ".anki_coverage.json"
 DEFAULT_TSV_PATH = DEFAULT_RESEARCH_DIR / "anki_import.txt"
 FIELD_SEP = "\x1f"
-JUNK_KEYWORDS = {"outline", "index", "readme", "toc", "table of contents", "agenda", "syllabus"}
+JUNK_KEYWORDS = {
+    "outline",
+    "index",
+    "readme",
+    "toc",
+    "table of contents",
+    "agenda",
+    "syllabus",
+    "schedule",
+    "logistics",
+    "office hours",
+    "grading",
+    "homework",
+    "due date",
+    "midterm",
+    "final exam",
+    "announcements",
+    "assignment",
+    "copyright",
+    "prerequisites",
+    "course overview",
+}
+SLIDE_MARKER_PATTERN = re.compile(r"^slide\s*\(\s*line\s*\d+\s*\)$", re.IGNORECASE)
+PAGE_NUM_PATTERN = re.compile(r"^(page\s+\d+|\d+\s*/\s*\d+)$", re.IGNORECASE)
 PROGRESS_BAR_WIDTH = 40
 
 
@@ -128,10 +151,14 @@ class AnkiCard:
 def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
     """Quality Gate: Returns True if chunk has meaningful technical content; False if junk/empty."""
     content = chunk.get("content", "").strip()
-    heading = chunk.get("heading", "").strip().lower()
+    raw_heading = chunk.get("heading", "").strip()
+    heading_lower = raw_heading.lower()
 
-    # 1. Reject meta/junk headings like 'cs230-outline', 'toc', 'syllabus'
-    if any(k in heading for k in JUNK_KEYWORDS):
+    # 1. Reject meta/junk headings like 'cs230-outline', 'toc', 'syllabus', logistics
+    if any(k in heading_lower for k in JUNK_KEYWORDS):
+        return False
+
+    if SLIDE_MARKER_PATTERN.match(raw_heading) or PAGE_NUM_PATTERN.match(raw_heading):
         return False
 
     # 2. Reject Table of Contents pages containing dotted lines
@@ -140,11 +167,44 @@ def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
 
     # 3. Check content density if content is present
     if content:
-        if len(content) < 60 or chunk.get("token_count", 0) < 15:
+        if len(content) < 80 or chunk.get("token_count", 0) < 20:
             return False
+
+        # Reject title-only or header-only preamble chunks
+        non_header_lines = [
+            l.strip()
+            for l in content.splitlines()
+            if l.strip() and not l.strip().startswith("#") and not l.strip().startswith("<!--")
+        ]
+        if not non_header_lines or sum(len(l) for l in non_header_lines) < 50:
+            return False
+
         clean_text = re.sub(r"[\s\-*#=:]+", "", content)
-        if len(clean_text) < 30:
+        if len(clean_text) < 40:
             return False
+
+        # Reject administrative or logistics content
+        content_lower = content.lower()
+        if any(
+            term in content_lower
+            for term in [
+                "due date",
+                "office hours",
+                "grading policy",
+                "midterm exam",
+                "submission link",
+            ]
+        ):
+            return False
+
+        # Reject simple build/packaging utility shell scripts
+        file_path = chunk.get("file_path", "").lower()
+        if file_path.endswith(".sh"):
+            if any(
+                cmd in content
+                for cmd in ["zip -r", "valgrind", "basename $PWD", "make clean"]
+            ):
+                return False
 
     return True
 
@@ -489,23 +549,18 @@ class AnkiCardFormatter:
         back_html = (
             f"<div><b>定义与物理意义 (Definition & Physical Meaning):</b></div>"
             f"<div>{body_text}</div>"
-            f"<div><b>1. 核心工作机制 (Core Mechanism):</b></div>"
-            f"<ul>"
-            f"<li><b>痛点背景 (Background & Problem):</b> 传统系统设计在扩展性与延迟方面的核心约束。</li>"
-            f"<li><b>技术突破 (Mechanism):</b> 利用硬件特性、算法创新与分布式原语解耦计算与通信。</li>"
-            f"</ul>"
-            f"<div><b>2. 架构对比与工程权衡 (Trade-offs & Comparison):</b></div>"
-            f"<table style=\"border-collapse: collapse; width: 100%; border: 1px solid #ccc;\">"
-            f"<thead><tr style=\"background-color: rgba(150, 150, 150, 0.1);\">"
-            f"<th style=\"border: 1px solid #ccc; padding: 6px; text-align: left;\">维度</th>"
-            f"<th style=\"border: 1px solid #ccc; padding: 6px; text-align: left;\">传统方案</th>"
-            f"<th style=\"border: 1px solid #ccc; padding: 6px; text-align: left;\">目标方案</th>"
-            f"</tr></thead>"
-            f"<tbody>"
-            f"<tr><td style=\"border: 1px solid #ccc; padding: 6px;\">性能 / 延迟</td><td style=\"border: 1px solid #ccc; padding: 6px;\">高延迟 / 开销大</td><td style=\"border: 1px solid #ccc; padding: 6px;\">低延迟 / 高吞吐</td></tr>"
-            f"<tr><td style=\"border: 1px solid #ccc; padding: 6px;\">复杂度 / 代价</td><td style=\"border: 1px solid #ccc; padding: 6px;\">简单直接</td><td style=\"border: 1px solid #ccc; padding: 6px;\">资源轮询 / 状态维护</td></tr>"
-            f"</tbody></table>"
         )
+
+        # Extract structured points from raw lines if bullet points exist
+        bullet_lines = [
+            re.sub(r"^[-*•\s]+", "", l).strip()
+            for l in raw_lines
+            if l.startswith("-") or l.startswith("*") or l.startswith("•")
+        ]
+        clean_bullets = [b for b in bullet_lines if b]
+        if clean_bullets:
+            items_html = "".join(f"<li>{bl}</li>" for bl in clean_bullets[:5])
+            back_html += f"<div><b>核心工作机制 (Core Mechanism):</b></div><ul>{items_html}</ul>"
 
         hubs = self.graph_bridge.get_related_hubs(content)
         if hubs:

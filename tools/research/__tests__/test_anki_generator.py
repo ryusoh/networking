@@ -78,6 +78,36 @@ def test_coverage_tracker_records_skipped_low_quality_chunks(tmp_path: Path):
     assert visited["c_junk"]["status"] == "skipped_low_quality"
 
 
+def test_is_high_quality_chunk_filters_logistics_and_slide_markers():
+    from tools.research.anki_generator import is_high_quality_chunk
+
+    junk_slide = {
+        "chunk_id": "c1",
+        "file_path": "research/cs231/slides.md",
+        "heading": "Slide (Line 142)",
+        "content": "Administrative details for homework submission due date and office hours.",
+        "token_count": 50,
+    }
+    junk_logistics = {
+        "chunk_id": "c2",
+        "file_path": "research/cs231/grading.md",
+        "heading": "Course Grading Policy",
+        "content": "The midterm exam and final exam each count for 40% of the grade.",
+        "token_count": 60,
+    }
+    valid_tech = {
+        "chunk_id": "c3",
+        "file_path": "research/cs231/raft.md",
+        "heading": "Raft Consensus Algorithm",
+        "content": "Raft decomposes consensus into leader election, log replication, and safety guarantees.",
+        "token_count": 120,
+    }
+
+    assert is_high_quality_chunk(junk_slide) is False
+    assert is_high_quality_chunk(junk_logistics) is False
+    assert is_high_quality_chunk(valid_tech) is True
+
+
 def test_sqlite_inspector_reads_existing_notes(tmp_path: Path):
     db_path = tmp_path / "collection.anki2"
     con = sqlite3.connect(db_path)
@@ -115,8 +145,7 @@ def test_anki_card_formatter(tmp_path: Path):
 
     assert "B4 Traffic Engineering:" in card.front_html
     assert "核心设计背景" in card.front_html
-    assert "<b>1. 核心工作机制 (Core Mechanism):</b>" in card.back_html
-    assert "<table" in card.back_html
+    assert "<b>核心工作机制 (Core Mechanism):</b>" in card.back_html
     assert "Centralized SDN control WAN" in card.back_html
     assert "research" in card.tags
 
@@ -347,7 +376,7 @@ def test_select_unvisited_chunks_pagerank_guided(tmp_path: Path):
             "chunk_id": "c1",
             "file_path": "research/cs231/seq.md",
             "heading": "Sequential Order Chunk",
-            "content": "Sequential chunk with no hub links or extra technical annotations present.",
+            "content": "Sequential chunk with no hub links or extra technical annotations present in this test document.",
             "token_count": 100,
         },
         {
