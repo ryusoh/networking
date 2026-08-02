@@ -34,9 +34,10 @@ def test_complete_research_agent_and_anki_pipeline_e2e(tmp_path: Path):
 
     sample_doc2 = course_dir / "paxos-consensus.md"
     sample_doc2.write_text(
-        "# Paxos Agreement Protocol\n\n"
-        "## Consensus\n"
-        "Paxos reaches consensus over unreliable network channels using 2-phase rounds.\n"
+        "# Paxos Agreement Protocol Overview\n\n"
+        "Paxos reaches consensus across distributed systems with fault-tolerant acceptors and proposers.\n\n"
+        "## Consensus Algorithm Details\n"
+        "Paxos reaches consensus over unreliable network channels using 2-phase rounds (Phase 1a/1b and Phase 2a/2b).\n"
     )
 
     # 1. Phase 1: Structural Parsing
@@ -100,5 +101,5 @@ def test_complete_research_agent_and_anki_pipeline_e2e(tmp_path: Path):
 
     # Select remaining unvisited chunks (from doc2)
     remaining = coverage_tracker.select_unvisited_chunks(chunks, count=2)
-    assert len(remaining) == 2
+    assert len(remaining) == 1
     assert "paxos-consensus.md" in remaining[0]["file_path"]

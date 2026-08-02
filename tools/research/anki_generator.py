@@ -2,7 +2,7 @@
 """Autonomous Anki Flashcard Generation & Ingestion Pipeline (tools/research/anki_generator.py).
 
 Systematically converts research/ courseware into high-density Anki notes styled primarily in Chinese
-with English technical terminology annotations. Enforces coverage tracking and deduplication.
+with English technical terminology annotations. Enforces coverage tracking, quality filtering, and deduplication.
 """
 
 from __future__ import annotations
@@ -37,6 +37,7 @@ DEFAULT_MANIFEST_PATH = DEFAULT_RESEARCH_DIR / ".chunks_manifest.json"
 DEFAULT_COVERAGE_PATH = DEFAULT_RESEARCH_DIR / ".anki_coverage.json"
 DEFAULT_TSV_PATH = DEFAULT_RESEARCH_DIR / "anki_import.txt"
 FIELD_SEP = "\x1f"
+JUNK_KEYWORDS = {"outline", "index", "readme", "toc", "table of contents", "agenda", "syllabus"}
 
 
 @dataclass
@@ -49,6 +50,30 @@ class AnkiCard:
     front_html: str
     back_html: str
     tags: list[str]
+
+
+def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
+    """Quality Gate: Returns True if chunk has meaningful technical content; False if junk/empty."""
+    content = chunk.get("content", "").strip()
+    heading = chunk.get("heading", "").strip().lower()
+
+    # 1. Reject meta/junk headings like 'cs230-outline', 'toc', 'syllabus'
+    if any(k in heading for k in JUNK_KEYWORDS):
+        return False
+
+    # 2. Reject Table of Contents pages containing dotted lines
+    if ". . . ." in content or "....." in content:
+        return False
+
+    # 3. Check content density if content is present
+    if content:
+        if len(content) < 60 or chunk.get("token_count", 0) < 15:
+            return False
+        clean_text = re.sub(r"[\s\-*#=:]+", "", content)
+        if len(clean_text) < 30:
+            return False
+
+    return True
 
 
 class CoverageTracker:
@@ -114,11 +139,14 @@ class CoverageTracker:
     def select_unvisited_chunks(
         self, manifest_chunks: list[dict[str, Any]], count: int = 5
     ) -> list[dict[str, Any]]:
-        """Select up to `count` unvisited, high-density chunks from manifest."""
+        """Select up to `count` high-quality, unvisited chunks from manifest."""
         unvisited = []
         for chunk in manifest_chunks:
             fpath = chunk["file_path"]
             cid = chunk["chunk_id"]
+
+            if not is_high_quality_chunk(chunk):
+                continue
 
             if not self.is_chunk_visited(fpath, cid):
                 unvisited.append(chunk)
@@ -289,10 +317,37 @@ class AnkiCardFormatter:
 
     def __init__(self, repo_root: Path = REPO_ROOT):
         self.repo_root = repo_root
-        self.citation_engine = CitationEngine(repo_root=repo_root)
+
+    def _extract_title(self, raw_heading: str, content: str, file_path: str) -> str:
+        """Extract a meaningful technical concept title from heading or content."""
+        clean_heading = raw_heading.strip()
+
+        is_generic = (
+            re.match(r"^page\s+\d+$", clean_heading, re.IGNORECASE)
+            or re.match(r"^\d+[\/\.-]\d+[\/\.-]\d+$", clean_heading)
+            or clean_heading.lower() in JUNK_KEYWORDS
+        )
+
+        if is_generic:
+            for line in content.splitlines():
+                line_str = line.strip()
+                if (
+                    line_str
+                    and not line_str.startswith("#")
+                    and not line_str.startswith("<!--")
+                    and not re.match(r"^\d+[\/\.-]\d+[\/\.-]\d+$", line_str)
+                    and not re.match(r"^\d+$", line_str)
+                ):
+                    clean_line = re.sub(r"^[-*•\s]+", "", line_str).strip()
+                    if len(clean_line) > 5 and not clean_line.lower() in JUNK_KEYWORDS:
+                        return clean_line[:80]
+            fname = Path(file_path).stem.replace("-", " ").title()
+            return f"{fname}"
+
+        return clean_heading
 
     def format_card(self, chunk: dict[str, Any]) -> AnkiCard:
-        """Render a single chunk into an AnkiCard object."""
+        """Render a single chunk into a high-density AnkiCard object."""
         raw_heading = chunk.get("heading", "System Concept")
         file_path = chunk["file_path"]
         start_line = chunk["start_line"]
@@ -300,8 +355,9 @@ class AnkiCardFormatter:
         content = chunk.get("content", "")
 
         module_name = file_path.split("/")[1] if "/" in file_path else "research"
+        concept_title = self._extract_title(raw_heading, content, file_path)
 
-        front_html = f"<strong>{raw_heading}</strong>"
+        front_html = f"<strong>{concept_title}</strong>"
 
         link_markdown = format_file_link(self.repo_root, file_path, start_line, end_line)
 
@@ -327,7 +383,7 @@ class AnkiCardFormatter:
         return AnkiCard(
             chunk_id=chunk["chunk_id"],
             file_path=file_path,
-            heading=raw_heading,
+            heading=concept_title,
             front_html=front_html,
             back_html=back_html,
             tags=tags,
@@ -403,12 +459,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     chunks = manifest_data.get("chunks", [])
 
     tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
-    unvisited = tracker.select_unvisited_chunks(chunks, count=args.count * 2)
+    unvisited = tracker.select_unvisited_chunks(chunks, count=args.count * 3)
 
     selected_chunks = filter_duplicate_chunks(unvisited, args.deck)[: args.count]
 
     if not selected_chunks:
-        print("No unvisited, non-duplicate chunks found to process into Anki cards.")
+        print("No unvisited, high-quality, non-duplicate chunks found to process into Anki cards.")
         return 0
 
     formatter = AnkiCardFormatter(repo_root=DEFAULT_RESEARCH_DIR.parent)
@@ -416,11 +472,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     connect_checker = AnkiConnectChecker()
 
-    # If Anki is closed and --auto-launch is requested, start Anki.app
     if args.auto_launch and not connect_checker.is_available():
         print("Anki GUI is closed. Launching /Applications/Anki.app in background...")
         os.system("open -a Anki")
-        # Wait up to 5 seconds for AnkiConnect endpoint to start
         import time
         for _ in range(10):
             time.sleep(0.5)
@@ -442,11 +496,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not imported_via_api:
         exporter = TSVExporter()
         tsv_path = exporter.export(cards)
-        print(f"Exported {len(cards)} cards to TSV package file:")
+        print(f"Exported {len(cards)} high-quality cards to TSV package file:")
         print(f"  Path: {tsv_path}")
         print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
 
-    # Mark chunks as visited in coverage tracker
     tracker.mark_chunks_visited(selected_chunks, deck_name=args.deck)
     print(f"Updated coverage tracking for {len(selected_chunks)} chunks in {tracker.coverage_path.name}")
 
