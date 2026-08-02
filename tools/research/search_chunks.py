@@ -66,14 +66,9 @@ class BM25Indexer:
 
         self.avg_doc_len = (total_len / self.num_chunks) if self.num_chunks > 0 else 1.0
 
-    def score(self, query: str) -> list[tuple[dict[str, Any], float]]:
-        """Score and rank chunks for a given query string."""
-        query_tokens = tokenize(query)
-        if not query_tokens or self.num_chunks == 0:
-            return []
-
+    def _compute_base_scores(self, query_tokens: list[str]) -> list[float]:
+        """Compute base BM25 scores for all chunks given query tokens."""
         scores: list[float] = [0.0] * self.num_chunks
-
         for token in query_tokens:
             doc_freq = self.df.get(token, 0)
             if doc_freq == 0:
@@ -91,6 +86,27 @@ class BM25Indexer:
                 numerator = tf * (self.k1 + 1.0)
                 denominator = tf + self.k1 * (1.0 - self.b + self.b * (doc_len / self.avg_doc_len))
                 scores[idx] += idf * (numerator / denominator)
+        return scores
+
+    def _calculate_boost(self, chunk: dict[str, Any], query_tokens: list[str]) -> float:
+        """Calculate score multiplier based on heading and path matches."""
+        heading_lower = chunk.get("heading", "").lower()
+        file_path_lower = chunk.get("file_path", "").lower()
+        boost = 1.0
+        for token in query_tokens:
+            if token in heading_lower:
+                boost += 0.5
+            if token in file_path_lower:
+                boost += 0.3
+        return boost
+
+    def score(self, query: str) -> list[tuple[dict[str, Any], float]]:
+        """Score and rank chunks for a given query string."""
+        query_tokens = tokenize(query)
+        if not query_tokens or self.num_chunks == 0:
+            return []
+
+        scores = self._compute_base_scores(query_tokens)
 
         # Apply heading boost if query terms appear in heading or file path
         results: list[tuple[dict[str, Any], float]] = []
@@ -99,16 +115,7 @@ class BM25Indexer:
                 continue
 
             chunk = self.chunks[idx]
-            heading_lower = chunk.get("heading", "").lower()
-            file_path_lower = chunk.get("file_path", "").lower()
-
-            boost = 1.0
-            for token in query_tokens:
-                if token in heading_lower:
-                    boost += 0.5
-                if token in file_path_lower:
-                    boost += 0.3
-
+            boost = self._calculate_boost(chunk, query_tokens)
             final_score = base_score * boost
             results.append((chunk, round(final_score, 4)))
 
