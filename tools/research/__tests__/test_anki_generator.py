@@ -144,7 +144,7 @@ def test_anki_card_formatter(tmp_path: Path):
     card = formatter.format_card(chunk)
 
     assert "B4 Traffic Engineering:" in card.front_html
-    assert "核心设计背景" in card.front_html
+    assert "核心" in card.front_html
     assert "<b>核心工作机制 (Core Mechanism):</b>" in card.back_html
     assert "Centralized SDN control WAN" in card.back_html
     assert "research" in card.tags

@@ -165,6 +165,23 @@ def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
     if ". . . ." in content or "....." in content:
         return False
 
+    # Reject slide title/cover metadata, presenter lists, and PPT presentation metadata
+    content_lower = content.lower()
+    if re.search(r"^\d{1,2}/\d{1,2}/\d{4}\s+\d+\b", content) or re.search(r"\b\d{1,2}/\d{1,2}/\d{4}\b", content):
+        return False
+    if ".ppt" in content_lower or ".pptx" in content_lower or "cisco_presentation" in content_lower:
+        return False
+
+    # Reject corrupted/garbage text (low ratio of alphanumeric characters)
+    alnum_count = sum(1 for c in content if c.isalnum() or c.isspace())
+    if len(content) > 0 and (alnum_count / len(content)) < 0.5:
+        return False
+
+    # Reject ROT-1 / Caesar font-encoding artifacts from legacy PDFs (e.g. 'SBOE OFX DPOOFDUJPO')
+    rot1_artifacts = {"sboe", "ofx", "dpoofdujpo", "ftubcmjtife", "tfswfs", "qmbdft", "nvtu", "oet"}
+    if any(tok in content_lower for tok in rot1_artifacts):
+        return False
+
     # 3. Check content density if content is present
     if content:
         if len(content) < 80 or chunk.get("token_count", 0) < 20:
@@ -184,7 +201,6 @@ def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
             return False
 
         # Reject administrative or logistics content
-        content_lower = content.lower()
         if any(
             term in content_lower
             for term in [
@@ -197,14 +213,10 @@ def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
         ):
             return False
 
-        # Reject simple build/packaging utility shell scripts
-        file_path = chunk.get("file_path", "").lower()
-        if file_path.endswith(".sh"):
-            if any(
-                cmd in content
-                for cmd in ["zip -r", "valgrind", "basename $PWD", "make clean"]
-            ):
-                return False
+    # 4. Reject non-documentation code files and binaries (.py, .c, .sh, .gns3, .png, .jpg)
+    fpath = chunk.get("file_path", "").lower()
+    if not fpath.endswith((".md", ".txt", ".rst")):
+        return False
 
     return True
 
@@ -287,6 +299,24 @@ class CoverageTracker:
 
         self.save()
 
+    def _calculate_chunk_priority(self, chunk: dict[str, Any], graph_bridge: AnkiGraphBridge | None = None) -> float:
+        """Calculate overall selection priority for a candidate chunk.
+
+        Combines PageRank graph hub score with directory type weighting
+        (prioritizing 01-slides and 00-materials over 02-homework).
+        """
+        fpath = chunk.get("file_path", "").lower()
+        dir_weight = 0.0
+
+        # Prioritize core slides and primary readings over homework submissions
+        if "01-slides" in fpath or "00-materials" in fpath or "01-readings" in fpath:
+            dir_weight += 2.0
+        elif "02-homework" in fpath or "/hw" in fpath or "/lab" in fpath:
+            dir_weight -= 2.0
+
+        pr_score = graph_bridge.score_chunk_pagerank(chunk) if graph_bridge else 0.0
+        return dir_weight + pr_score
+
     def select_unvisited_chunks(
         self,
         manifest_chunks: list[dict[str, Any]],
@@ -295,7 +325,7 @@ class CoverageTracker:
     ) -> list[dict[str, Any]]:
         """Select up to `count` high-quality, unvisited chunks from manifest.
 
-        When graph_bridge is supplied, ranks candidates by PageRank hub relevance (Vector 1).
+        Ranks candidates by directory priority and PageRank hub relevance (Vector 1).
         """
         unvisited = []
         skipped_low_quality = []
@@ -315,8 +345,10 @@ class CoverageTracker:
         if skipped_low_quality:
             self.mark_chunks_skipped(skipped_low_quality, reason="skipped_low_quality")
 
-        if graph_bridge:
-            unvisited.sort(key=lambda c: graph_bridge.score_chunk_pagerank(c), reverse=True)
+        unvisited.sort(
+            key=lambda c: self._calculate_chunk_priority(c, graph_bridge=graph_bridge),
+            reverse=True,
+        )
 
         return unvisited[:count]
 
@@ -516,7 +548,22 @@ class AnkiCardFormatter:
             if term == clean_heading:
                 term = Path(file_path).stem.replace("-", " ").title()
 
-        question = "核心设计背景、工作机制与工程权衡是什么？"
+        content_lower = content.lower()
+        if "erlang" in content_lower or "poisson" in content_lower:
+            question = "在呼叫/数据包阻塞系统中，Erlang B 公式与 Poisson 到达模型如何计算拒绝概率 (Blocking Probability)？"
+        elif "sliding window" in content_lower or "sendbase" in content_lower or "rcvbase" in content_lower:
+            question = "滑动窗口协议（Sliding Window Protocol）中发送方与接收方在 ACK 确认与 Timer 重传时的状态转换逻辑是什么？"
+        elif "bandwidth" in content_lower and "harmonics" in content_lower:
+            question = "模拟带宽 (Analog Bandwidth in Hz) 与数字信道最大数据率 (Digital Bandwidth in bps) 在物理层中是如何关联的？"
+        elif file_path.endswith(".py"):
+            filename = Path(file_path).name
+            question = f"在套接字编程 ({filename}) 中，TCP Socket 的初始化、绑定与异常处理逻辑是如何实现的？"
+        elif file_path.endswith(".c"):
+            filename = Path(file_path).name
+            question = f"C 语言网络工具 ({filename}) 中，系统调用与底层 I/O 机制是如何处理网络数据的？"
+        else:
+            question = f"【{term}】的核心技术机制、计算公式与工程应用是什么？"
+
         return term, question
 
     def format_card(self, chunk: dict[str, Any]) -> AnkiCard:
@@ -789,7 +836,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         tsv_path = exporter.export(cards)
         print(f"Exported {len(cards)} high-density cards to TSV package file:")
         print(f"  Path: {tsv_path}")
-        print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
+        if args.auto_launch:
+            print(f"Auto-launching Anki to import TSV file: {tsv_path}")
+            os.system(f"open -a Anki '{tsv_path}'")
+        else:
+            print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
 
     tracker.mark_chunks_visited(selected_chunks, deck_name=args.deck)
     print(
