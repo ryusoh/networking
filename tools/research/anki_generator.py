@@ -38,6 +38,20 @@ DEFAULT_COVERAGE_PATH = DEFAULT_RESEARCH_DIR / ".anki_coverage.json"
 DEFAULT_TSV_PATH = DEFAULT_RESEARCH_DIR / "anki_import.txt"
 FIELD_SEP = "\x1f"
 JUNK_KEYWORDS = {"outline", "index", "readme", "toc", "table of contents", "agenda", "syllabus"}
+PROGRESS_BAR_WIDTH = 40
+
+
+def format_progress_bar(visited: int, total: int, width: int = PROGRESS_BAR_WIDTH) -> str:
+    """Render a fixed-width progress bar string.
+
+    Uses box-drawing characters ━ (U+2501) and ─ (U+2500) which are
+    guaranteed to render at the same width in monospace fonts, unlike
+    the visually mismatched █/░ pair.
+    """
+    pct = visited / total * 100 if total else 0
+    filled = int(width * visited // total) if total else 0
+    empty = width - filled
+    return f"[{'━' * filled}{'─' * empty}] {pct:5.1f}% ({visited}/{total} chunks)"
 
 
 @dataclass

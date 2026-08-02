@@ -10,6 +10,7 @@ from tools.research.anki_generator import (
     SQLiteInspector,
     TSVExporter,
     filter_duplicate_chunks,
+    format_progress_bar,
 )
 
 
@@ -111,6 +112,37 @@ def test_tsv_exporter(tmp_path: Path):
     assert "#separator:Tab" in content
     assert "#html:true" in content
     assert "<strong>B4 WAN</strong>\t<div>Centralized TE</div>\tresearch cs234" in content
+
+
+def test_format_progress_bar_fixed_width():
+    """All progress bars must have identical character width regardless of fill %."""
+    bar_0 = format_progress_bar(0, 100)
+    bar_half = format_progress_bar(5, 8)
+    bar_full = format_progress_bar(100, 100)
+    bar_tiny = format_progress_bar(17, 13122)
+
+    # Extract the bracket-enclosed portion [....]
+    import re
+    def bar_inner(s):
+        m = re.search(r'\[(.+?)\]', s)
+        assert m, f"No bracketed bar found in: {s}"
+        return m.group(1)
+
+    inner_0 = bar_inner(bar_0)
+    inner_half = bar_inner(bar_half)
+    inner_full = bar_inner(bar_full)
+    inner_tiny = bar_inner(bar_tiny)
+
+    assert len(inner_0) == 40, f"Expected width 40, got {len(inner_0)}"
+    assert len(inner_half) == 40, f"Expected width 40, got {len(inner_half)}"
+    assert len(inner_full) == 40, f"Expected width 40, got {len(inner_full)}"
+    assert len(inner_tiny) == 40, f"Expected width 40, got {len(inner_tiny)}"
+
+    # Verify they use consistent characters (━ and ─, not mixed █/░)
+    assert '━' * 25 in inner_half  # 5/8 = 62.5% of 40 = 25
+    assert '─' * 15 in inner_half
+    assert '━' not in inner_0  # 0% filled
+    assert '─' not in inner_full  # 100% filled
 
 
 def test_tsv_exporter_strips_newlines_from_html(tmp_path: Path):
