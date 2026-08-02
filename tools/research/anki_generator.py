@@ -154,15 +154,68 @@ def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
     raw_heading = chunk.get("heading", "").strip()
     heading_lower = raw_heading.lower()
 
-    # 1. Reject meta/junk headings like 'cs230-outline', 'toc', 'syllabus', logistics
-    if any(k in heading_lower for k in JUNK_KEYWORDS):
+    # Reject README files, sample code repositories, test runners, and tutorial apps
+    fpath = chunk.get("file_path", "").lower()
+    if (
+        fpath.endswith(("readme.md", "readme.txt", "readme"))
+        or "/sample-program/" in fpath
+        or "/tests/" in fpath
+        or "/test/" in fpath
+        or "/gpac-temp/" in fpath
+    ):
         return False
 
-    # Reject short fragmented words or bullet markers as headings (e.g. 'bytes', 'answer RRs')
+    # 1. Reject meta/junk headings like 'cs230-outline', 'toc', 'syllabus', logistics, testing, chatting
+    if any(k in heading_lower for k in JUNK_KEYWORDS) or heading_lower in {"testing", "chatting", "test_end", "build", "installation", "setup"}:
+        return False
+
+    # Reject short fragmented words, figure captions, table headers, or bullet markers as headings
     if heading_lower in {"bytes", "bits", "answer rrs", "answer", "rrs", "question", "questions", "part", "slide"}:
         return False
 
+    # Reject figure captions, table headers, and chart labels (e.g. 'Fig. 1', '(a) Cache pushes', 'Nodes # Links')
+    caption_patterns = [
+        r"^fig\.",
+        r"^figure\b",
+        r"^\([a-z]\)",
+        r"\bvs\.",
+        r"\bavg replic ratio\b",
+        r"\bcumulative hop\b",
+        r"\bdegree distribution\b",
+        r"\bqueries performed\b",
+        r"\bnode degree\b",
+        r"\bnode rank\b",
+        r"\bpush threshold\b",
+        r"\bmax load\b",
+        r"nodes\s*#\s*links",
+    ]
+    if any(re.search(pat, heading_lower) for pat in caption_patterns):
+        return False
+
+    # Reject headings that start with prepositions or numbers
+    if re.match(r"^(of|for|in|by|with|to|from|on|at|and|or)\b", heading_lower):
+        return False
+
     if re.match(r"^\d+\s+[a-z]", heading_lower) or SLIDE_MARKER_PATTERN.match(raw_heading) or PAGE_NUM_PATTERN.match(raw_heading):
+        return False
+
+    # Reject raw simulation graphs, build/run commands, and test logs
+    content_lower = content.lower()
+    if any(
+        term in content_lower
+        for term in [
+            "simulation methodology",
+            "queries/minute",
+            "zipf-like capacity distribution",
+            "10,000 node simulation",
+            "5,000 node simulation",
+            "10000-node random graph",
+            "go test 2>",
+            "go build",
+            "start a chat node with",
+            "run the tests with",
+        ]
+    ):
         return False
 
     # 2. Reject Table of Contents pages containing dotted lines
@@ -312,11 +365,13 @@ class CoverageTracker:
         fpath = chunk.get("file_path", "").lower()
         dir_weight = 0.0
 
-        # Prioritize core slides and primary readings over homework submissions
-        if "01-slides" in fpath or "00-materials" in fpath or "01-readings" in fpath:
-            dir_weight += 2.0
-        elif "02-homework" in fpath or "/hw" in fpath or "/lab" in fpath:
-            dir_weight -= 2.0
+        # Prioritize core slides, textbook review chapters, and primary materials
+        if "kurose-final-review" in fpath or "review-slide-lectures" in fpath or "01-slides" in fpath or "00-materials" in fpath:
+            dir_weight += 10.0
+        elif "01-readings" in fpath or "lecture-notes" in fpath:
+            dir_weight += 5.0
+        elif "02-homework" in fpath or "03-homework" in fpath or "/hw" in fpath or "/lab" in fpath or "related-work" in fpath:
+            dir_weight -= 10.0
 
         pr_score = graph_bridge.score_chunk_pagerank(chunk) if graph_bridge else 0.0
         return dir_weight + pr_score
@@ -526,7 +581,8 @@ class AnkiCardFormatter:
 
     def _extract_concept_term(self, raw_heading: str, content: str, file_path: str) -> tuple[str, str]:
         """Extract (english_term, chinese_question) from chunk heading and content."""
-        clean_heading = raw_heading.strip()
+        clean_heading = re.sub(r"^(of|for|in|by|with|to|from|on|at|and|or)\b\s*", "", raw_heading.strip(), flags=re.IGNORECASE)
+        clean_heading = re.sub(r"[:\(\)]+", "", clean_heading).strip()
 
         is_generic = (
             re.match(r"^page\s+\d+$", clean_heading, re.IGNORECASE)
@@ -549,6 +605,7 @@ class AnkiCardFormatter:
                     and not re.match(r"^\d+$", line_str)
                 ):
                     clean_line = re.sub(r"^[-*•\d\.\s]+", "", line_str).strip()
+                    clean_line = re.sub(r"^(of|for|in|by|with|to|from|on|at|and|or)\b\s*", "", clean_line, flags=re.IGNORECASE)
                     if len(clean_line) > 8 and not clean_line.lower() in JUNK_KEYWORDS:
                         term = clean_line[:60]
                         break
@@ -556,19 +613,19 @@ class AnkiCardFormatter:
                 term = Path(file_path).stem.replace("-", " ").title()
 
         content_lower = content.lower()
-        if "dns" in content_lower and ("rr" in content_lower or "resource record" in content_lower or "authority" in content_lower):
-            term = "DNS Protocol & Resource Records (RR)"
-            question = "DNS 报文首部 16 位标志位、4 大 RR 记录类型 (A, NS, CNAME, MX) 与 4 个 Length 字段的物理意义与解析机制是什么？"
-        elif "erlang" in content_lower or "poisson" in content_lower:
+        if ("erlang b" in content_lower or "erlang c" in content_lower or ("erlang" in content_lower and "blocking" in content_lower)) and "gnutella" not in content_lower:
             term = "Erlang B vs Erlang C Queueing Models"
             question = "在呼叫/数据包阻塞系统中，Erlang B 公式与 Poisson 到达模型如何计算拒绝概率 (Blocking Probability)？"
-        elif "sliding window" in content_lower or "sendbase" in content_lower or "rcvbase" in content_lower:
+        elif "dns" in content_lower and ("resource record" in content_lower or "cname" in content_lower or "authoritative" in content_lower) and "gnutella" not in content_lower:
+            term = "DNS Protocol & Resource Records (RR)"
+            question = "DNS 报文首部 16 位标志位、4 大 RR 记录类型 (A, NS, CNAME, MX) 与 4 个 Length 字段的物理意义与解析机制是什么？"
+        elif ("sliding window" in content_lower or "sendbase" in content_lower) and "tcp" in content_lower:
             term = "TCP Sliding Window & Flow Control"
             question = "滑动窗口协议（Sliding Window Protocol）中发送方与接收方在 ACK 确认与 Timer 重传时的状态转换逻辑是什么？"
-        elif "chord" in content_lower or "finger table" in content_lower:
+        elif "chord" in content_lower and ("finger table" in content_lower or "stabilize" in content_lower):
             term = "Chord DHT Finger Table & Node Join"
             question = "Chord 环中路由表 Finger Table 的索引计算公式、O(log N) 查询复杂度与节点动态加入 (Stabilization) 机制是什么？"
-        elif "bgp" in content_lower or "as-path" in content_lower:
+        elif "bgp" in content_lower and ("as-path" in content_lower or "local-pref" in content_lower):
             term = "BGP Path Vector Protocol & Routing Policy"
             question = "边界网关协议 (BGP) 的关键属性 (AS-PATH, NEXT-HOP, Local-Pref, MED) 及 4 级选路优先级决策链逻辑是什么？"
         elif "bandwidth" in content_lower and "harmonics" in content_lower:
