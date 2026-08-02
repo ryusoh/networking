@@ -32,3 +32,10 @@ python3 tools/research/anki_generator.py --count 5 --deck "金融" --tsv
 3. **Bilingual Card Formatting & Automatic Execution:**
    - Render bilingual Chinese-primary HTML cards with English technical terms, LaTeX delimiters (`\(...\)`), and line-anchored citations (`[path#Lstart-Lend](file://...)`).
    - Inject directly into the **`金融`** deck via AnkiConnect REST API or automatically launch Anki via `open -a Anki research/anki_import.txt`. Never ask the user to manually run the launch command.
+
+4. **Database Safety Non-Negotiable:**
+   - **NEVER attempt raw SQLite `INSERT`/`UPDATE` mutations directly on live `collection.anki2` or `collection.anki21b` files.** Raw direct SQLite writes cause database lock collisions, corrupt index collations (`unicase`), and disrupt Anki's V3 scheduler database.
+   - **Always use safe ingestion mechanisms:**
+     1. AnkiConnect REST API (`http://127.0.0.1:8765`) via `addNotes`.
+     2. TSV Package Export (`research/anki_import.txt`) with `#separator:Tab` and `#html:true`, launched via `open -a Anki research/anki_import.txt`.
+   - **Automatic Backups Location:** Profile backups are safely stored at `~/Library/Application Support/Anki2/<profile>/backups/*.colpkg`.

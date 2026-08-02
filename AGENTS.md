@@ -197,6 +197,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   the `add-extension` skill for the full new-extension checklist.
 - `docs/` — `ebpf-research.md`, `nas-strategy.md`. `bin/coverage_rank.py` — the
   coverage ranking helper.
+- `tools/research/` — courseware research agent pipeline (`anki_generator.py`, `scene_builder.py`, `citation_engine.py`, `memory_host.py`). **Safety Rule:** Never execute raw SQLite `INSERT`/`UPDATE` mutations directly on live Anki collections (`collection.anki2` / `collection.anki21b`); use AnkiConnect REST API or TSV/APKG package export (`open -a Anki`) to prevent database lock collisions and collation errors.
 
 ### Shell scripts in `bin/` (macOS bash 3.2 gotchas)
 
