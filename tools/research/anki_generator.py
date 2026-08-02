@@ -416,6 +416,14 @@ class TSVExporter:
     def __init__(self, output_path: Path = DEFAULT_TSV_PATH):
         self.output_path = output_path
 
+    def _sanitize_field(self, html: str) -> str:
+        """Strip newlines from HTML fields for TSV export.
+
+        Anki's TSV import treats every line as a separate card, so
+        multi-line HTML in a field creates junk cards with empty backs.
+        """
+        return html.replace("\n", "").replace("\r", "")
+
     def export(self, cards: list[AnkiCard]) -> Path:
         """Export cards to a tab-separated text file for Anki import."""
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -425,8 +433,10 @@ class TSVExporter:
             "#tags:research networking",
         ]
         for card in cards:
+            front = self._sanitize_field(card.front_html)
+            back = self._sanitize_field(card.back_html)
             tags_str = " ".join(card.tags)
-            lines.append(f"{card.front_html}\t{card.back_html}\t{tags_str}")
+            lines.append(f"{front}\t{back}\t{tags_str}")
 
         self.output_path.write_text("\n".join(lines), encoding="utf-8")
         return self.output_path

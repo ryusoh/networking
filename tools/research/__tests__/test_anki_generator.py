@@ -113,6 +113,70 @@ def test_tsv_exporter(tmp_path: Path):
     assert "<strong>B4 WAN</strong>\t<div>Centralized TE</div>\tresearch cs234" in content
 
 
+def test_tsv_exporter_strips_newlines_from_html(tmp_path: Path):
+    """Multi-line HTML in front/back must be flattened to single-line TSV.
+
+    Anki's TSV import treats every line as a separate card.  If back_html
+    contains literal newlines, one card becomes N junk cards (most with
+    empty backs).  Regression test for the 27-junk-card bug.
+    """
+    tsv_file = tmp_path / "anki_import.txt"
+    exporter = TSVExporter(output_path=tsv_file)
+
+    multiline_back = (
+        "<div><b>Title</b></div>\n"
+        "<ul>\n"
+        "<li>Point A</li>\n"
+        "<li>Point B</li>\n"
+        "</ul>\n"
+        "<table>\n"
+        "<tr><td>Col1</td><td>Col2</td></tr>\n"
+        "</table>"
+    )
+    cards = [
+        AnkiCard(
+            chunk_id="c1",
+            file_path="research/test.md",
+            heading="Test",
+            front_html="Question\nwith newline?",
+            back_html=multiline_back,
+            tags=["research"],
+        ),
+        AnkiCard(
+            chunk_id="c2",
+            file_path="research/test2.md",
+            heading="Test2",
+            front_html="Second card",
+            back_html="<div>Simple</div>",
+            tags=["research"],
+        ),
+    ]
+
+    path = exporter.export(cards)
+    content = path.read_text(encoding="utf-8")
+    lines = content.strip().split("\n")
+
+    # 3 header lines + 2 card lines = 5 total
+    header_lines = [l for l in lines if l.startswith("#")]
+    data_lines = [l for l in lines if not l.startswith("#")]
+    assert len(header_lines) == 3, f"Expected 3 headers, got {len(header_lines)}"
+    assert len(data_lines) == 2, (
+        f"Expected exactly 2 data lines (one per card), got {len(data_lines)}. "
+        f"Newlines in HTML are leaking into the TSV."
+    )
+
+    # Each data line must have exactly 2 tabs (front\tback\ttags)
+    for i, line in enumerate(data_lines):
+        tab_count = line.count("\t")
+        assert tab_count == 2, (
+            f"Data line {i} has {tab_count} tabs, expected 2 (front\\tback\\ttags)"
+        )
+
+    # Verify HTML content is preserved (just flattened)
+    assert "<li>Point A</li>" in data_lines[0]
+    assert "<table>" in data_lines[0]
+
+
 def test_custom_qa_card_cli_ingestion(tmp_path: Path):
     """Test custom Q&A card ingestion via --front and --back CLI flags."""
     from tools.research.anki_generator import main
