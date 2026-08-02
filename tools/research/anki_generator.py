@@ -35,6 +35,7 @@ from tools.research.search_chunks import format_file_link
 DEFAULT_RESEARCH_DIR = REPO_ROOT / "research"
 DEFAULT_MANIFEST_PATH = DEFAULT_RESEARCH_DIR / ".chunks_manifest.json"
 DEFAULT_COVERAGE_PATH = DEFAULT_RESEARCH_DIR / ".anki_coverage.json"
+DEFAULT_TSV_PATH = DEFAULT_RESEARCH_DIR / "anki_import.txt"
 FIELD_SEP = "\x1f"
 
 
@@ -228,6 +229,35 @@ class AnkiConnectChecker:
                 pass
         return existing
 
+    def add_notes(self, cards: list[AnkiCard], deck_name: str, model_name: str = "Basic") -> list[int | None]:
+        """Dispatch addNotes API request to AnkiConnect."""
+        notes_payload = []
+        for card in cards:
+            notes_payload.append(
+                {
+                    "deckName": deck_name,
+                    "modelName": model_name,
+                    "fields": {
+                        "Front": card.front_html,
+                        "Back": card.back_html,
+                    },
+                    "tags": card.tags,
+                }
+            )
+
+        payload = json.dumps(
+            {"action": "addNotes", "version": 6, "params": {"notes": notes_payload}}
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            self.url, data=payload, headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            if res.get("error"):
+                raise RuntimeError(f"AnkiConnect error: {res['error']}")
+            return res.get("result", [])
+
 
 def filter_duplicate_chunks(
     chunks: list[dict[str, Any]],
@@ -275,7 +305,6 @@ class AnkiCardFormatter:
 
         link_markdown = format_file_link(self.repo_root, file_path, start_line, end_line)
 
-        # Parse bullet points from content
         raw_lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith("#")]
         bullet_items = []
         for line in raw_lines[:6]:
@@ -305,9 +334,31 @@ class AnkiCardFormatter:
         )
 
 
+class TSVExporter:
+    """Exporter for Anki tab-separated package files (#separator:Tab, #html:true)."""
+
+    def __init__(self, output_path: Path = DEFAULT_TSV_PATH):
+        self.output_path = output_path
+
+    def export(self, cards: list[AnkiCard]) -> Path:
+        """Export cards to a tab-separated text file for Anki import."""
+        self.output_path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [
+            "#separator:Tab",
+            "#html:true",
+            "#tags:research networking",
+        ]
+        for card in cards:
+            tags_str = " ".join(card.tags)
+            lines.append(f"{card.front_html}\t{card.back_html}\t{tags_str}")
+
+        self.output_path.write_text("\n".join(lines), encoding="utf-8")
+        return self.output_path
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Autonomous Anki Flashcard Generation Pipeline (Phase 1-3 Formatter)."
+        description="Autonomous Anki Flashcard Generation Pipeline (Phase 1-4 Complete Pipeline)."
     )
     parser.add_argument(
         "--manifest",
@@ -330,6 +381,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         default="金融",
         help="Target Anki deck name.",
     )
+    parser.add_argument(
+        "--tsv",
+        action="store_true",
+        help="Force export to TSV package file instead of AnkiConnect API.",
+    )
     args = parser.parse_args(argv)
 
     manifest_path = Path(args.manifest).resolve()
@@ -344,20 +400,37 @@ def main(argv: Sequence[str] | None = None) -> int:
     tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
     unvisited = tracker.select_unvisited_chunks(chunks, count=args.count * 2)
 
-    filtered = filter_duplicate_chunks(unvisited, args.deck)[: args.count]
+    selected_chunks = filter_duplicate_chunks(unvisited, args.deck)[: args.count]
+
+    if not selected_chunks:
+        print("No unvisited, non-duplicate chunks found to process into Anki cards.")
+        return 0
 
     formatter = AnkiCardFormatter(repo_root=DEFAULT_RESEARCH_DIR.parent)
-    cards = [formatter.format_card(c) for c in filtered]
+    cards = [formatter.format_card(c) for c in selected_chunks]
 
-    print(f"=== ANKI CARD FORMATTER REPORT ===")
-    print(f"Target Deck: {args.deck}")
-    print(f"Formatted Cards Generated ({len(cards)} / {args.count}):\n")
+    connect_checker = AnkiConnectChecker()
+    imported_via_api = False
 
-    for idx, card in enumerate(cards, start=1):
-        print(f"Card #{idx}:")
-        print(f"  Front: {card.front_html}")
-        print(f"  Back:  {card.back_html[:150]}...")
-        print(f"  Tags:  {' '.join(card.tags)}\n")
+    if not args.tsv and connect_checker.is_available():
+        try:
+            note_ids = connect_checker.add_notes(cards, deck_name=args.deck)
+            print(f"Successfully imported {len(cards)} cards directly into Anki deck '{args.deck}' via AnkiConnect!")
+            print(f"Anki Note IDs: {note_ids}")
+            imported_via_api = True
+        except Exception as err:
+            print(f"AnkiConnect import warning: {err}. Falling back to TSV package export...")
+
+    if not imported_via_api:
+        exporter = TSVExporter()
+        tsv_path = exporter.export(cards)
+        print(f"Successfully exported {len(cards)} cards to TSV package file:")
+        print(f"  Path: {tsv_path}")
+        print(f"  Instructions: Open Anki -> File -> Import -> Select {tsv_path.name}")
+
+    # Mark chunks as visited in coverage tracker
+    tracker.mark_chunks_visited(selected_chunks, deck_name=args.deck)
+    print(f"Updated coverage tracking for {len(selected_chunks)} chunks in {tracker.coverage_path.name}")
 
     return 0
 

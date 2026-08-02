@@ -1,12 +1,14 @@
-"""Unit tests for Phase 1-3 Anki Pipeline (tools/research/anki_generator.py)."""
+"""Unit tests for Phase 1-4 Anki Pipeline (tools/research/anki_generator.py)."""
 
 import sqlite3
 from pathlib import Path
 from tools.research.anki_generator import (
+    AnkiCard,
     AnkiCardFormatter,
     AnkiConnectChecker,
     CoverageTracker,
     SQLiteInspector,
+    TSVExporter,
     filter_duplicate_chunks,
 )
 
@@ -83,3 +85,27 @@ def test_anki_card_formatter(tmp_path: Path):
     assert "<ul>" in card.back_html
     assert "Centralized SDN control WAN" in card.back_html
     assert "research" in card.tags
+
+
+def test_tsv_exporter(tmp_path: Path):
+    tsv_file = tmp_path / "anki_import.txt"
+    exporter = TSVExporter(output_path=tsv_file)
+
+    cards = [
+        AnkiCard(
+            chunk_id="c1",
+            file_path="research/cs234/b4.md",
+            heading="B4",
+            front_html="<strong>B4 WAN</strong>",
+            back_html="<div>Centralized TE</div>",
+            tags=["research", "cs234"],
+        )
+    ]
+
+    path = exporter.export(cards)
+    assert path.exists()
+
+    content = path.read_text(encoding="utf-8")
+    assert "#separator:Tab" in content
+    assert "#html:true" in content
+    assert "<strong>B4 WAN</strong>\t<div>Centralized TE</div>\tresearch cs234" in content
