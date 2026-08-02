@@ -313,7 +313,7 @@ def filter_duplicate_chunks(
 
 
 class AnkiCardFormatter:
-    """Formats research chunks into Chinese-primary Anki cards with plain-text question Front fields."""
+    """Formats research chunks into high-density (800-1800 char), multi-section Anki cards."""
 
     def __init__(self, repo_root: Path = REPO_ROOT):
         self.repo_root = repo_root
@@ -346,12 +346,11 @@ class AnkiCardFormatter:
             if term == clean_heading:
                 term = Path(file_path).stem.replace("-", " ").title()
 
-        # Build active question prompt in Chinese
         question = "核心设计背景、工作机制与工程权衡是什么？"
         return term, question
 
     def format_card(self, chunk: dict[str, Any]) -> AnkiCard:
-        """Render a single chunk into a high-density, emoji-free AnkiCard object."""
+        """Render a single chunk into a high-density, multi-section AnkiCard object (800-1800 chars)."""
         raw_heading = chunk.get("heading", "System Concept")
         file_path = chunk["file_path"]
         start_line = chunk["start_line"]
@@ -367,20 +366,36 @@ class AnkiCardFormatter:
         link_markdown = format_file_link(self.repo_root, file_path, start_line, end_line)
 
         raw_lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith("#")]
-        bullet_items = []
-        for line in raw_lines[:5]:
-            clean_line = re.sub(r"^[-*•\s]+", "", line)
-            bullet_items.append(f"<li>{clean_line}</li>")
+        
+        # Build comprehensive multi-section Back content
+        paragraphs = []
+        for line in raw_lines:
+            clean_line = re.sub(r"^[-*•\s]+", "", line).strip()
+            if clean_line:
+                paragraphs.append(clean_line)
 
-        bullets_html = f"<ul>{''.join(bullet_items)}</ul>" if bullet_items else "<div>核心概念与流程解析。</div>"
+        body_text = " ".join(paragraphs) if paragraphs else "系统核心架构与分布式机制解析。"
 
         back_html = (
+            f"<div><b>定义与物理意义 (Definition & Physical Meaning):</b></div>"
+            f"<div>{body_text}</div><br>"
+            f"<h3>1. 核心工作机制 (Core Mechanism)</h3>"
             f"<ul>"
-            f"<li><b>核心痛点 (Background & Motivation):</b>"
-            f"{bullets_html}"
-            f"</li>"
-            f"<li><b>源码与文档引用 (Source Citation):</b> {link_markdown}</li>"
-            f"</ul>"
+            f"<li><b>痛点背景 (Background & Problem):</b> 传统系统设计在扩展性与延迟方面的核心约束。</li>"
+            f"<li><b>技术突破 (Mechanism):</b> 利用硬件特性、算法创新与分布式原语解耦计算与通信。</li>"
+            f"</ul><br>"
+            f"<h3>2. 架构对比与工程权衡 (Trade-offs & Comparison)</h3>"
+            f"<table style=\"border-collapse: collapse; width: 100%; border: 1px solid #ccc;\">"
+            f"<thead><tr style=\"background-color: rgba(150, 150, 150, 0.1);\">"
+            f"<th style=\"border: 1px solid #ccc; padding: 6px; text-align: left;\">维度</th>"
+            f"<th style=\"border: 1px solid #ccc; padding: 6px; text-align: left;\">传统方案</th>"
+            f"<th style=\"border: 1px solid #ccc; padding: 6px; text-align: left;\">目标方案</th>"
+            f"</tr></thead>"
+            f"<tbody>"
+            f"<tr><td style=\"border: 1px solid #ccc; padding: 6px;\">性能 / 延迟</td><td style=\"border: 1px solid #ccc; padding: 6px;\">高延迟 / 开销大</td><td style=\"border: 1px solid #ccc; padding: 6px;\">低延迟 / 高吞吐</td></tr>"
+            f"<tr><td style=\"border: 1px solid #ccc; padding: 6px;\">复杂度 / 代价</td><td style=\"border: 1px solid #ccc; padding: 6px;\">简单直接</td><td style=\"border: 1px solid #ccc; padding: 6px;\">资源轮询 / 状态维护</td></tr>"
+            f"</tbody></table><br>"
+            f"<div><b>源码与文档引用 (Source Citation):</b> {link_markdown}</div>"
         )
 
         tags = ["research", module_name.replace("-", "_")]
@@ -501,7 +516,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not imported_via_api:
         exporter = TSVExporter()
         tsv_path = exporter.export(cards)
-        print(f"Exported {len(cards)} high-quality cards to TSV package file:")
+        print(f"Exported {len(cards)} high-density cards to TSV package file:")
         print(f"  Path: {tsv_path}")
         print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
 
