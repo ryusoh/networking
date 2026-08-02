@@ -111,3 +111,45 @@ def test_tsv_exporter(tmp_path: Path):
     assert "#separator:Tab" in content
     assert "#html:true" in content
     assert "<strong>B4 WAN</strong>\t<div>Centralized TE</div>\tresearch cs234" in content
+
+
+def test_custom_qa_card_cli_ingestion(tmp_path: Path):
+    """Test custom Q&A card ingestion via --front and --back CLI flags."""
+    from tools.research.anki_generator import main
+
+    tsv_file = tmp_path / "anki_import.txt"
+    ret = main(
+        [
+            "--front",
+            "<strong>Custom Concept</strong>: Core Question?",
+            "--back",
+            "<div>Detailed Answer</div>",
+            "--deck",
+            "金融",
+            "--tags",
+            "research cs234 custom_qa",
+            "--tsv",
+        ]
+    )
+    assert ret == 0
+
+
+def test_custom_qa_card_ankiconnect(monkeypatch, tmp_path: Path):
+    """Test custom Q&A card ingestion via mocked AnkiConnect API."""
+    from tools.research.anki_generator import AnkiConnectChecker, main
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(AnkiConnectChecker, "add_notes", lambda self, cards, deck_name: [123456])
+
+    ret = main(
+        [
+            "--front",
+            "<strong>Paxos Consensus</strong>: How does Multi-Paxos work?",
+            "--back",
+            "<div>Leader election + Log replication</div>",
+            "--deck",
+            "金融",
+        ]
+    )
+    assert ret == 0
+

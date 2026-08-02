@@ -72,6 +72,27 @@ If Markdown sidecars, slides, or code files in `research/` have been updated:
 python3 tools/research/parse_chunks.py
 ```
 
+### 7. Post-Answer Interactive Anki Export Protocol
+
+After delivering a synthesized, citation-anchored answer to a user's research request, the agent MUST append an interactive export offer at the end of the response:
+
+> 💡 **Export Answer to Anki Flashcard?**
+> Would you like to organize and export this response into a structured, bilingual Anki flashcard for your **`金融`** deck?
+> _(Reply **"yes"**, **"export to Anki"**, or **"import card"** to auto-import)._
+
+When the user confirms or requests export:
+
+1. **Format Front HTML:** `<strong>[Concept Title (English & Chinese)]</strong>: [Core Engineering Question]`
+2. **Format Back HTML:** Structure into 4 standard sections:
+   - **定义与物理意义 (Definition & Physical Meaning)**
+   - **核心工作机制 (Core Mechanism & Flow)**
+   - **架构对比与工程权衡 (Trade-offs Table)**
+   - **源码与文档引用 (Source Citation):** Bounded line-anchored Markdown links.
+3. **Execute Auto-Ingestion Command:**
+   ```bash
+   python3 tools/research/anki_generator.py --front "<front_html>" --back "<back_html>" --deck "金融" --tags "research networking <module_name>" --auto-launch
+   ```
+
 ## Citation Requirement
 
 All answers, protocol explanations, and code breakdowns derived from `research/` materials MUST include line-anchored Markdown citations formatted as:

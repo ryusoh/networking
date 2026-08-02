@@ -467,7 +467,69 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Automatically launch Anki.app if closed to enable 100% automated AnkiConnect ingestion.",
     )
+    parser.add_argument(
+        "--front",
+        default="",
+        help="Custom Front field HTML/Text for Q&A card export.",
+    )
+    parser.add_argument(
+        "--back",
+        default="",
+        help="Custom Back field HTML/Text for Q&A card export.",
+    )
+    parser.add_argument(
+        "--tags",
+        default="research networking",
+        help="Space-separated tags for custom card export.",
+    )
     args = parser.parse_args(argv)
+
+    # Custom Q&A card direct ingestion path
+    if args.front and args.back:
+        tag_list = [t for t in args.tags.split() if t]
+        custom_card = AnkiCard(
+            chunk_id="custom-qa",
+            file_path="custom-qa",
+            heading=args.front[:60],
+            front_html=args.front,
+            back_html=args.back,
+            tags=tag_list if tag_list else ["research", "qa_export"],
+        )
+        cards = [custom_card]
+        connect_checker = AnkiConnectChecker()
+
+        if args.auto_launch and not connect_checker.is_available():
+            print("Anki GUI is closed. Launching /Applications/Anki.app in background...")
+            os.system("open -a Anki")
+            import time
+
+            for _ in range(10):
+                time.sleep(0.5)
+                if connect_checker.is_available():
+                    break
+
+        imported_via_api = False
+        if not args.tsv and connect_checker.is_available():
+            try:
+                note_ids = connect_checker.add_notes(cards, deck_name=args.deck)
+                print("🎉 CUSTOM Q&A CARD INGESTION SUCCESSFUL!")
+                print(
+                    f"Directly imported 1 custom Q&A card into Anki deck '{args.deck}' via AnkiConnect API."
+                )
+                print(f"Anki Note ID: {note_ids}")
+                imported_via_api = True
+            except Exception as err:
+                print(
+                    f"AnkiConnect import warning: {err}. Falling back to TSV package export..."
+                )
+
+        if not imported_via_api:
+            exporter = TSVExporter()
+            tsv_path = exporter.export(cards)
+            print("Exported 1 custom Q&A card to TSV package file:")
+            print(f"  Path: {tsv_path}")
+            print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
+        return 0
 
     manifest_path = Path(args.manifest).resolve()
     if not manifest_path.exists():
@@ -496,6 +558,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Anki GUI is closed. Launching /Applications/Anki.app in background...")
         os.system("open -a Anki")
         import time
+
         for _ in range(10):
             time.sleep(0.5)
             if connect_checker.is_available():
@@ -507,7 +570,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             note_ids = connect_checker.add_notes(cards, deck_name=args.deck)
             print(f"🎉 100% AUTOMATED INGESTION SUCCESSFUL!")
-            print(f"Directly imported {len(cards)} cards into Anki deck '{args.deck}' via AnkiConnect API.")
+            print(
+                f"Directly imported {len(cards)} cards into Anki deck '{args.deck}' via AnkiConnect API."
+            )
             print(f"Anki Note IDs: {note_ids}")
             imported_via_api = True
         except Exception as err:
@@ -521,7 +586,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
 
     tracker.mark_chunks_visited(selected_chunks, deck_name=args.deck)
-    print(f"Updated coverage tracking for {len(selected_chunks)} chunks in {tracker.coverage_path.name}")
+    print(
+        f"Updated coverage tracking for {len(selected_chunks)} chunks in {tracker.coverage_path.name}"
+    )
+
 
     return 0
 

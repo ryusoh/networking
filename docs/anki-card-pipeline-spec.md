@@ -485,3 +485,50 @@ class CoverageProgressReporter:
         print(f"              {cls.render_bar(global_visited, global_total)}")
         print("=" * 80 + "\n")
 ```
+
+---
+
+## 10. Interactive Q&A Answer Export & Auto-Ingestion Pipeline
+
+This section defines the interactive workflow and CLI contract that enables `research-agent` to organize any synthesized research answer into a structured Anki note and auto-ingest it into the target deck (`金融`).
+
+### 10.1 Workflow Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Student / User
+    participant Agent as Research Agent
+    participant Generator as anki_generator.py (--front / --back)
+    participant AnkiConnect as AnkiConnect (localhost:8765)
+    participant TSV as TSV Exporter (anki_import.txt)
+
+    User->>Agent: Query concept (/research-agent "B4 WAN Traffic Engineering")
+    Agent->>Agent: Retrieve chunks, build scene & synthesize answer with citations
+    Agent-->>User: Present synthesized answer & line-anchored citations
+    Agent-->>User: Offer: "💡 Export Answer to Anki Flashcard for '金融' deck?"
+    User->>Agent: Confirm ("yes" / "export to Anki")
+    Agent->>Agent: Format Front HTML (Bold Title + Question) & Back HTML (4 Sections + Graph Hubs)
+    Agent->>Generator: Execute anki_generator.py --front "<front>" --back "<back>" --deck "金融" --auto-launch
+    alt Anki is Active / Auto-Launched
+        Generator->>AnkiConnect: Dispatch addNotes JSON Payload
+        AnkiConnect-->>Generator: Return Note ID
+    else Anki API Unavailable
+        Generator->>TSV: Write research/anki_import.txt
+    end
+    Generator-->>Agent: Ingestion Summary
+    Agent-->>User: Report successful Anki card ingestion & Note ID
+```
+
+### 10.2 Command Interface Contract
+
+Custom Q&A notes are ingested via `tools/research/anki_generator.py` using `--front` and `--back` arguments:
+
+```bash
+python3 tools/research/anki_generator.py \
+  --front "<strong>B4 WAN 流量工程</strong>: B4 系统如何通过集中式 SDN 控制器解耦 WAN 路由并实现 100% 链路利用率？" \
+  --back "<div><b>定义与物理意义 (Definition & Physical Meaning):</b></div><div>B4 是 Google 部署的软件定义广域网...</div>" \
+  --deck "金融" \
+  --tags "research cs234 b4_wan" \
+  --auto-launch
+```
