@@ -378,13 +378,13 @@ class AnkiCardFormatter:
 
         back_html = (
             f"<div><b>定义与物理意义 (Definition & Physical Meaning):</b></div>"
-            f"<div>{body_text}</div><br>"
-            f"<h3>1. 核心工作机制 (Core Mechanism)</h3>"
+            f"<div>{body_text}</div>"
+            f"<div><b>1. 核心工作机制 (Core Mechanism):</b></div>"
             f"<ul>"
             f"<li><b>痛点背景 (Background & Problem):</b> 传统系统设计在扩展性与延迟方面的核心约束。</li>"
             f"<li><b>技术突破 (Mechanism):</b> 利用硬件特性、算法创新与分布式原语解耦计算与通信。</li>"
-            f"</ul><br>"
-            f"<h3>2. 架构对比与工程权衡 (Trade-offs & Comparison)</h3>"
+            f"</ul>"
+            f"<div><b>2. 架构对比与工程权衡 (Trade-offs & Comparison):</b></div>"
             f"<table style=\"border-collapse: collapse; width: 100%; border: 1px solid #ccc;\">"
             f"<thead><tr style=\"background-color: rgba(150, 150, 150, 0.1);\">"
             f"<th style=\"border: 1px solid #ccc; padding: 6px; text-align: left;\">维度</th>"
@@ -394,7 +394,7 @@ class AnkiCardFormatter:
             f"<tbody>"
             f"<tr><td style=\"border: 1px solid #ccc; padding: 6px;\">性能 / 延迟</td><td style=\"border: 1px solid #ccc; padding: 6px;\">高延迟 / 开销大</td><td style=\"border: 1px solid #ccc; padding: 6px;\">低延迟 / 高吞吐</td></tr>"
             f"<tr><td style=\"border: 1px solid #ccc; padding: 6px;\">复杂度 / 代价</td><td style=\"border: 1px solid #ccc; padding: 6px;\">简单直接</td><td style=\"border: 1px solid #ccc; padding: 6px;\">资源轮询 / 状态维护</td></tr>"
-            f"</tbody></table><br>"
+            f"</tbody></table>"
             f"<div><b>源码与文档引用 (Source Citation):</b> {link_markdown}</div>"
         )
 
