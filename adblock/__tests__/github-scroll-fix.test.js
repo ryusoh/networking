@@ -1,108 +1,120 @@
+'use strict';
+
+const path = require('path');
+const { instrumentFile } = require('./helpers/instrument');
+
 describe('github-scroll-fix.js', () => {
-  let origLocation;
+  let origFocus;
+  let origScrollIntoView;
+  let origScrollTo;
 
   beforeEach(() => {
-    jest.resetModules();
-    jest.clearAllMocks();
-    origLocation = window.location;
+    jest.useFakeTimers();
+    jest.setSystemTime(10000);
+
+    // Setup window environment for github check
     delete window.location;
-    window.location = new URL('https://github.com/ryusoh/networking');
+    window.location = { hostname: 'github.com' };
+
+    // Mock user interaction properties
+    Object.defineProperty(window, 'scrollY', { value: 0, writable: true, configurable: true });
+    Object.defineProperty(window, 'pageYOffset', { value: 0, writable: true, configurable: true });
+    Object.defineProperty(window, 'innerHeight', {
+      value: 1000,
+      writable: true,
+      configurable: true
+    });
+
+    // Setup document structure
+    document.body.innerHTML = '<div>test</div>';
+    Object.defineProperty(document.body, 'scrollHeight', {
+      value: 5000,
+      writable: true,
+      configurable: true
+    });
+
+    origFocus = jest.fn();
+    HTMLElement.prototype.focus = origFocus;
+
+    origScrollIntoView = jest.fn();
+    Element.prototype.scrollIntoView = origScrollIntoView;
+
+    origScrollTo = jest.fn();
+    window.scrollTo = origScrollTo;
+    window.scroll = origScrollTo;
+
+    const srcPath = path.resolve(__dirname, '../github-scroll-fix.js');
+    const instrumented = instrumentFile(srcPath);
+    eval(instrumented);
   });
 
   afterEach(() => {
-    window.location = origLocation;
+    jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
-  it('intercepts focus to enforce preventScroll: true', () => {
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'github-scroll-fix.js'));
+  test('does not run on non-github sites', () => {
+    window.location.hostname = 'example.com';
+    const srcPath = path.resolve(__dirname, '../github-scroll-fix.js');
+    const instrumented = instrumentFile(srcPath);
 
-    eval(code);
-
-    const btn = document.createElement('button');
-    const focusSpy = jest.fn();
-    btn.focus = focusSpy;
-
-    // Simulate focus call
-    btn.focus();
-    btn.focus({ preventScroll: false });
-
-    // The wrapped method should enforce preventScroll: true
-    expect(HTMLElement.prototype.focus).toBeDefined();
+    const initialFocus = HTMLElement.prototype.focus;
+    eval(instrumented);
+    expect(HTMLElement.prototype.focus).toBe(initialFocus);
   });
 
-  it('blocks automated scrollIntoView to bottom elements when near top', () => {
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'github-scroll-fix.js'));
-
-    eval(code);
-
+  test('forces preventScroll=true when calling focus()', () => {
     const el = document.createElement('div');
-    el.getBoundingClientRect = () => ({ top: 1500, bottom: 1600, left: 0, right: 100 });
+    el.focus();
+    expect(origFocus).toHaveBeenCalledWith({ preventScroll: true });
 
-    window.scrollY = 0;
-    let scrolled = false;
-    Element.prototype.scrollIntoView = function () {
-      scrolled = true;
-    };
+    el.focus({ preventScroll: false });
+    expect(origFocus).toHaveBeenCalledWith({ preventScroll: true });
+  });
 
-    // Re-eval after mocking base
-    eval(code);
+  test('blocks scrollIntoView when jumping to bottom without user interaction', () => {
+    const el = document.createElement('div');
+    el.getBoundingClientRect = () => ({ top: 4000 }); // Far down
+    window.scrollY = 0; // Near top
 
-    // Call scrollIntoView near top -> should be blocked
+    // Test blocking
+    const result = el.scrollIntoView();
+    expect(origScrollIntoView).not.toHaveBeenCalled();
+    expect(result).toBeUndefined();
+
+    // Test allowing (recent interaction)
+    window.dispatchEvent(new Event('click')); // Will set time
     el.scrollIntoView();
-    expect(scrolled).toBe(false);
+    expect(origScrollIntoView).toHaveBeenCalled();
   });
 
-  it('blocks automated scrollTo near bottom when at top without user interaction', () => {
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'github-scroll-fix.js'));
+  test('blocks scrollTo when jumping to bottom without user interaction', () => {
+    window.scrollY = 0; // Near top
+    document.body.scrollHeight = 5000;
 
-    let lastScrollTo = null;
-    window.scrollTo = (x, y) => {
-      lastScrollTo = { x, y };
-    };
+    // Jump past 70% of 4000 = 2800
+    window.scrollTo(0, 3500);
+    expect(origScrollTo).not.toHaveBeenCalled();
 
-    eval(code);
+    // Jump with options object
+    window.scrollTo({ top: 3500 });
+    expect(origScrollTo).not.toHaveBeenCalled();
 
+    // Allow if recent interaction
+    window.dispatchEvent(new Event('keydown'));
+    window.scrollTo(0, 3500);
+    expect(origScrollTo).toHaveBeenCalledWith(0, 3500);
+
+    // Allow if using options object
+    window.scrollTo({ top: 3500 });
+    expect(origScrollTo).toHaveBeenCalledWith({ top: 3500 });
+  });
+
+  test('allows scrollTo if not jumping far', () => {
     window.scrollY = 0;
-    Object.defineProperty(document.body, 'scrollHeight', { value: 3000, configurable: true });
+    document.body.scrollHeight = 5000;
 
-    // Try programmatic scrollTo bottom (y = 2500)
-    window.scrollTo(0, 2500);
-
-    // Should be filtered out (lastScrollTo remains null)
-    expect(lastScrollTo).toBeNull();
-  });
-
-  it('allows scrollTo when user explicitly clicks', () => {
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'github-scroll-fix.js'));
-
-    let lastScrollTo = null;
-    window.scrollTo = (x, y) => {
-      lastScrollTo = { x, y };
-    };
-
-    eval(code);
-
-    window.scrollY = 0;
-    Object.defineProperty(document.body, 'scrollHeight', { value: 3000, configurable: true });
-
-    // Simulate click event
-    window.dispatchEvent(new Event('click'));
-
-    window.scrollTo(0, 2500);
-
-    // Should pass through
-    expect(lastScrollTo).toEqual({ x: 0, y: 2500 });
-  });
-
-  it('does nothing if not on github.com', () => {
-    window.location = new URL('https://example.com');
-    const { instrumentFile } = require('./helpers/instrument');
-    const code = instrumentFile(require('path').join(__dirname, '..', 'github-scroll-fix.js'));
-
-    expect(() => eval(code)).not.toThrow();
+    window.scrollTo(0, 500); // Only small jump
+    expect(origScrollTo).toHaveBeenCalledWith(0, 500);
   });
 });
