@@ -366,6 +366,7 @@ class AnkiGraphBridge:
     def get_related_hubs(self, text: str, top_n: int = 3) -> list[tuple[str, float, str]]:
         """Scans input text for concept labels present in the target deck's knowledge graph, returning top-N by PageRank."""
         from graph.references import _normalize
+
         norm_text = _normalize(text)
         matches = []
         for node in self.nodes:
@@ -375,4 +376,112 @@ class AnkiGraphBridge:
                 matches.append((label, pr, self.target_deck))
         matches.sort(key=lambda x: x[1], reverse=True)
         return matches[:top_n]
+```
+
+---
+
+## 9. Hierarchical Multi-Level Coverage Progress Bar Subsystem
+
+This section specifies the progress tracking and visual terminal reporting subsystem that quantifies courseware memorization coverage across three distinct levels of directory hierarchy after flashcard batch generation.
+
+### 9.1 Core Coverage Objectives & Granularity Levels
+
+After executing card generation and ingestion, the pipeline computes and renders a multi-level coverage progress report to inform the user of exact memorization progress:
+
+1. **Submodule Level Coverage (Level A):** Percentage of chunks memorized within the specific active submodule or folder (e.g., `research/cs231-distributed-systems/00-materials`).
+2. **Course Level Coverage (Level B):** Aggregate percentage of chunks memorized across the entire course directory (e.g., `research/cs231-distributed-systems`).
+3. **Global Repository Level Coverage (Level C):** Overall percentage of chunks memorized across all courseware in `research/` (`cs231`, `cs232`, `cs233`, `cs234`).
+
+### 9.2 Progress Bar Terminal UI Standard
+
+Upon completing card generation, or when calling `python3 tools/research/anki_generator.py --status`, the terminal outputs the following standardized progress report:
+
+```text
+================================================================================
+📊 Anki Courseware Memorization Progress Report
+================================================================================
+  Submodule : cs231-distributed-systems/00-materials
+              [██████████████████████░░░░░░░░░░░░░░░░░░░░]  52.4% (22/42 chunks)
+
+  Course    : cs231-distributed-systems
+              [████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░]  38.1% (120/315 chunks)
+
+  Global    : research/ (cs231, cs232, cs233, cs234)
+              [████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]  18.5% (450/2430 chunks)
+================================================================================
+```
+
+### 9.3 Calculation Formula and Data Sources
+
+- **Manifest Source (`research/.chunks_manifest.json`):** Supplies total chunk count ($T_{scope}$) for each scope prefix.
+- **Coverage Source (`research/.anki_coverage.json`):** Supplies visited chunk IDs ($V_{scope}$) marked as processed into Anki notes.
+- **Formula:**
+  $$\text{Coverage \%} = \left( \frac{|V_{scope}|}{|T_{scope}|} \right) \times 100\%$$
+
+| Scope Level             | Prefix Extraction Logic                                            | Total Chunks ($T$) Definition                                    | Visited Chunks ($V$) Definition                                   |
+| :---------------------- | :----------------------------------------------------------------- | :--------------------------------------------------------------- | :---------------------------------------------------------------- |
+| **Submodule (Level A)** | Parent directory of generated chunks (`research/course/submodule`) | Chunks in manifest where `file_path` starts with `submodule_dir` | Chunks in `visited_chunk_ids` with matching `submodule_dir`       |
+| **Course (Level B)**    | Second directory segment (`research/course`)                       | Chunks in manifest where `file_path` starts with `course_dir`    | Chunks in `visited_chunk_ids` with matching `course_dir`          |
+| **Global (Level C)**    | `research/` root prefix                                            | All valid chunks in `research/.chunks_manifest.json`             | All entries in `research/.anki_coverage.json` `visited_chunk_ids` |
+
+### 9.4 Implementation Blueprint (`CoverageTracker` Extensions)
+
+The `CoverageTracker` class in `tools/research/anki_generator.py` is extended with multi-level aggregation and bar rendering methods:
+
+```python
+class CoverageProgressReporter:
+    """Computes and renders multi-level coverage progress bars."""
+
+    @staticmethod
+    def render_bar(visited: int, total: int, width: int = 40) -> str:
+        """Renders an ASCII block progress bar string."""
+        pct = (visited / total * 100.0) if total > 0 else 0.0
+        filled_len = int(width * visited // total) if total > 0 else 0
+        bar = "█" * filled_len + "░" * (width - filled_len)
+        return f"[{bar}] {pct:5.1f}% ({visited}/{total} chunks)"
+
+    @classmethod
+    def print_report(
+        cls,
+        manifest_chunks: list[dict[str, Any]],
+        visited_chunk_ids: set[str],
+        active_file_path: str | None = None,
+    ) -> None:
+        """Calculates and prints Submodule, Course, and Global progress bars."""
+        if not manifest_chunks:
+            return
+
+        global_total = len(manifest_chunks)
+        global_visited = sum(1 for c in manifest_chunks if c["chunk_id"] in visited_chunk_ids)
+
+        course_dir = ""
+        submodule_dir = ""
+        if active_file_path:
+            parts = Path(active_file_path).parts
+            if len(parts) >= 2:
+                course_dir = str(Path(*parts[:2]))
+            if len(parts) >= 3:
+                submodule_dir = str(Path(*parts[:3]))
+
+        print("\n" + "=" * 80)
+        print("📊 Anki Courseware Memorization Progress Report")
+        print("=" * 80)
+
+        if submodule_dir:
+            sub_chunks = [c for c in manifest_chunks if c["file_path"].startswith(submodule_dir)]
+            sub_vis = sum(1 for c in sub_chunks if c["chunk_id"] in visited_chunk_ids)
+            sub_label = Path(submodule_dir).relative_to("research") if submodule_dir.startswith("research") else submodule_dir
+            print(f"  Submodule : {sub_label}")
+            print(f"              {cls.render_bar(sub_vis, len(sub_chunks))}\n")
+
+        if course_dir:
+            crs_chunks = [c for c in manifest_chunks if c["file_path"].startswith(course_dir)]
+            crs_vis = sum(1 for c in crs_chunks if c["chunk_id"] in visited_chunk_ids)
+            crs_label = Path(course_dir).name
+            print(f"  Course    : {crs_label}")
+            print(f"              {cls.render_bar(crs_vis, len(crs_chunks))}\n")
+
+        print(f"  Global    : research/ (cs231, cs232, cs233, cs234)")
+        print(f"              {cls.render_bar(global_visited, global_total)}")
+        print("=" * 80 + "\n")
 ```
