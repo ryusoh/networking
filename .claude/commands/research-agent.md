@@ -91,6 +91,7 @@ When the user confirms or requests export:
    ```bash
    python3 tools/research/anki_generator.py --front "<front_html>" --back "<back_html>" --deck "金融" --tags "research networking <module_name>" --auto-launch
    ```
+4. **Append Progress Report:** Always capture and append the **📊 Anki Courseware Memorization Progress Report** printed by `anki_generator.py` at the end of your response to the user.
 
 ## Citation Requirement
 

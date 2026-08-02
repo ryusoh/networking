@@ -269,9 +269,20 @@ def test_tsv_exporter_strips_newlines_from_html(tmp_path: Path):
     assert "<table>" in data_lines[0]
 
 
-def test_custom_qa_card_cli_ingestion(tmp_path: Path):
+def test_custom_qa_card_cli_ingestion(tmp_path: Path, capsys):
     """Test custom Q&A card ingestion via --front and --back CLI flags."""
+    import json
     from tools.research.anki_generator import main
+
+    manifest_file = tmp_path / "manifest.json"
+    coverage_file = tmp_path / "coverage.json"
+    manifest_file.write_text(
+        json.dumps({"chunks": [{"chunk_id": "c1", "file_path": "research/cs234/b4.md"}]}),
+        encoding="utf-8",
+    )
+    coverage_file.write_text(
+        json.dumps({"visited_chunk_ids": {"c1": {"status": "generated"}}}), encoding="utf-8"
+    )
 
     tsv_file = tmp_path / "anki_import.txt"
     ret = main(
@@ -284,10 +295,16 @@ def test_custom_qa_card_cli_ingestion(tmp_path: Path):
             "金融",
             "--tags",
             "research cs234 custom_qa",
+            "--manifest",
+            str(manifest_file),
+            "--coverage",
+            str(coverage_file),
             "--tsv",
         ]
     )
     assert ret == 0
+    captured = capsys.readouterr().out
+    assert "Memorization Progress Report" in captured
 
 
 def test_custom_qa_card_ankiconnect(monkeypatch, tmp_path: Path):

@@ -857,6 +857,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("Exported 1 custom Q&A card to TSV package file:")
             print(f"  Path: {tsv_path}")
             print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
+
+        manifest_path = Path(args.manifest).resolve()
+        if manifest_path.exists():
+            try:
+                manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+                chunks = manifest_data.get("chunks", [])
+                tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
+                visited_ids = set(tracker.data.get("visited_chunk_ids", {}).keys())
+                CoverageProgressReporter.print_report(chunks, visited_ids)
+            except Exception:
+                pass
         return 0
 
     manifest_path = Path(args.manifest).resolve()
