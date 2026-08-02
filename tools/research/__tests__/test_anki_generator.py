@@ -72,7 +72,7 @@ def test_anki_card_formatter(tmp_path: Path):
     chunk = {
         "chunk_id": "c1",
         "file_path": "research/cs234/b4.md",
-        "heading": "B4 Traffic Engineering (软件定义网络 WAN)",
+        "heading": "B4 Traffic Engineering",
         "start_line": 1,
         "end_line": 3,
         "content": "- Centralized SDN control WAN\n- Merchant switch silicon",
@@ -81,7 +81,9 @@ def test_anki_card_formatter(tmp_path: Path):
     formatter = AnkiCardFormatter(repo_root=tmp_path)
     card = formatter.format_card(chunk)
 
-    assert "B4 Traffic Engineering" in card.front_html
+    assert "B4 Traffic Engineering:" in card.front_html
+    assert "核心设计背景" in card.front_html
+    assert "<strong>" not in card.front_html
     assert "<ul>" in card.back_html
     assert "Centralized SDN control WAN" in card.back_html
     assert "research" in card.tags

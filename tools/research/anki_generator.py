@@ -313,13 +313,13 @@ def filter_duplicate_chunks(
 
 
 class AnkiCardFormatter:
-    """Formats research chunks into Chinese-primary HTML Anki cards with English technical terms."""
+    """Formats research chunks into Chinese-primary Anki cards with plain-text question Front fields."""
 
     def __init__(self, repo_root: Path = REPO_ROOT):
         self.repo_root = repo_root
 
-    def _extract_title(self, raw_heading: str, content: str, file_path: str) -> str:
-        """Extract a meaningful technical concept title from heading or content."""
+    def _extract_concept_term(self, raw_heading: str, content: str, file_path: str) -> tuple[str, str]:
+        """Extract (english_term, chinese_question) from chunk heading and content."""
         clean_heading = raw_heading.strip()
 
         is_generic = (
@@ -328,6 +328,7 @@ class AnkiCardFormatter:
             or clean_heading.lower() in JUNK_KEYWORDS
         )
 
+        term = clean_heading
         if is_generic:
             for line in content.splitlines():
                 line_str = line.strip()
@@ -340,14 +341,17 @@ class AnkiCardFormatter:
                 ):
                     clean_line = re.sub(r"^[-*•\s]+", "", line_str).strip()
                     if len(clean_line) > 5 and not clean_line.lower() in JUNK_KEYWORDS:
-                        return clean_line[:80]
-            fname = Path(file_path).stem.replace("-", " ").title()
-            return f"{fname}"
+                        term = clean_line[:60]
+                        break
+            if term == clean_heading:
+                term = Path(file_path).stem.replace("-", " ").title()
 
-        return clean_heading
+        # Build active question prompt in Chinese
+        question = "核心设计背景、工作机制与工程权衡是什么？"
+        return term, question
 
     def format_card(self, chunk: dict[str, Any]) -> AnkiCard:
-        """Render a single chunk into a high-density AnkiCard object."""
+        """Render a single chunk into a high-density, emoji-free AnkiCard object."""
         raw_heading = chunk.get("heading", "System Concept")
         file_path = chunk["file_path"]
         start_line = chunk["start_line"]
@@ -355,26 +359,27 @@ class AnkiCardFormatter:
         content = chunk.get("content", "")
 
         module_name = file_path.split("/")[1] if "/" in file_path else "research"
-        concept_title = self._extract_title(raw_heading, content, file_path)
+        term, question = self._extract_concept_term(raw_heading, content, file_path)
 
-        front_html = f"<strong>{concept_title}</strong>"
+        # Plain text Front field without HTML tags, brackets, or emojis
+        front_text = f"{term}: {question}"
 
         link_markdown = format_file_link(self.repo_root, file_path, start_line, end_line)
 
         raw_lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith("#")]
         bullet_items = []
-        for line in raw_lines[:6]:
-            clean_line = re.sub(r"^[-*]\s*", "", line)
-            bullet_items.append(f"<li><div>{clean_line}</div></li>")
+        for line in raw_lines[:5]:
+            clean_line = re.sub(r"^[-*•\s]+", "", line)
+            bullet_items.append(f"<li>{clean_line}</li>")
 
         bullets_html = f"<ul>{''.join(bullet_items)}</ul>" if bullet_items else "<div>核心概念与流程解析。</div>"
 
         back_html = (
             f"<ul>"
-            f"<li><div><b>核心概念 & 痛点 (Background & Motivation):</b></div>"
+            f"<li><b>核心痛点 (Background & Motivation):</b>"
             f"{bullets_html}"
             f"</li>"
-            f"<li><div><b>源码与文档引用 (Source Citation):</b> {link_markdown}</div></li>"
+            f"<li><b>源码与文档引用 (Source Citation):</b> {link_markdown}</li>"
             f"</ul>"
         )
 
@@ -383,8 +388,8 @@ class AnkiCardFormatter:
         return AnkiCard(
             chunk_id=chunk["chunk_id"],
             file_path=file_path,
-            heading=concept_title,
-            front_html=front_html,
+            heading=term,
+            front_html=front_text,
             back_html=back_html,
             tags=tags,
         )
