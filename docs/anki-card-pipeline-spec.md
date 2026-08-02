@@ -236,3 +236,143 @@ flowchart TD
 - **Deliverables:**
   - CLI executable `python3 tools/research/anki_generator.py --count 5 --deck "<target_deck>"`.
   - Updated agent skill `.agents/skills/research-agent/SKILL.md` and synchronized command `.claude/commands/research-agent.md`.
+
+---
+
+## 8. Integration with `~/dev/anki` PageRank & Knowledge Graph Infrastructure
+
+This section specifies how the card generation pipeline leverages the pre-existing PageRank knowledge graph engine and local graph datasets stored in `~/dev/anki/`.
+
+> [!IMPORTANT]
+> **Strict Deck Scope Isolation (`金融` Deck Focus):**
+> `graph_data.json` contains over 160,000 notes across multiple decks. All language-learning decks (`言語日語`, `言語粤語`, `言語英語`, `言語呉語`, `言語台語`) are completely irrelevant to networking and computer systems engineering. The pipeline MUST strictly filter nodes and edges to focus **exclusively on the `金融` deck**, which hosts technical, financial, and domain infrastructure cards.
+
+### 8.1 Overview of `~/dev/anki` Graph Datasets and Engines
+
+| Component / File Path | Location / Size                                 | Purpose & Technical Capability                                                                                                                                          |
+| :-------------------- | :---------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `graph_data.json`     | `~/dev/anki/graph/graph_data.json` (~159 MB)    | Full local knowledge graph containing note GUIDs, Front labels, deck attributes, calculated PageRank scores, 3D coordinates ($x, y, z$), and directed edge links.       |
+| `history_data.json`   | `~/dev/anki/graph/history_data.json` (~15.8 MB) | Historical card review trajectory data mapped by review date.                                                                                                           |
+| `builder.py`          | `~/dev/anki/graph/builder.py`                   | Constructs NetworkX directed graphs (`nx.DiGraph`) and computes PageRank scores ($\alpha = 0.85$).                                                                      |
+| `references.py`       | `~/dev/anki/graph/references.py`                | Executes $O(N + M)$ multi-pattern substring matching via Aho-Corasick automatons with TF-IDF / Max-DF gating ($\le 2\%$ document frequency) and weighted edge creation. |
+| `export_data.py`      | `~/dev/anki/graph/export_data.py`               | Performs ForceAtlas2 and 3D Fibonacci sphere layout generation; supports fast incremental updates via `.export_cache.json`.                                             |
+| `pagerank_report.py`  | `~/dev/anki/graph/pagerank_report.py`           | Provides concept normalization (`_normalize_concept`) and generates Markdown reports ranking hub nodes and isolated cards.                                              |
+
+### 8.2 Architectural Integration Vectors
+
+```mermaid
+flowchart TD
+    subgraph LocalAnkiInfra["~/dev/anki Infrastructure Engine"]
+        GraphData["graph_data.json (Filtered: 金融 Deck)"]
+        RefEngine["references.py (Aho-Corasick + TF-IDF)"]
+        PRBuilder["builder.py (PageRank Engine)"]
+        IncExporter["export_data.py (Incremental Export)"]
+    end
+
+    subgraph Pipeline["Networking Anki Pipeline"]
+        Selector["Layer 1: PageRank-Guided Selection (金融 Deck)"]
+        Dedup["Layer 2: Graph-Aware Near-Duplicate Guard"]
+        Formatter["Layer 3: Cross-Deck Concept Injection"]
+        Ingestion["Layer 4: Ingestion & Incremental Export"]
+        Report["Layer 5: Topology Impact Reporting (金融 Deck)"]
+    end
+
+    GraphData -->|1. Prioritize Hub Topics| Selector
+    RefEngine -->|2. Sub-phrase Matching| Dedup
+    RefEngine -->|3. Related Concept Links| Formatter
+    Ingestion -->|4. Trigger Delta Update| IncExporter
+    IncExporter -->|5. Recalculate PageRank| PRBuilder
+    PRBuilder --> Report
+```
+
+1. **PageRank-Guided Candidate Selection (Phase 1):**
+   - _Mechanic:_ Rather than selecting unvisited courseware chunks sequentially, `CoverageTracker` cross-references candidate topics against high-PageRank hub nodes in `graph_data.json` belonging strictly to the `金融` deck.
+   - _Impact:_ Guarantees that foundational topics strongly linked to existing technical card clusters are generated and memorized first.
+
+2. **Graph-Aware Near-Duplicate Guard (Phase 2):**
+   - _Mechanic:_ Employs `_normalize_concept()` and TF-IDF sub-phrase filtering from `references.py` to check whether a candidate concept is already covered within compound cards in the `金融` deck.
+   - _Impact:_ Rejects semantic near-duplicates that pass standard exact-title string matching.
+
+3. **Concept Linking & Related Card Injection (Phase 3):**
+   - _Mechanic:_ Passes candidate card Back text through an Aho-Corasick automaton built from `金融` deck nodes in `graph_data.json`. High-PageRank matching concept labels are appended under a structured HTML section (`<div class="related-concepts">...</div>`).
+   - _Impact:_ Automatically contextualizes new networking notes within the user's broader `金融` knowledge graph.
+
+4. **Automated Post-Ingestion Incremental Graph Update (Phase 4):**
+   - _Mechanic:_ Upon successful note ingestion via AnkiConnect, the pipeline triggers `python3 ~/dev/anki/graph/export_data.py` to perform an incremental delta update using `.export_cache.json`.
+   - _Impact:_ Keeps the 3D visualization and local graph datasets synchronized without costly full 160k-node graph rebuilds.
+
+5. **PageRank Topology Impact Reporting (Phase 5):**
+   - _Mechanic:_ Invokes `pagerank_report.py` to measure the network effect of newly added notes in `金融`, outputting metrics on whether new cards formed new hubs or resolved isolated nodes.
+
+### 8.3 Interface Contract & Bridge Module (`AnkiGraphBridge`)
+
+To maintain subproject isolation and prevent code duplication, integration is mediated by a dedicated bridge module (`tools/research/anki_graph_bridge.py`), configured to filter specifically for the target deck (`金融`):
+
+```python
+"""Anki Knowledge Graph Bridge (tools/research/anki_graph_bridge.py).
+
+Interfaces with ~/dev/anki/graph to provide PageRank lookup, Aho-Corasick subphrase matching,
+and automated graph re-export triggers scoped strictly to the target deck (金融).
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+ANKI_REPO_ROOT = Path("/Users/lz/dev/anki")
+if str(ANKI_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(ANKI_REPO_ROOT))
+
+class AnkiGraphBridge:
+    """Bridge for querying ~/dev/anki graph data scoped strictly to target deck (金融)."""
+
+    def __init__(self, target_deck: str = "金融", repo_root: Path = ANKI_REPO_ROOT):
+        self.target_deck = target_deck
+        self.repo_root = repo_root
+        self.graph_path = repo_root / "graph" / "graph_data.json"
+        self.nodes: list[dict[str, Any]] = []
+        self.links: list[dict[str, Any]] = []
+        self._load_graph_data()
+
+    def _load_graph_data(self) -> None:
+        """Loads and filters nodes and links strictly for the target deck (金融)."""
+        if not self.graph_path.exists():
+            return
+        try:
+            data = json.loads(self.graph_path.read_text(encoding="utf-8"))
+            raw_nodes = data.get("nodes", [])
+            raw_links = data.get("links", [])
+
+            # Filter nodes strictly for the target deck (ignoring language decks)
+            filtered_node_ids = set()
+            for node in raw_nodes:
+                deck_name = node.get("deck") or node.get("d") or ""
+                if deck_name == self.target_deck:
+                    self.nodes.append(node)
+                    filtered_node_ids.add(node.get("id"))
+
+            # Filter links where both source and target belong to target_deck
+            for link in raw_links:
+                src = link.get("source") or link.get("s")
+                tgt = link.get("target") or link.get("t")
+                if src in filtered_node_ids and tgt in filtered_node_ids:
+                    self.links.append(link)
+        except Exception:
+            pass
+
+    def get_related_hubs(self, text: str, top_n: int = 3) -> list[tuple[str, float, str]]:
+        """Scans input text for concept labels present in the target deck's knowledge graph, returning top-N by PageRank."""
+        from graph.references import _normalize
+        norm_text = _normalize(text)
+        matches = []
+        for node in self.nodes:
+            label = node.get("label") or node.get("l") or ""
+            if label and len(label) >= 2 and _normalize(label) in norm_text:
+                pr = float(node.get("pagerank") or node.get("p") or 0.0)
+                matches.append((label, pr, self.target_deck))
+        matches.sort(key=lambda x: x[1], reverse=True)
+        return matches[:top_n]
+```
