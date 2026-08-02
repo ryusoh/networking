@@ -108,6 +108,55 @@ def test_is_high_quality_chunk_filters_logistics_and_slide_markers():
     assert is_high_quality_chunk(valid_tech) is True
 
 
+def test_is_high_quality_chunk_allows_page_num_headings():
+    """Page N headings with dense technical content must be accepted as high quality."""
+    from tools.research.anki_generator import is_high_quality_chunk
+
+    page_chunk = {
+        "chunk_id": "c_page",
+        "file_path": "research/cs232/kurose_ch4.md",
+        "heading": "Page 15",
+        "content": (
+            "BGP Path Vector Protocol: Autonomous System routing policies use AS-PATH, "
+            "NEXT-HOP, and Local-Pref attributes for BGP route selection."
+        ),
+        "token_count": 80,
+    }
+    assert is_high_quality_chunk(page_chunk) is True
+
+
+def test_coverage_tracker_allows_multiple_chunks_per_file(tmp_path: Path):
+    """Generating one chunk from a file must NOT blacklist remaining high-quality chunks in the same file."""
+    coverage_path = tmp_path / ".anki_coverage.json"
+    tracker = CoverageTracker(coverage_path=coverage_path)
+
+    manifest_chunks = [
+        {
+            "chunk_id": "file_a_chunk_1",
+            "file_path": "research/cs232/ch4.md",
+            "heading": "Page 1: Link State",
+            "content": "Dijkstra link state algorithm computes shortest path using global LSA topology.",
+            "token_count": 100,
+        },
+        {
+            "chunk_id": "file_a_chunk_2",
+            "file_path": "research/cs232/ch4.md",
+            "heading": "Page 2: Distance Vector",
+            "content": "Bellman-Ford distance vector algorithm computes routing tables using neighbor exchanges.",
+            "token_count": 100,
+        },
+    ]
+
+    # Generate card for chunk 1
+    tracker.mark_chunks_visited([manifest_chunks[0]], deck_name="金融")
+
+    # Chunk 2 from same file must still be selectable
+    new_tracker = CoverageTracker(coverage_path=coverage_path)
+    selected = new_tracker.select_unvisited_chunks(manifest_chunks, count=5)
+    assert len(selected) == 1
+    assert selected[0]["chunk_id"] == "file_a_chunk_2"
+
+
 def test_sqlite_inspector_reads_existing_notes(tmp_path: Path):
     db_path = tmp_path / "collection.anki2"
     con = sqlite3.connect(db_path)
@@ -346,6 +395,30 @@ def test_coverage_progress_reporter(capsys):
     assert "Course    : cs231" in captured
     assert "Global    : research/" in captured
     assert "50.0%" in captured
+
+
+def test_coverage_progress_reporter_with_dict(capsys):
+    """Test CoverageProgressReporter when passed a dict with 'generated' and 'skipped_low_quality' statuses."""
+    from tools.research.anki_generator import CoverageProgressReporter
+
+    manifest_chunks = [
+        {"chunk_id": "c1", "file_path": "research/cs231/00-materials/paxos.md"},
+        {"chunk_id": "c2", "file_path": "research/cs231/00-materials/raft.md"},
+        {"chunk_id": "c3", "file_path": "research/cs234/b4.md"},
+    ]
+    visited_dict = {
+        "c1": {"status": "generated"},
+        "c2": {"status": "skipped_low_quality"},
+    }
+
+    CoverageProgressReporter.print_report(
+        manifest_chunks, visited_dict, active_file_path="research/cs231/00-materials/paxos.md"
+    )
+    captured = capsys.readouterr().out
+    assert "Anki Courseware Memorization Progress Report" in captured
+    assert "Generated: 1 cards (33.33%)" in captured
+    assert "Audited/Skipped: 1 chunks (33.3%)" in captured
+    assert "Unvisited: 1 chunks (33.3%)" in captured
 
 
 def test_anki_generator_status_flag(tmp_path: Path, capsys):

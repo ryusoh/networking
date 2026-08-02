@@ -342,8 +342,7 @@ class CoverageTracker:
             if status == "skipped_low_quality":
                 return False
             return True
-        visited_files = self.data.get("visited_files", {})
-        return file_path in visited_files
+        return False
 
     def mark_chunks_visited(self, chunks: list[dict[str, Any]], deck_name: str) -> None:
         """Mark a list of chunks as processed into Anki cards."""
