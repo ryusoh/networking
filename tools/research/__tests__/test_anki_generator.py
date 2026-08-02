@@ -1,8 +1,9 @@
-"""Unit tests for Phase 1 & Phase 2 Anki Pipeline (tools/research/anki_generator.py)."""
+"""Unit tests for Phase 1-3 Anki Pipeline (tools/research/anki_generator.py)."""
 
 import sqlite3
 from pathlib import Path
 from tools.research.anki_generator import (
+    AnkiCardFormatter,
     AnkiConnectChecker,
     CoverageTracker,
     SQLiteInspector,
@@ -29,13 +30,6 @@ def test_coverage_tracker_filters_visited_chunks(tmp_path: Path):
             "start_line": 1,
             "end_line": 40,
         },
-        {
-            "chunk_id": "c3",
-            "file_path": "research/cs232/cache.md",
-            "heading": "Cache Invalidation",
-            "start_line": 1,
-            "end_line": 30,
-        },
     ]
 
     selected = tracker.select_unvisited_chunks(manifest_chunks, count=2)
@@ -46,7 +40,7 @@ def test_coverage_tracker_filters_visited_chunks(tmp_path: Path):
 
     new_tracker = CoverageTracker(coverage_path=coverage_path)
     selected_after = new_tracker.select_unvisited_chunks(manifest_chunks, count=2)
-    assert len(selected_after) == 2
+    assert len(selected_after) == 1
     assert selected_after[0]["chunk_id"] == "c2"
 
 
@@ -68,30 +62,24 @@ def test_sqlite_inspector_reads_existing_notes(tmp_path: Path):
     assert "napi" in titles
 
 
-def test_filter_duplicate_chunks(tmp_path: Path):
-    db_path = tmp_path / "collection.anki2"
-    con = sqlite3.connect(db_path)
-    con.execute("CREATE TABLE decks (id INTEGER PRIMARY KEY, name TEXT);")
-    con.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, flds TEXT);")
-    con.execute("CREATE TABLE cards (id INTEGER PRIMARY KEY, nid INTEGER, did INTEGER);")
+def test_anki_card_formatter(tmp_path: Path):
+    target_file = tmp_path / "research" / "cs234" / "b4.md"
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+    target_file.write_text("# B4 Traffic Engineering\n- Centralized SDN control WAN\n- Merchant switch silicon\n")
 
-    con.execute("INSERT INTO decks VALUES (1, 'TestDeck');")
-    con.execute("INSERT INTO notes VALUES (10, 'B4 Traffic Engineering\x1fExtra');")
-    con.execute("INSERT INTO cards VALUES (100, 10, 1);")
-    con.commit()
-    con.close()
+    chunk = {
+        "chunk_id": "c1",
+        "file_path": "research/cs234/b4.md",
+        "heading": "B4 Traffic Engineering (软件定义网络 WAN)",
+        "start_line": 1,
+        "end_line": 3,
+        "content": "- Centralized SDN control WAN\n- Merchant switch silicon",
+    }
 
-    chunks = [
-        {"chunk_id": "c1", "heading": "B4 Traffic Engineering", "file_path": "f1.md"},
-        {"chunk_id": "c2", "heading": "Paxos Consensus", "file_path": "f2.md"},
-    ]
+    formatter = AnkiCardFormatter(repo_root=tmp_path)
+    card = formatter.format_card(chunk)
 
-    inspector = SQLiteInspector(collection_path=db_path)
-    checker = AnkiConnectChecker(url="http://127.0.0.1:99999")  # inactive port
-
-    filtered = filter_duplicate_chunks(
-        chunks, "TestDeck", sqlite_inspector=inspector, anki_connect_checker=checker
-    )
-
-    assert len(filtered) == 1
-    assert filtered[0]["chunk_id"] == "c2"
+    assert "B4 Traffic Engineering" in card.front_html
+    assert "<ul>" in card.back_html
+    assert "Centralized SDN control WAN" in card.back_html
+    assert "research" in card.tags

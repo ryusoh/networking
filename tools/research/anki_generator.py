@@ -18,6 +18,7 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
@@ -26,10 +27,27 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from tools.research.citation_engine import CitationEngine
+from tools.research.parse_chunks import estimate_tokens
+from tools.research.scene_builder import SceneBuilder
+from tools.research.search_chunks import format_file_link
+
 DEFAULT_RESEARCH_DIR = REPO_ROOT / "research"
 DEFAULT_MANIFEST_PATH = DEFAULT_RESEARCH_DIR / ".chunks_manifest.json"
 DEFAULT_COVERAGE_PATH = DEFAULT_RESEARCH_DIR / ".anki_coverage.json"
 FIELD_SEP = "\x1f"
+
+
+@dataclass
+class AnkiCard:
+    """Dataclass representing a generated Anki card note."""
+
+    chunk_id: str
+    file_path: str
+    heading: str
+    front_html: str
+    back_html: str
+    tags: list[str]
 
 
 class CoverageTracker:
@@ -236,9 +254,60 @@ def filter_duplicate_chunks(
     return filtered
 
 
+class AnkiCardFormatter:
+    """Formats research chunks into Chinese-primary HTML Anki cards with English technical terms."""
+
+    def __init__(self, repo_root: Path = REPO_ROOT):
+        self.repo_root = repo_root
+        self.citation_engine = CitationEngine(repo_root=repo_root)
+
+    def format_card(self, chunk: dict[str, Any]) -> AnkiCard:
+        """Render a single chunk into an AnkiCard object."""
+        raw_heading = chunk.get("heading", "System Concept")
+        file_path = chunk["file_path"]
+        start_line = chunk["start_line"]
+        end_line = chunk["end_line"]
+        content = chunk.get("content", "")
+
+        module_name = file_path.split("/")[1] if "/" in file_path else "research"
+
+        front_html = f"<strong>{raw_heading}</strong>"
+
+        link_markdown = format_file_link(self.repo_root, file_path, start_line, end_line)
+
+        # Parse bullet points from content
+        raw_lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith("#")]
+        bullet_items = []
+        for line in raw_lines[:6]:
+            clean_line = re.sub(r"^[-*]\s*", "", line)
+            bullet_items.append(f"<li><div>{clean_line}</div></li>")
+
+        bullets_html = f"<ul>{''.join(bullet_items)}</ul>" if bullet_items else "<div>核心概念与流程解析。</div>"
+
+        back_html = (
+            f"<ul>"
+            f"<li><div><b>核心概念 & 痛点 (Background & Motivation):</b></div>"
+            f"{bullets_html}"
+            f"</li>"
+            f"<li><div><b>源码与文档引用 (Source Citation):</b> {link_markdown}</div></li>"
+            f"</ul>"
+        )
+
+        tags = ["research", module_name.replace("-", "_")]
+
+        return AnkiCard(
+            chunk_id=chunk["chunk_id"],
+            file_path=file_path,
+            heading=raw_heading,
+            front_html=front_html,
+            back_html=back_html,
+            tags=tags,
+        )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Autonomous Anki Flashcard Generation Pipeline (Phase 1 Coverage & Phase 2 Deduplication)."
+        description="Autonomous Anki Flashcard Generation Pipeline (Phase 1-3 Formatter)."
     )
     parser.add_argument(
         "--manifest",
@@ -277,13 +346,18 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     filtered = filter_duplicate_chunks(unvisited, args.deck)[: args.count]
 
-    print(f"=== ANKI COVERAGE & DEDUPLICATION REPORT ===")
-    print(f"Total Chunks in Manifest: {len(chunks)}")
-    print(f"Target Deck: {args.deck}")
-    print(f"Selected Non-Duplicate Chunks ({len(filtered)} / {args.count}):\n")
+    formatter = AnkiCardFormatter(repo_root=DEFAULT_RESEARCH_DIR.parent)
+    cards = [formatter.format_card(c) for c in filtered]
 
-    for idx, c in enumerate(filtered, start=1):
-        print(f"{idx}. [{c['file_path']}#L{c['start_line']}-L{c['end_line']}] {c.get('heading')}")
+    print(f"=== ANKI CARD FORMATTER REPORT ===")
+    print(f"Target Deck: {args.deck}")
+    print(f"Formatted Cards Generated ({len(cards)} / {args.count}):\n")
+
+    for idx, card in enumerate(cards, start=1):
+        print(f"Card #{idx}:")
+        print(f"  Front: {card.front_html}")
+        print(f"  Back:  {card.back_html[:150]}...")
+        print(f"  Tags:  {' '.join(card.tags)}\n")
 
     return 0
 
