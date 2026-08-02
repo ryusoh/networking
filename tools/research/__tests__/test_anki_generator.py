@@ -47,6 +47,37 @@ def test_coverage_tracker_filters_visited_chunks(tmp_path: Path):
     assert selected_after[0]["chunk_id"] == "c2"
 
 
+def test_coverage_tracker_records_skipped_low_quality_chunks(tmp_path: Path):
+    """Low quality chunks must be marked as audited & skipped in coverage JSON."""
+    coverage_path = tmp_path / ".anki_coverage.json"
+    tracker = CoverageTracker(coverage_path=coverage_path)
+
+    manifest_chunks = [
+        {
+            "chunk_id": "c_junk",
+            "file_path": "research/cs230/outline.md",
+            "heading": "Course Outline / Table of Contents",
+            "content": ". . . . . . . .",
+        },
+        {
+            "chunk_id": "c_valid",
+            "file_path": "research/cs234/b4.md",
+            "heading": "B4 Traffic Engineering",
+            "content": "Centralized SDN WAN architecture with software-based TE and Paxos state machines.",
+            "token_count": 150,
+        },
+    ]
+
+    selected = tracker.select_unvisited_chunks(manifest_chunks, count=2)
+    assert len(selected) == 1
+    assert selected[0]["chunk_id"] == "c_valid"
+
+    # Verify junk chunk was recorded as skipped_low_quality
+    visited = tracker.data.get("visited_chunk_ids", {})
+    assert "c_junk" in visited
+    assert visited["c_junk"]["status"] == "skipped_low_quality"
+
+
 def test_sqlite_inspector_reads_existing_notes(tmp_path: Path):
     db_path = tmp_path / "collection.anki2"
     con = sqlite3.connect(db_path)

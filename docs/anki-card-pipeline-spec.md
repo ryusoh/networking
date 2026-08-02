@@ -411,14 +411,20 @@ Upon completing card generation, or when calling `python3 tools/research/anki_ge
 ================================================================================
 ```
 
-### 9.3 Calculation Formula and Data Sources
+### 9.3 Handling Low-Quality Chunks & Progress Calculation
 
-- **Manifest Source (`research/.chunks_manifest.json`):** Supplies total chunk count ($T_{scope}$) for each scope prefix.
-- **Coverage Source (`research/.anki_coverage.json`):** Supplies visited chunk IDs ($V_{scope}$) marked as processed into Anki notes.
+- **Low-Quality / Junk Chunk Handling Policy:** During candidate selection (`select_unvisited_chunks`), chunks failing the `is_high_quality_chunk` gate (e.g. administrative outlines, TOC dots `.....`, < 15 tokens) are **automatically marked as audited** in `research/.anki_coverage.json` under `visited_chunk_ids` with `"status": "skipped_low_quality"`.
+- **Engineering Rationale:**
+  1. **Idempotent Auditing:** Prevents the selector from re-evaluating known junk chunks on subsequent runs.
+  2. **Accurate 100% Completion:** Ensures the progress bar ($|V_{scope}| / |T_{scope}|$) reaches 100% once every chunk in a file/module has been processed—either converted into an Anki note (`status: "generated"`) or explicitly audited & skipped (`status: "skipped_low_quality"`).
+
+- **Data Sources:**
+  - **Manifest Source (`research/.chunks_manifest.json`):** Supplies total chunk count ($T_{scope}$) for each scope prefix.
+  - **Coverage Source (`research/.anki_coverage.json`):** Supplies processed chunk IDs ($V_{scope}$), including both generated notes and audited low-quality chunks.
 - **Formula:**
   $$\text{Coverage \%} = \left( \frac{|V_{scope}|}{|T_{scope}|} \right) \times 100\%$$
 
-| Scope Level             | Prefix Extraction Logic                                            | Total Chunks ($T$) Definition                                    | Visited Chunks ($V$) Definition                                   |
+| Scope Level             | Prefix Extraction Logic                                            | Total Chunks ($T$) Definition                                    | Visited/Processed Chunks ($V$) Definition                         |
 | :---------------------- | :----------------------------------------------------------------- | :--------------------------------------------------------------- | :---------------------------------------------------------------- |
 | **Submodule (Level A)** | Parent directory of generated chunks (`research/course/submodule`) | Chunks in manifest where `file_path` starts with `submodule_dir` | Chunks in `visited_chunk_ids` with matching `submodule_dir`       |
 | **Course (Level B)**    | Second directory segment (`research/course`)                       | Chunks in manifest where `file_path` starts with `course_dir`    | Chunks in `visited_chunk_ids` with matching `course_dir`          |

@@ -146,6 +146,24 @@ class CoverageTracker:
                 "generated_at": now_str,
                 "heading": chunk.get("heading"),
                 "deck": deck_name,
+                "status": "generated",
+            }
+
+        self.save()
+
+    def mark_chunks_skipped(
+        self, chunks: list[dict[str, Any]], reason: str = "skipped_low_quality"
+    ) -> None:
+        """Mark a list of low-quality or non-card-worthy chunks as audited & skipped."""
+        now_str = datetime.now(timezone.utc).isoformat()
+        visited_chunks = self.data.setdefault("visited_chunk_ids", {})
+
+        for chunk in chunks:
+            cid = chunk["chunk_id"]
+            visited_chunks[cid] = {
+                "audited_at": now_str,
+                "heading": chunk.get("heading"),
+                "status": reason,
             }
 
         self.save()
@@ -155,17 +173,24 @@ class CoverageTracker:
     ) -> list[dict[str, Any]]:
         """Select up to `count` high-quality, unvisited chunks from manifest."""
         unvisited = []
+        skipped_low_quality = []
         for chunk in manifest_chunks:
             fpath = chunk["file_path"]
             cid = chunk["chunk_id"]
 
-            if not is_high_quality_chunk(chunk):
+            if self.is_chunk_visited(fpath, cid):
                 continue
 
-            if not self.is_chunk_visited(fpath, cid):
-                unvisited.append(chunk)
-                if len(unvisited) >= count:
-                    break
+            if not is_high_quality_chunk(chunk):
+                skipped_low_quality.append(chunk)
+                continue
+
+            unvisited.append(chunk)
+            if len(unvisited) >= count:
+                break
+
+        if skipped_low_quality:
+            self.mark_chunks_skipped(skipped_low_quality, reason="skipped_low_quality")
 
         return unvisited
 
