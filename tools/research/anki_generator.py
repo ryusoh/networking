@@ -393,22 +393,33 @@ class CoverageTracker:
         )
 
     def is_chunk_visited(self, file_path: str, chunk_id: str) -> bool:
-        """Check if a file path or chunk ID has already been converted to an Anki card."""
+        """Check if a file path or chunk ID has already been processed."""
         visited_chunks = self.data.get("visited_chunk_ids", {})
         if chunk_id in visited_chunks:
             status = visited_chunks[chunk_id].get("status")
-            if status == "generated":
-                return True
-            if status == "skipped_low_quality":
-                return True
-            return True
+            # generated, pending_import, imported, and skipped all count as visited
+            return status in ("generated", "pending_import", "imported", "skipped_low_quality")
         return False
 
-    def mark_chunks_visited(self, chunks: list[dict[str, Any]], deck_name: str) -> None:
-        """Mark a list of chunks as processed into Anki cards."""
+    def mark_chunks_visited(
+        self,
+        chunks: list[dict[str, Any]],
+        deck_name: str,
+        status: str = "generated",
+        front_htmls: dict[str, str] | None = None,
+    ) -> None:
+        """Mark a list of chunks as processed into Anki cards.
+
+        Args:
+            chunks: Chunks that were converted to cards.
+            deck_name: Target deck name.
+            status: One of "generated", "pending_import", or "imported".
+            front_htmls: Mapping from chunk_id to the rendered front HTML.
+        """
         now_str = datetime.now(timezone.utc).isoformat()
         visited_files = self.data.setdefault("visited_files", {})
         visited_chunks = self.data.setdefault("visited_chunk_ids", {})
+        fronts = front_htmls or {}
 
         for chunk in chunks:
             fpath = chunk["file_path"]
@@ -418,14 +429,22 @@ class CoverageTracker:
                 "last_generated": now_str,
                 "deck": deck_name,
             }
-            visited_chunks[cid] = {
+            entry: dict[str, Any] = {
                 "generated_at": now_str,
                 "heading": chunk.get("heading"),
                 "deck": deck_name,
-                "status": "generated",
+                "status": status,
             }
+            if cid in fronts:
+                entry["front_html"] = fronts[cid]
+            visited_chunks[cid] = entry
 
         self.save()
+
+    def pending_import_chunks(self) -> dict[str, dict[str, Any]]:
+        """Return chunks that have been exported to TSV but not yet verified as imported."""
+        visited_chunks = self.data.get("visited_chunk_ids", {})
+        return {cid: info for cid, info in visited_chunks.items() if info.get("status") == "pending_import"}
 
     def mark_chunks_skipped(
         self, chunks: list[dict[str, Any]], reason: str = "skipped_low_quality"
@@ -971,6 +990,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     graph_bridge = AnkiGraphBridge(target_deck=args.deck)
     tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
+
+    pending = tracker.pending_import_chunks()
+    if pending:
+        print(
+            f"WARNING: {len(pending)} chunk(s) were previously exported to TSV but not yet verified as imported."
+        )
+        print("Run: python3 tools/research/anki_import_verifier.py")
+        print("or confirm the TSV import in Anki before generating more cards to avoid duplicates.")
+
     unvisited = tracker.select_unvisited_chunks(
         chunks, count=args.count * 3, graph_bridge=graph_bridge
     )
@@ -1023,7 +1051,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
 
-    tracker.mark_chunks_visited(selected_chunks, deck_name=args.deck)
+    front_htmls = {card.chunk_id: card.front_html for card in cards}
+    import_status = "imported" if imported_via_api else "pending_import"
+    tracker.mark_chunks_visited(
+        selected_chunks,
+        deck_name=args.deck,
+        status=import_status,
+        front_htmls=front_htmls,
+    )
     print(
         f"Updated coverage tracking for {len(selected_chunks)} chunks in {tracker.coverage_path.name}"
     )

@@ -493,3 +493,46 @@ def test_select_unvisited_chunks_pagerank_guided(tmp_path: Path):
     pr_selected = tracker.select_unvisited_chunks(manifest_chunks, count=2, graph_bridge=bridge)
     assert [c["chunk_id"] for c in pr_selected] == ["c3", "c2"]
 
+
+def test_coverage_tracker_pending_import_status(tmp_path: Path):
+    """TSV-exported chunks should be marked pending_import and store front_html."""
+    coverage_path = tmp_path / ".anki_coverage.json"
+    tracker = CoverageTracker(coverage_path=coverage_path)
+
+    chunks = [
+        {
+            "chunk_id": "c_pending",
+            "file_path": "research/cs234/b4.md",
+            "heading": "B4 Traffic Engineering",
+        }
+    ]
+    tracker.mark_chunks_visited(
+        chunks,
+        deck_name="TestDeck",
+        status="pending_import",
+        front_htmls={"c_pending": "What is B4?"},
+    )
+
+    data = tracker.data["visited_chunk_ids"]["c_pending"]
+    assert data["status"] == "pending_import"
+    assert data["front_html"] == "What is B4?"
+    assert tracker.is_chunk_visited("research/cs234/b4.md", "c_pending")
+
+
+def test_coverage_tracker_imported_status_is_visited(tmp_path: Path):
+    """Imported chunks must be treated as visited so they are not regenerated."""
+    coverage_path = tmp_path / ".anki_coverage.json"
+    tracker = CoverageTracker(coverage_path=coverage_path)
+
+    chunks = [
+        {
+            "chunk_id": "c_imported",
+            "file_path": "research/cs234/b4.md",
+            "heading": "B4 Traffic Engineering",
+        }
+    ]
+    tracker.mark_chunks_visited(chunks, deck_name="TestDeck", status="imported")
+
+    selected = tracker.select_unvisited_chunks(chunks, count=1)
+    assert selected == []
+

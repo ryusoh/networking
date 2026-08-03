@@ -40,8 +40,10 @@ python3 tools/research/anki_card_validator.py research/anki_import.txt
 
 3. **Bilingual Card Formatting & Automatic Execution:**
    - Render bilingual Chinese-primary HTML cards with English technical terms, LaTeX delimiters (`\(...\)`), and line-anchored citations (`[path#Lstart-Lend](file://...)`).
-   - **Preferred:** Inject directly into the **`金融`** deck via AnkiConnect REST API (`http://127.0.0.1:8765`) if the AnkiConnect add-on is installed.
-   - **Fallback:** Automatically launch Anki with the TSV file via `open -a Anki research/anki_import.txt`. Never ask the user to manually run the launch command. If AnkiConnect is unavailable, the user must click **Import** in the Anki import dialog that appears.
+   - **Preferred:** Inject directly into the **`金融`** deck via AnkiConnect REST API (`http://127.0.0.1:8765`) if the AnkiConnect add-on is installed. AnkiConnect gives immediate confirmation, so the chunk status becomes `imported`.
+   - **Fallback (no AnkiConnect):** Automatically launch Anki with the TSV file via `open -a Anki research/anki_import.txt`. Never ask the user to manually run the launch command. The user must click **Import** in the Anki import dialog. The chunk status stays `pending_import` until verified.
+   - **Verify the import immediately:** Run `python3 tools/research/anki_import_verifier.py`. It reads the local `collection.anki2`, matches the generated fronts, and flips `pending_import` → `imported`.
+   - **Do not generate a new batch while any `pending_import` chunks exist.** If verification still shows missing cards, the previous TSV import was not completed; resolve it before continuing.
 
 4. **Database Safety Non-Negotiable:**
    - **NEVER attempt raw SQLite `INSERT`/`UPDATE` mutations directly on live `collection.anki2` or `collection.anki21b` files.** Raw direct SQLite writes cause database lock collisions, corrupt index collations (`unicase`), and disrupt Anki's V3 scheduler database.
