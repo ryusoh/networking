@@ -132,7 +132,7 @@ describe('gov_bypass background.js', () => {
 
   test('TILE_CACHE_FETCH responds with data on cache hit', async () => {
     global.FileReader = class {
-      readAsDataURL(_blob) {
+      readAsDataURL() {
         this.result = 'data:image/png;base64,xxx';
         this.onload();
       }

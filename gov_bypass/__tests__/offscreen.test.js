@@ -22,7 +22,7 @@ describe('gov_bypass offscreen.js', () => {
 
     // Manual stub for DOMParser
     global.DOMParser = class {
-      parseFromString(html, _type) {
+      parseFromString(html) {
         // Very basic stub just to make tests pass that depend on parseFromString returning a document-like object
         // JSDOM in Node doesn't always expose window.DOMParser appropriately directly to the eval scope
         // We will mock the required querySelectorAll functionality specifically for these tests
