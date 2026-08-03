@@ -26,7 +26,8 @@ DIAGRAM_PATTERNS = [
     re.compile(r"\b(R|H|F|M|G|V)\s*bit\b", re.IGNORECASE),
     re.compile(r"\btype\s*=\s*\d+\b.*\bcode\s*=\s*\d+\b", re.IGNORECASE),
     re.compile(r"\d+\s+\d+\s+\d+\s+\d+\s*$"),  # column headers like 0 8 16 24
-    re.compile(r"\b(AS\s+\d+|Router\d+|router\d+)\b", re.IGNORECASE),
+    # router ID lists like "Router1 Router2"; (?!\.\w) exempts domains like router137.cerf.edu
+    re.compile(r"\b(?:AS\s+\d+|Router\d+|router\d+)(?!\.\w)\b", re.IGNORECASE),
 ]
 GENERIC_TOPIC_LABELS = {
     "bgp basics",

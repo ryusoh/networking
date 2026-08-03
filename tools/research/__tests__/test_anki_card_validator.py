@@ -130,6 +130,26 @@ def test_abstract_dump_card_is_flagged_on_multiple_detectors(tmp_path: Path) -> 
     assert any("author/affiliation" in i for i in texts)
 
 
+def test_router_id_list_is_flagged(tmp_path: Path) -> None:
+    rows = [
+        "Real question about OSPF flooding?\t<div>Router1 Router2 Router3 exchange LSAs</div>\tresearch"
+    ]
+    path = _write_tsv(tmp_path, rows)
+    issues = validate_tsv(path)
+    assert any("ASCII diagram" in i for i in _all_issue_texts(issues))
+
+
+def test_router_domain_name_is_not_a_diagram(tmp_path: Path) -> None:
+    """A hostname like router137.cerf.edu is prose, not a router-ID diagram."""
+    rows = [
+        "为什么地址分配给接口而非主机？\t"
+        "<div>同一台路由器从不同接口引用时有不同域名，如 router137.cerf.edu。</div>\t"
+        "research"
+    ]
+    path = _write_tsv(tmp_path, rows)
+    assert validate_tsv(path) == {}
+
+
 def test_reviewed_bilingual_card_passes(tmp_path: Path) -> None:
     rows = [
         "拜占庭将军问题中，口头消息（oral messages）下的可解条件是什么？\t"
