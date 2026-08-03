@@ -300,7 +300,7 @@
     // Collect existing paragraph texts to avoid duplicates
     const existingTexts = new Set();
     articleBody.querySelectorAll('p').forEach((p) => {
-      const t = p.textContent.trim();
+      const t = /** @type {string} */ (p.textContent).trim();
       if (t) {
         existingTexts.add(t);
       }
