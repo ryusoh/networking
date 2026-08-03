@@ -41,16 +41,18 @@ date-stamp | outline | qa-mismatch | duplicate | other`.
 
 ## Workflow execution protocol
 
-1. **Quality & deduplication check:**
-   - Select unvisited chunks using `research/.anki_coverage.json`.
-   - Inspect local SQLite `collection.anki2` and active AnkiConnect
+### 1. Quality & deduplication check
+
+- Select unvisited chunks using `research/.anki_coverage.json`.
+- Inspect local SQLite `collection.anki2` and active AnkiConnect
      (`http://127.0.0.1:8765`) to ensure zero title collision.
    - Enforce the **Quality Gate** (`is_high_quality_chunk`) to reject
      zero-info outlines, TOC dots, presenter lists, build/test instructions,
      figure captions, or low-density metadata.
 
-2. **Agent authoring (the only card-writing step):**
-   - Read every candidate in `research/anki_candidates.jsonl` in full,
+### 2. Agent authoring (the only card-writing step)
+
+- Read every candidate in `research/anki_candidates.jsonl` in full,
      including its `content` and `citation`.
    - Author each card as one JSON line in `research/anki_cards.jsonl` with
      fields: `chunk_id`, `front`, `back`, `tags`, `citation`.
@@ -62,7 +64,7 @@ date-stamp | outline | qa-mismatch | duplicate | other`.
      `--reject-chunk <chunk_id> --reason <CATEGORY>` instead of writing a bad
      card.
 
-### Card format contract (enforce on every card)
+#### Card format contract (enforce on every card)
 
 The validator enforces these rules; the import refuses cards that violate
 them. Author cards to this density target:
@@ -75,6 +77,15 @@ them. Author cards to this density target:
   `<b>section name (English Term):</b>` header. Inline bilingual terms in
   `<b>`/`<strong>` throughout the explanation (not a single English summary
   paragraph at the end).
+- **Translation scope:** annotate **domain terminology only** — protocols,
+  algorithms, architectures, mechanisms, and named concepts. Do **not**
+  translate ordinary English words (e.g. `decades`, `invention or discovery`,
+  `qualitative`, `trivial`, `goals change`). The reader is a networking
+  professional.
+- **Acronyms:** expand every acronym on first use, in the front or in the
+  back (e.g. `NITRD (Networking and Information Technology Research and
+Development)`). An acronym that appears in the front but is never expanded
+  anywhere is a reject.
 - **End with** a `源码与文档引用 (Source Citation):` section containing the
   line-anchored Markdown link.
 
@@ -99,8 +110,9 @@ Example (bad — low density, no inline terms, no sections):
 }
 ```
 
-3. **Agent quality review (mandatory before import):**
-   - Immediately inspect the authored `research/anki_cards.jsonl`. **Read every
+### 3. Agent quality review (mandatory before import)
+
+- Immediately inspect the authored `research/anki_cards.jsonl`. **Read every
      card's front AND back in full — never approve from a truncated print.**
    - Run the automated validator:
      `python3 tools/research/anki_card_validator.py research/anki_cards.jsonl`.
@@ -128,9 +140,10 @@ Example (bad — low density, no inline terms, no sections):
    - **Never import to Anki without completing this review step.**
    - For brief or high-density concepts, use `search_web` to enrich the card.
 
-4. **Import & state hygiene:**
-   - Import only with `python3 tools/research/anki_generator.py --import --deck "金融"`.
-   - The generator refuses to emit new candidates while any chunks are in
+### 4. Import & state hygiene
+
+- Import only with `python3 tools/research/anki_generator.py --import --deck "金融"`.
+- The generator refuses to emit new candidates while any chunks are in
      `"candidate"` or `"pending_import"` status. Resolve the current batch
      first.
    - **Never hand-edit `research/.anki_coverage.json`.** Use CLI verbs only
@@ -141,8 +154,9 @@ Example (bad — low density, no inline terms, no sections):
      with the legacy TSV file (`research/anki_import.txt`). Do not ask the user
      to run the launch command manually.
 
-5. **Database safety non-negotiable:**
-   - **Never** run raw SQLite `INSERT`/`UPDATE` on live
+### 5. Database safety non-negotiable
+
+- **Never** run raw SQLite `INSERT`/`UPDATE` on live
      `collection.anki2` / `collection.anki21b` files.
    - Use only AnkiConnect `addNotes` or the TSV package export path.
    - Profile backups live at

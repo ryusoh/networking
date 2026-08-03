@@ -61,6 +61,69 @@ ORG_KEYWORD_RE = re.compile(
 )
 DATE_STAMP_RE = re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b")
 TEMPLATE_FRONT_RE = re.compile(r"【.+】的核心技术机制、计算公式与工程应用是什么？?$")
+COMMON_WORD_TRANSLATIONS = {
+    "decades",
+    "invention or discovery",
+    "qualitative",
+    "quantitative",
+    "trivial",
+    "goals change",
+    "one block per step",
+    "reduced errors",
+    "reduced failures",
+    "difficult or impossible to measure",
+}
+COMMON_ACRONYMS = {
+    "FFT",
+    "MPI",
+    "TCP",
+    "IP",
+    "UDP",
+    "BGP",
+    "DNS",
+    "HTTP",
+    "HTTPS",
+    "TLS",
+    "SSL",
+    "NAT",
+    "ARP",
+    "DHCP",
+    "QoS",
+    "SLA",
+    "AS",
+    "LAN",
+    "WAN",
+    "SDN",
+    "RDMA",
+    "RPC",
+    "API",
+    "OSI",
+    "VLAN",
+    "ICMP",
+    "OSPF",
+    "MPLS",
+    "VXLAN",
+    "NVGRE",
+    "GRE",
+    "IPsec",
+    "MAC",
+    "PHY",
+    "LLC",
+    "PPP",
+    "SLIP",
+    "ATM",
+    "SONET",
+    "SDH",
+    "DWDM",
+    "CDMA",
+    "TDMA",
+    "FDMA",
+    "GSM",
+    "LTE",
+    "WiFi",
+    "AS-PATH",
+    "NEXT-HOP",
+}
 
 
 def _count_control_chars(text: str) -> int:
@@ -149,6 +212,55 @@ def _count_section_headers(back: str) -> int:
     return len(re.findall(r"<(b|strong)>[^<]*[:：]</\1>", back, re.IGNORECASE))
 
 
+def _has_low_value_translation(text: str) -> str | None:
+    """Return the ordinary English phrase if it was translated instead of terminology."""
+    plain = re.sub(r"<[^>]+>", "", text)
+    for match in re.finditer(r"[（(]([^（）()]+)[)）]", plain):
+        phrase = match.group(1).strip().lower()
+        if phrase in COMMON_WORD_TRANSLATIONS:
+            return match.group(1).strip()
+    return None
+
+
+def _acronym_is_explained(acronym: str, text: str) -> bool:
+    """True if the acronym is expanded in a parenthetical (words match letters)."""
+    letters = acronym.lower()
+
+    def _expansion_matches(content: str) -> bool:
+        words = re.findall(r"[A-Za-z]+", content)
+        stop = {"and", "of", "the", "for", "to", "in", "on", "a", "an"}
+        core = [w for w in words if w.lower() not in stop and w.lower() != letters]
+        if len(core) < len(letters):
+            return False
+        firsts = "".join(w[0].lower() for w in core[: len(letters)])
+        return firsts == letters
+
+    for match in re.finditer(
+        r"[（(]([^（）()]*\b" + re.escape(acronym) + r"\b[^（）()]*)[)）]", text
+    ):
+        if _expansion_matches(match.group(1)):
+            return True
+    for match in re.finditer(
+        r"\b" + re.escape(acronym) + r"\s*[（(]([^（）()]+)[)）]", text
+    ):
+        if _expansion_matches(match.group(1)):
+            return True
+    return False
+
+
+def _unexplained_acronyms(front: str, back: str) -> list[str]:
+    """Non-common acronyms in the front must be expanded somewhere in the card."""
+    front_plain = re.sub(r"<[^>]+>", "", front)
+    back_plain = re.sub(r"<[^>]+>", "", back)
+    combined = f"{front_plain} {back_plain}"
+    acronyms = set(re.findall(r"\b[A-Z]{2,}(?:-[A-Z]+)*\b", front_plain)) - COMMON_ACRONYMS
+    return [
+        acronym
+        for acronym in acronyms
+        if not _acronym_is_explained(acronym, combined)
+    ]
+
+
 def _validate_card(front: str, back: str) -> list[str]:
     """Run all single-card quality checks."""
     card_issues: list[str] = []
@@ -194,6 +306,18 @@ def _validate_card(front: str, back: str) -> list[str]:
 
     if _count_section_headers(back) < 2:
         card_issues.append("Back lacks structured section headers (<b>...</b>:)")
+
+    low_value = _has_low_value_translation(front) or _has_low_value_translation(back)
+    if low_value:
+        card_issues.append(
+            f"Translates ordinary English instead of domain terminology: '{low_value}'"
+        )
+
+    unexplained = _unexplained_acronyms(front, back)
+    if unexplained:
+        card_issues.append(
+            "Acronym(s) used but never expanded/explained: " + ", ".join(sorted(unexplained))
+        )
 
     return card_issues
 

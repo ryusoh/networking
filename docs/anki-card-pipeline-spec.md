@@ -131,6 +131,10 @@ Every card must satisfy:
   `<b>section name (English Term):</b>` headers. English technical terms are
   inlined in `<b>`/`<strong>` throughout the explanation, not summarized in a
   single trailing English paragraph.
+- **Translation scope:** annotate domain terminology only. Do not translate
+  ordinary English words (`decades`, `invention or discovery`, `qualitative`,
+  `trivial`, etc.). Expand every acronym on first use (e.g. `NITRD (Networking
+and Information Technology Research and Development)`).
 - **Citation:** a final `源码与文档引用 (Source Citation):` section with the
   line-anchored Markdown link.
 
@@ -157,6 +161,8 @@ The validator is a hard gate. `--import` refuses to import while issues exist
 - Missing bilingual front annotation.
 - Missing inline English term annotations in the back.
 - Missing structured section headers in the back.
+- Ordinary English words translated instead of domain terminology.
+- Acronyms used but never expanded or explained.
 
 ## 10. Custom one-off cards
 

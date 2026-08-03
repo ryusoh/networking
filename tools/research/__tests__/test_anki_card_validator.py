@@ -150,6 +150,32 @@ def test_low_density_card_is_flagged(tmp_path: Path) -> None:
     assert any("structured section headers" in i for i in texts)
 
 
+def test_ordinary_english_translation_is_flagged(tmp_path: Path) -> None:
+    rows = [
+        "并行二维 FFT 的精巧转置调度 (Astute Parallel 2D-FFT Transpose): 处理器 \\(P_i\\) 在第 \\(j\\) 步把块发给谁？\t"
+        "<div><b>调度规则 (Schedule):</b></div><div>每一步每个处理器恰好发送并接收一个块（one block per step）。</div>"
+        "<div><b>复杂度 (Complexity):</b></div><div>精巧调度只需 \\(O(k)\\) 次块传输。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs231/fft.md#L1-L5](file:///tmp/x.md)</div>\t"
+        "research"
+    ]
+    path = _write_tsv(tmp_path, rows)
+    issues = validate_tsv(path)
+    assert any("ordinary English" in i for i in _all_issue_texts(issues))
+
+
+def test_unexplained_acronym_is_flagged(tmp_path: Path) -> None:
+    rows = [
+        "NITRD 重大挑战的进展指标 (Progress Indicators for NITRD Grand Challenges): 为什么成就难以量化？\t"
+        "<div><b>定性本质 (Qualitative Nature):</b></div><div>成就本质上是定性的。</div>"
+        "<div><b>指标谱系 (Indicator Spectrum):</b></div><div>指标横跨定量到定性。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs231/nitrd.md#L1-L5](file:///tmp/x.md)</div>\t"
+        "research"
+    ]
+    path = _write_tsv(tmp_path, rows)
+    issues = validate_tsv(path)
+    assert any("never expanded" in i for i in _all_issue_texts(issues))
+
+
 def test_router_id_list_is_flagged(tmp_path: Path) -> None:
     rows = [
         "Real question about OSPF flooding?\t<div>Router1 Router2 Router3 exchange LSAs</div>\tresearch"

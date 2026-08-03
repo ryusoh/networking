@@ -570,7 +570,9 @@ def test_import_refuses_validator_flagged_draft(monkeypatch, tmp_path: Path):
         ["Paxos: 【Paxos】的核心技术机制、计算公式与工程应用是什么？\t<div>consensus</div>\tresearch"],
         ["research/x.md:chunk-1"],
     )
-    ret = import_reviewed_cards("金融", tmp_path / "cov.json", tsv_path=tsv)
+    ret = import_reviewed_cards(
+        "金融", tmp_path / "cov.json", cards_path=tmp_path / "anki_cards.jsonl", tsv_path=tsv
+    )
     assert ret == 2
 
 
@@ -587,7 +589,9 @@ def test_import_refuses_row_sidecar_mismatch(monkeypatch, tmp_path: Path):
         ["拜占庭将军问题中口头消息的可解条件是什么？\t<div>n ≥ 3m+1，超过三分之二忠诚时可解。</div>\tresearch"],
         ["research/x.md:chunk-1", "research/x.md:chunk-2"],
     )
-    ret = import_reviewed_cards("金融", tmp_path / "cov.json", tsv_path=tsv)
+    ret = import_reviewed_cards(
+        "金融", tmp_path / "cov.json", cards_path=tmp_path / "anki_cards.jsonl", tsv_path=tsv
+    )
     assert ret == 2
 
 
