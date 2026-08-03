@@ -71,7 +71,7 @@ To generate high-quality, bilingual (Chinese primary with English technical term
 python3 tools/research/anki_generator.py --count 5 --deck "<target_deck>"
 ```
 
-#### Agent Judgment & Internet Enhancement Protocol:
+#### Agent Judgment & Internet Enhancement Protocol
 
 When invoking the Anki pipeline or reviewing candidate flashcards:
 
@@ -104,9 +104,11 @@ When the user confirms or requests export:
    - **架构对比与工程权衡 (Trade-offs Table)**
    - **源码与文档引用 (Source Citation):** Bounded line-anchored Markdown links.
 3. **Execute Auto-Ingestion Command:**
+
    ```bash
    python3 tools/research/anki_generator.py --front "<front_html>" --back "<back_html>" --deck "金融" --tags "research networking <module_name>" --auto-launch
    ```
+
 4. **Append Progress Report:** Always capture and append the **📊 Anki Courseware Memorization Progress Report** printed by `anki_generator.py` at the end of your response to the user.
 
 ## Citation Requirement
