@@ -61,18 +61,16 @@ ORG_KEYWORD_RE = re.compile(
 )
 DATE_STAMP_RE = re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b")
 TEMPLATE_FRONT_RE = re.compile(r"【.+】的核心技术机制、计算公式与工程应用是什么？?$")
-COMMON_WORD_TRANSLATIONS = {
-    "decades",
-    "invention or discovery",
-    "qualitative",
-    "quantitative",
-    "trivial",
-    "goals change",
-    "one block per step",
-    "reduced errors",
-    "reduced failures",
-    "difficult or impossible to measure",
-}
+# Over-translation gate: a card body is Chinese prose with <b> emphasis on key
+# Chinese terms. English annotations are reserved for acronym expansions and
+# the rare term a domain reader would not already know (the user's reference
+# card annotates exactly one term, "time-harmonic field"). More than this many
+# non-acronym English parentheticals in the back is sprinkling, not annotation.
+MAX_ENGLISH_ANNOTATIONS = 2
+SECTION_HEADER_RE = re.compile(r"<(b|strong)>[^<]*[:：]</\1>", re.IGNORECASE)
+LATEX_RE = re.compile(r"\\\(.*?\\\)|\\\[.*?\\\]")
+MARKDOWN_LINK_RE = re.compile(r"\[[^\]]*\]\([^()]*\)")
+ACRONYM_TOKEN_RE = re.compile(r"\b(?:[A-Z]{2,}|[A-Za-z]*[A-Z][a-z]+[A-Z][A-Za-z]*)$")
 COMMON_ACRONYMS = {
     "FFT",
     "MPI",
@@ -198,28 +196,30 @@ def _front_lacks_bilingual_annotation(front: str) -> bool:
     return True
 
 
-def _count_bold_ascii(back: str) -> int:
-    """Count <b>/<strong> segments containing ASCII technical terms."""
-    return sum(
-        1
-        for m in re.finditer(r"<(b|strong)>([^<]+)</\1>", back, re.IGNORECASE)
-        if re.search(r"[A-Za-z]", m.group(2))
-    )
-
-
 def _count_section_headers(back: str) -> int:
     """Count <b>...</b>: style section headers used in dense card backs."""
     return len(re.findall(r"<(b|strong)>[^<]*[:：]</\1>", back, re.IGNORECASE))
 
 
-def _has_low_value_translation(text: str) -> str | None:
-    """Return the ordinary English phrase if it was translated instead of terminology."""
-    plain = re.sub(r"<[^>]+>", "", text)
+def _english_annotations(back: str) -> list[str]:
+    """English parenthetical annotations in the body, excluding acronym
+    expansions, section headers, LaTeX, and citation links."""
+    stripped = SECTION_HEADER_RE.sub("", back)
+    stripped = LATEX_RE.sub("", stripped)
+    stripped = MARKDOWN_LINK_RE.sub("", stripped)
+    plain = re.sub(r"<[^>]+>", "", stripped)
+    annotations: list[str] = []
     for match in re.finditer(r"[（(]([^（）()]+)[)）]", plain):
-        phrase = match.group(1).strip().lower()
-        if phrase in COMMON_WORD_TRANSLATIONS:
-            return match.group(1).strip()
-    return None
+        content = match.group(1).strip()
+        if not re.search(r"[A-Za-z]", content):
+            continue
+        before = plain[: match.start()].rstrip()
+        if ACRONYM_TOKEN_RE.search(before):
+            continue  # acronym expansion, e.g. WSN (Wireless Sensor Network)
+        if re.search(r"\b[A-Z]{2,}\b", content):
+            continue  # the parenthetical itself carries the acronym
+        annotations.append(content)
+    return annotations
 
 
 def _acronym_is_explained(acronym: str, text: str) -> bool:
@@ -301,16 +301,16 @@ def _validate_card(front: str, back: str) -> list[str]:
             "Front lacks bilingual term annotation (use 中文概念 (English Term): or English Term: ...)"
         )
 
-    if _count_bold_ascii(back) < 3:
-        card_issues.append("Back lacks inline English term annotations (<b>/<strong>)")
-
     if _count_section_headers(back) < 2:
         card_issues.append("Back lacks structured section headers (<b>...</b>:)")
 
-    low_value = _has_low_value_translation(front) or _has_low_value_translation(back)
-    if low_value:
+    annotations = _english_annotations(back)
+    if len(annotations) > MAX_ENGLISH_ANNOTATIONS:
+        shown = ", ".join(f"'{a}'" for a in annotations[:5])
         card_issues.append(
-            f"Translates ordinary English instead of domain terminology: '{low_value}'"
+            f"Back sprinkles {len(annotations)} English annotations "
+            f"(max {MAX_ENGLISH_ANNOTATIONS}): {shown} — write the body in Chinese; "
+            "annotate only terms a domain reader would not already know"
         )
 
     unexplained = _unexplained_acronyms(front, back)

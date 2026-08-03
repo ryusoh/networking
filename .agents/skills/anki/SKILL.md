@@ -1,6 +1,6 @@
 ---
 name: anki
-description: Automatically generates and ingests 5 high-quality, bilingual (Chinese/English) flashcards into the Anki '金融' deck using the research agent pipeline.
+description: Automatically generates and ingests 5 high-quality, Chinese-primary flashcards into the Anki '金融' deck using the research agent pipeline.
 ---
 
 # Autonomous Anki Flashcard Ingestion Skill (/anki)
@@ -57,9 +57,8 @@ date-stamp | outline | qa-mismatch | duplicate | other`.
   - Author each card as one JSON line in `research/anki_cards.jsonl` with
     fields: `chunk_id`, `front`, `back`, `tags`, `citation`.
   - Front must be a real question (not a topic label or paper title). Back
-    must be Chinese-primary bilingual HTML with English technical terms, LaTeX
-    `\(...\)` where useful, and a line-anchored citation
-    (`[path#Lstart-Lend](file://...)`).
+    must be Chinese-primary HTML with LaTeX `\(...\)` where useful and a
+    line-anchored citation (`[path#Lstart-Lend](file://...)`).
   - If a candidate is too fragmented to rescue, **reject it** with
     `--reject-chunk <chunk_id> --reason <CATEGORY>` instead of writing a bad
     card.
@@ -73,15 +72,18 @@ them. Author cards to this density target:
   `<strong>中文概念 (English Term)</strong>: 具体问题？` or
   `<strong>English Term</strong>: 中文具体问题？`.
   Never a bare Chinese question without an English term annotation.
-- **Back:** at least 3 dense sections, each introduced by a
-  `<b>section name (English Term):</b>` header. Inline bilingual terms in
-  `<b>`/`<strong>` throughout the explanation (not a single English summary
-  paragraph at the end).
-- **Translation scope:** annotate **domain terminology only** — protocols,
-  algorithms, architectures, mechanisms, and named concepts. Do **not**
-  translate ordinary English words (e.g. `decades`, `invention or discovery`,
-  `qualitative`, `trivial`, `goals change`). The reader is a networking
-  professional.
+- **Back:** at least 3 dense sections, each introduced by a `<b>section
+name:</b>` header. Write the body in Chinese prose; use `<b>` to emphasize
+  key **Chinese** terms. Do not append English glosses.
+- **English annotations (machine-gated, cap = 2 per back):** annotate a term
+  in English ONLY if a domain reader would not already know it — i.e.
+  acronym expansions on first use (exempt from the cap) and rare specialized
+  nomenclature with no settled Chinese rendering (e.g. `时谐场 (time-harmonic
+field)`). Basic vocabulary — `latency`, `deadline`, `aggregation`,
+  `overhead`, `real-time system` — needs no annotation; the reader is a
+  networking professional. The validator rejects any back with more than 2
+  non-acronym English parentheticals (`Back sprinkles N English
+annotations`). When in doubt, do NOT annotate.
 - **Acronyms:** expand every acronym on first use, in the front or in the
   back (e.g. `NITRD (Networking and Information Technology Research and
 Development)`). An acronym that appears in the front but is never expanded
@@ -95,13 +97,13 @@ Example (good):
 {
   "chunk_id": "research/cs231/parallel-fft.md:chunk-1",
   "front": "并行二维 FFT 的块转置 (Parallel 2D-FFT Block Transpose): 处理器 \\(P_i\\) 需要把块 \\(B_{ij}\\) 发送给谁？",
-  "back": "<div><b>通信模式 (Communication Pattern):</b></div><div>\\(P_i\\) 将块 \\(B_{ij}\\) 发送给 \\(P_j\\)（\\(j \\neq i\\)），实现按行到按列的分布切换。</div><div><b>复杂度 (Complexity):</b></div><div>基本顺序循环需要 \\(O(k^2)\\) 次块传输；按 \\(i\\) 或 \\(j\\) 并行化仅改变启动维度，不减少总传输量。</div><div><b>源码与文档引用 (Source Citation):</b> [research/cs231/parallel-fft.md#L103-L167](file:///.../parallel-fft.md#L103-L167)</div>",
+  "back": "<div><b>通信模式:</b></div><div>\\(P_i\\) 将块 \\(B_{ij}\\) 发送给 \\(P_j\\)（\\(j \\neq i\\)），实现<b>按行分布到按列分布</b>的切换。</div><div><b>复杂度:</b></div><div>基本顺序循环需要 \\(O(k^2)\\) 次块传输；按 \\(i\\) 或 \\(j\\) 并行化仅改变启动维度，<b>不减少总传输量</b>。</div><div><b>源码与文档引用 (Source Citation):</b> [research/cs231/parallel-fft.md#L103-L167](file:///.../parallel-fft.md#L103-L167)</div>",
   "tags": ["research", "cs231"],
   "citation": "research/cs231/parallel-fft.md#L103-L167"
 }
 ```
 
-Example (bad — low density, no inline terms, no sections):
+Example (bad — low density, no sections, English summary paragraph):
 
 ```json
 {
