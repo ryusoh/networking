@@ -1,16 +1,20 @@
 """End-to-End (E2E) Integration Test for Research Agent & Anki Pipeline.
 
-Executes the complete end-to-end workflow across Phases 1 through 5 and Anki Flashcard Generation:
-1. Structural Parsing & Line Mapping (parse_chunks.py)
-2. BM25 Lexical Search & Ranking (search_chunks.py)
-3. Token-Bounded Scene Assembly (scene_builder.py)
-4. Citation Verification Engine (citation_engine.py)
-5. Durable Memory & Mastery Matrix (memory_host.py)
-6. Anki Flashcard Generation, Deduplication, & Ingestion (anki_generator.py)
+Executes the complete end-to-end workflow across Phases 1 through 5 and the
+inverted Anki pipeline (code emits candidates, LLM authors cards, code imports).
 """
 
+import json
 from pathlib import Path
-from tools.research.anki_generator import AnkiCardFormatter, CoverageTracker, TSVExporter, filter_duplicate_chunks
+
+from tools.research.anki_generator import (
+    AnkiConnectChecker,
+    CoverageTracker,
+    TSVExporter,
+    emit_candidates,
+    filter_duplicate_chunks,
+    import_reviewed_cards,
+)
 from tools.research.citation_engine import CitationEngine
 from tools.research.memory_host import MemoryHost
 from tools.research.parse_chunks import build_chunks_manifest
@@ -18,7 +22,7 @@ from tools.research.scene_builder import SceneBuilder
 from tools.research.search_chunks import BM25Indexer
 
 
-def test_complete_research_agent_and_anki_pipeline_e2e(tmp_path: Path):
+def test_complete_research_agent_and_anki_pipeline_e2e(monkeypatch, tmp_path: Path):
     # Setup temporary courseware structure
     research_dir = tmp_path / "research"
     course_dir = research_dir / "cs234-advanced-networks"
@@ -42,6 +46,8 @@ def test_complete_research_agent_and_anki_pipeline_e2e(tmp_path: Path):
 
     # 1. Phase 1: Structural Parsing
     manifest = build_chunks_manifest(research_dir, tmp_path)
+    manifest_path = tmp_path / ".chunks_manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     chunks = manifest["chunks"]
     assert len(chunks) == 4
 
@@ -71,7 +77,7 @@ def test_complete_research_agent_and_anki_pipeline_e2e(tmp_path: Path):
     memory_report = memory_host.get_student_report("student1")
     assert memory_report["average_mastery"] == 0.92
 
-    # 6. Anki Flashcard Generation Pipeline
+    # 6. Inverted Anki Pipeline: candidates -> authored cards -> import
     coverage_path = research_dir / ".anki_coverage.json"
     coverage_tracker = CoverageTracker(coverage_path=coverage_path)
 
@@ -83,23 +89,63 @@ def test_complete_research_agent_and_anki_pipeline_e2e(tmp_path: Path):
     non_duplicates = filter_duplicate_chunks(unvisited, deck_name="TestDeck")
     assert len(non_duplicates) == 2
 
-    # Card Formatting
-    card_formatter = AnkiCardFormatter(repo_root=tmp_path)
-    card = card_formatter.format_card(non_duplicates[0])
-    assert "B4" in card.front_html or "Overview" in card.front_html
-    assert "Source Citation" in card.back_html
+    # Emit candidates JSONL
+    candidates_path = research_dir / "anki_candidates.jsonl"
+    ret = emit_candidates(
+        count=2,
+        deck_name="TestDeck",
+        manifest_path=tmp_path / ".chunks_manifest.json",
+        coverage_path=coverage_path,
+        candidates_path=candidates_path,
+    )
+    assert ret == 0
+    assert candidates_path.exists()
 
-    # Package Export
+    # LLM authors cards (simulated here by reading candidates and writing cards)
+    cards_path = research_dir / "anki_cards.jsonl"
+    candidates = [json.loads(line) for line in candidates_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    with cards_path.open("w", encoding="utf-8") as fh:
+        for cand in candidates:
+            card = {
+                "chunk_id": cand["chunk_id"],
+                "front": f"What is {cand['heading']}?",
+                "back": f"<div>{cand['content']}</div>",
+                "tags": ["research", "cs234"],
+                "citation": cand["citation"],
+            }
+            fh.write(json.dumps(card, ensure_ascii=False) + "\n")
+
+    # Mock AnkiConnect and import
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(AnkiConnectChecker, "add_notes", lambda self, cards, deck_name: [12345])
+
+    ret = import_reviewed_cards("TestDeck", coverage_path, cards_path=cards_path)
+    assert ret == 0
+    coverage = json.loads(coverage_path.read_text(encoding="utf-8"))
+    assert coverage["visited_chunk_ids"][candidates[0]["chunk_id"]]["status"] == "imported"
+    assert coverage["visited_chunk_ids"][candidates[0]["chunk_id"]]["note_id"] == 12345
+
+    # TSVExporter is still available for manual fallback
     tsv_path = research_dir / "anki_import.txt"
+    from tools.research.anki_generator import AnkiCard
+
     exporter = TSVExporter(output_path=tsv_path)
-    export_file = exporter.export([card])
+    export_file = exporter.export(
+        [
+            AnkiCard(
+                chunk_id="manual",
+                file_path="manual",
+                heading="Manual card",
+                front_html="Front",
+                back_html="<div>Back</div>",
+                tags=["research"],
+            )
+        ]
+    )
     assert export_file.exists()
     assert "#separator:Tab" in export_file.read_text(encoding="utf-8")
 
-    # Update coverage (marks doc1 as visited)
-    coverage_tracker.mark_chunks_visited([non_duplicates[0]], deck_name="TestDeck")
-
-    # Select remaining unvisited chunks (from doc2)
+    # Select remaining unvisited chunks (none left)
+    coverage_tracker = CoverageTracker(coverage_path=coverage_path)
     remaining = coverage_tracker.select_unvisited_chunks(chunks, count=2)
-    assert len(remaining) == 1
-    assert "paxos-consensus.md" in remaining[0]["file_path"]
+    assert len(remaining) == 0

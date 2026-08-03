@@ -4,13 +4,14 @@ import sqlite3
 from pathlib import Path
 from tools.research.anki_generator import (
     AnkiCard,
-    AnkiCardFormatter,
     AnkiConnectChecker,
     CoverageTracker,
     SQLiteInspector,
     TSVExporter,
+    emit_candidates,
     filter_duplicate_chunks,
     format_progress_bar,
+    import_reviewed_cards,
 )
 
 
@@ -173,30 +174,6 @@ def test_sqlite_inspector_reads_existing_notes(tmp_path: Path):
     inspector = SQLiteInspector(collection_path=db_path)
     titles = inspector.get_existing_front_titles("TestDeck")
     assert "napi" in titles
-
-
-def test_anki_card_formatter(tmp_path: Path):
-    target_file = tmp_path / "research" / "cs234" / "b4.md"
-    target_file.parent.mkdir(parents=True, exist_ok=True)
-    target_file.write_text("# B4 Traffic Engineering\n- Centralized SDN control WAN\n- Merchant switch silicon\n")
-
-    chunk = {
-        "chunk_id": "c1",
-        "file_path": "research/cs234/b4.md",
-        "heading": "B4 Traffic Engineering",
-        "start_line": 1,
-        "end_line": 3,
-        "content": "- Centralized SDN control WAN\n- Merchant switch silicon",
-    }
-
-    formatter = AnkiCardFormatter(repo_root=tmp_path)
-    card = formatter.format_card(chunk)
-
-    assert "B4 Traffic Engineering:" in card.front_html
-    assert "核心" in card.front_html
-    assert "<b>核心工作机制 (Core Mechanism):</b>" in card.back_html
-    assert "Centralized SDN control WAN" in card.back_html
-    assert "research" in card.tags
 
 
 def test_tsv_exporter(tmp_path: Path):
@@ -451,8 +428,8 @@ def test_select_unvisited_chunks_pagerank_guided(tmp_path: Path):
     graph_dir.mkdir(parents=True, exist_ok=True)
     graph_data = {
         "nodes": [
-            {"id": "n1", "l": "Paxos", "d": "金融", "p": 0.85},
-            {"id": "n2", "l": "Vector Clocks", "d": "金融", "p": 0.95},
+            {"id": "n1", "l": "Paxos", "course": "cs231", "d": "金融", "p": 0.85},
+            {"id": "n2", "l": "Vector Clocks", "course": "cs231", "d": "金融", "p": 0.95},
         ],
     }
     (graph_dir / "graph_data.json").write_text(json.dumps(graph_data), encoding="utf-8")
@@ -580,7 +557,7 @@ def _write_draft(tmp_path: Path, rows: list[str], chunk_ids: list[str]):
 
 def test_import_refuses_validator_flagged_draft(monkeypatch, tmp_path: Path):
     """A junk draft must not reach Anki even if the reviewer runs --import."""
-    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_tsv
+    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_cards
 
     def _boom(self, cards, deck_name):
         raise AssertionError("add_notes must not be called for a flagged draft")
@@ -593,12 +570,12 @@ def test_import_refuses_validator_flagged_draft(monkeypatch, tmp_path: Path):
         ["Paxos: 【Paxos】的核心技术机制、计算公式与工程应用是什么？\t<div>consensus</div>\tresearch"],
         ["research/x.md:chunk-1"],
     )
-    ret = import_reviewed_tsv("金融", tmp_path / "cov.json", tsv_path=tsv)
+    ret = import_reviewed_cards("金融", tmp_path / "cov.json", tsv_path=tsv)
     assert ret == 2
 
 
 def test_import_refuses_row_sidecar_mismatch(monkeypatch, tmp_path: Path):
-    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_tsv
+    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_cards
 
     monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
     monkeypatch.setattr(
@@ -610,7 +587,7 @@ def test_import_refuses_row_sidecar_mismatch(monkeypatch, tmp_path: Path):
         ["拜占庭将军问题中口头消息的可解条件是什么？\t<div>n ≥ 3m+1，超过三分之二忠诚时可解。</div>\tresearch"],
         ["research/x.md:chunk-1", "research/x.md:chunk-2"],
     )
-    ret = import_reviewed_tsv("金融", tmp_path / "cov.json", tsv_path=tsv)
+    ret = import_reviewed_cards("金融", tmp_path / "cov.json", tsv_path=tsv)
     assert ret == 2
 
 
@@ -618,7 +595,7 @@ def test_import_marks_reviewed_chunks_imported(monkeypatch, tmp_path: Path):
     """Clean reviewed rows import and flip pending_import to imported with the edited front."""
     import json
 
-    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_tsv
+    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_cards
 
     monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
     monkeypatch.setattr(AnkiConnectChecker, "add_notes", lambda self, cards, deck_name: [424242])
@@ -644,7 +621,7 @@ def test_import_marks_reviewed_chunks_imported(monkeypatch, tmp_path: Path):
         encoding="utf-8",
     )
 
-    ret = import_reviewed_tsv("金融", coverage, tsv_path=tsv)
+    ret = import_reviewed_cards("金融", coverage, tsv_path=tsv)
     assert ret == 0
     entry = json.loads(coverage.read_text(encoding="utf-8"))["visited_chunk_ids"][
         "research/x.md:chunk-1"
@@ -666,10 +643,374 @@ def test_reject_chunk_marks_skipped(tmp_path: Path):
         ),
         encoding="utf-8",
     )
-    ret = main(["--reject-chunk", "research/x.md:chunk-9", "--coverage", str(coverage)])
+    ret = main(
+        [
+            "--reject-chunk",
+            "research/x.md:chunk-9",
+            "--reason",
+            "title-slide",
+            "--coverage",
+            str(coverage),
+        ]
+    )
     assert ret == 0
     entry = json.loads(coverage.read_text(encoding="utf-8"))["visited_chunk_ids"][
         "research/x.md:chunk-9"
     ]
     assert entry["status"] == "skipped_low_quality"
     assert "audited_at" in entry
+    assert entry["reason"] == "title-slide"
+
+
+def test_emit_candidates_writes_jsonl_and_marks_candidate(monkeypatch, tmp_path: Path):
+    import json
+
+    from tools.research import anki_generator
+    from tools.research.anki_generator import emit_candidates
+
+    monkeypatch.setattr(anki_generator, "filter_duplicate_chunks", lambda chunks, deck, **kw: chunks)
+
+    manifest_file = tmp_path / "manifest.json"
+    coverage_file = tmp_path / "cov.json"
+    candidates_file = tmp_path / "anki_candidates.jsonl"
+    manifest_file.write_text(
+        json.dumps(
+            {
+                "chunks": [
+                    {
+                        "chunk_id": "c1",
+                        "file_path": "research/cs234/b4.md",
+                        "heading": "B4 Traffic Engineering",
+                        "start_line": 10,
+                        "end_line": 25,
+                        "content": (
+                            "B4 uses centralized software-defined networking control over a "
+                            "wide-area network built from merchant switch silicon. The traffic "
+                            "engineering system computes forwarding paths that balance capacity "
+                            "against demand and reacts to link failures within seconds."
+                        ),
+                        "token_count": 45,
+                    },
+                    {
+                        "chunk_id": "c2",
+                        "file_path": "research/cs231/paxos.md",
+                        "heading": "Paxos Consensus",
+                        "start_line": 1,
+                        "end_line": 5,
+                        "content": (
+                            "Paxos is a family of protocols for solving consensus in a network of "
+                            "unreliable processors. Consensus is the process of agreeing on one "
+                            "result among a group of participants, even if some fail."
+                        ),
+                        "token_count": 38,
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    coverage_file.write_text("{}", encoding="utf-8")
+
+    ret = emit_candidates(
+        count=2,
+        deck_name="金融",
+        manifest_path=manifest_file,
+        coverage_path=coverage_file,
+        candidates_path=candidates_file,
+    )
+    assert ret == 0
+    assert candidates_file.exists()
+    records = [json.loads(line) for line in candidates_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(records) == 2
+    assert records[0]["chunk_id"] == "c1"
+    assert "#L10-L25" in records[0]["citation"]
+
+    coverage = json.loads(coverage_file.read_text(encoding="utf-8"))
+    assert coverage["visited_chunk_ids"]["c1"]["status"] == "candidate"
+    assert coverage["visited_chunk_ids"]["c2"]["status"] == "candidate"
+
+
+def test_emit_candidates_refuses_unresolved_chunks(tmp_path: Path):
+    import json
+
+    from tools.research.anki_generator import emit_candidates
+
+    manifest_file = tmp_path / "manifest.json"
+    coverage_file = tmp_path / "cov.json"
+    manifest_file.write_text(json.dumps({"chunks": []}), encoding="utf-8")
+    coverage_file.write_text(
+        json.dumps(
+            {"visited_chunk_ids": {"c1": {"status": "candidate"}}}
+        ),
+        encoding="utf-8",
+    )
+    ret = emit_candidates(
+        count=1,
+        deck_name="金融",
+        manifest_path=manifest_file,
+        coverage_path=coverage_file,
+        candidates_path=tmp_path / "anki_candidates.jsonl",
+    )
+    assert ret == 2
+
+
+def test_import_reviewed_cards_from_jsonl(monkeypatch, tmp_path: Path):
+    import json
+
+    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_cards
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(AnkiConnectChecker, "add_notes", lambda self, cards, deck_name: [999999])
+
+    cards_file = tmp_path / "anki_cards.jsonl"
+    cards_file.write_text(
+        json.dumps(
+            {
+                "chunk_id": "research/cs234/b4.md:chunk-1",
+                "front": "拜占庭将军问题中口头消息的可解条件是什么？",
+                "back": "<div>n ≥ 3m+1，超过三分之二忠诚时可解。</div>",
+                "tags": ["research", "cs234"],
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    coverage_file = tmp_path / "cov.json"
+    coverage_file.write_text("{}", encoding="utf-8")
+
+    ret = import_reviewed_cards("金融", coverage_file, cards_path=cards_file)
+    assert ret == 0
+    coverage = json.loads(coverage_file.read_text(encoding="utf-8"))
+    entry = coverage["visited_chunk_ids"]["research/cs234/b4.md:chunk-1"]
+    assert entry["status"] == "imported"
+    assert entry["note_id"] == 999999
+    assert entry["front_html"] == "拜占庭将军问题中口头消息的可解条件是什么？"
+
+
+def test_reject_chunk_requires_reason(tmp_path: Path):
+    import json
+
+    import pytest
+    from tools.research.anki_generator import main
+
+    coverage = tmp_path / "cov.json"
+    coverage.write_text(
+        json.dumps(
+            {"visited_chunk_ids": {"research/x.md:chunk-9": {"status": "candidate"}}}
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit):
+        main(["--reject-chunk", "research/x.md:chunk-9", "--coverage", str(coverage)])
+
+
+def test_reject_chunk_appends_review_log(tmp_path: Path):
+    import json
+
+    from tools.research.anki_generator import main
+
+    coverage = tmp_path / "cov.json"
+    review = tmp_path / "anki_review.jsonl"
+    coverage.write_text(
+        json.dumps(
+            {"visited_chunk_ids": {"research/x.md:chunk-9": {"status": "candidate"}}}
+        ),
+        encoding="utf-8",
+    )
+    ret = main(
+        [
+            "--reject-chunk",
+            "research/x.md:chunk-9",
+            "--reason",
+            "metadata-dump",
+            "--coverage",
+            str(coverage),
+            "--review-path",
+            str(review),
+        ]
+    )
+    assert ret == 0
+    lines = [l for l in review.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert entry["chunk_id"] == "research/x.md:chunk-9"
+    assert entry["verdict"] == "reject"
+    assert entry["reason"] == "metadata-dump"
+
+
+def test_import_appends_accept_review_log(monkeypatch, tmp_path: Path):
+    import json
+
+    from tools.research.anki_generator import AnkiConnectChecker, main
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(AnkiConnectChecker, "add_notes", lambda self, cards, deck_name: [111])
+
+    cards_file = tmp_path / "anki_cards.jsonl"
+    cards_file.write_text(
+        json.dumps(
+            {
+                "chunk_id": "research/x.md:chunk-1",
+                "front": "Question?",
+                "back": "<div>Answer</div>",
+                "tags": ["research"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    coverage = tmp_path / "cov.json"
+    coverage.write_text("{}", encoding="utf-8")
+    review = tmp_path / "anki_review.jsonl"
+
+    ret = main(
+        [
+            "--import",
+            "--deck",
+            "金融",
+            "--cards",
+            str(cards_file),
+            "--coverage",
+            str(coverage),
+            "--review-path",
+            str(review),
+        ]
+    )
+    assert ret == 0
+    lines = [l for l in review.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert entry["chunk_id"] == "research/x.md:chunk-1"
+    assert entry["verdict"] == "accept"
+    assert entry["note_id"] == 111
+
+
+def test_select_unvisited_chunks_penalizes_high_reject_rate_course(tmp_path: Path):
+    """Chunks from courses with high historical rejection must be ranked later."""
+    import json
+
+    from tools.research.anki_generator import CoverageTracker
+
+    coverage_path = tmp_path / ".anki_coverage.json"
+    review_path = tmp_path / "anki_review.jsonl"
+    tracker = CoverageTracker(coverage_path=coverage_path)
+
+    manifest_chunks = [
+        {
+            "chunk_id": "research/cs234/b4.md:chunk-1",
+            "file_path": "research/cs234/b4.md",
+            "heading": "B4 Traffic Engineering",
+            "content": (
+                "B4 uses centralized software-defined networking traffic engineering over a "
+                "wide-area network built from merchant switch silicon and optical links."
+            ),
+            "token_count": 100,
+        },
+        {
+            "chunk_id": "research/cs231/paxos.md:chunk-1",
+            "file_path": "research/cs231/paxos.md",
+            "heading": "Paxos Consensus",
+            "content": (
+                "Paxos is a family of protocols for solving consensus in a network of "
+                "unreliable processors using proposers, acceptors, and learners."
+            ),
+            "token_count": 100,
+        },
+    ]
+
+    # cs234 has a 100% reject rate; cs231 has a 100% accept rate.
+    with review_path.open("w", encoding="utf-8") as fh:
+        fh.write(
+            json.dumps({"chunk_id": "research/cs234/junk.md:chunk-1", "verdict": "reject"})
+            + "\n"
+        )
+        fh.write(
+            json.dumps({"chunk_id": "research/cs231/good.md:chunk-1", "verdict": "accept"})
+            + "\n"
+        )
+
+    selected = tracker.select_unvisited_chunks(
+        manifest_chunks, count=2, review_path=review_path
+    )
+    assert [c["chunk_id"] for c in selected] == [
+        "research/cs231/paxos.md:chunk-1",
+        "research/cs234/b4.md:chunk-1",
+    ]
+
+
+def test_import_skips_duplicate_front_hash(monkeypatch, tmp_path: Path):
+    """A front already stored in coverage must not be re-imported as a new note."""
+    import json
+
+    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_cards
+
+    def _boom(self, cards, deck_name):
+        raise AssertionError("add_notes must not be called for a duplicate front")
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(AnkiConnectChecker, "add_notes", _boom)
+
+    coverage = tmp_path / "cov.json"
+    coverage.write_text(
+        json.dumps(
+            {
+                "visited_chunk_ids": {
+                    "research/cs234/b4.md:chunk-1": {
+                        "status": "imported",
+                        "front_html": "What is B4?",
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    cards_file = tmp_path / "anki_cards.jsonl"
+    cards_file.write_text(
+        json.dumps(
+            {
+                "chunk_id": "research/cs234/b4.md:chunk-2",
+                "front": "What is B4?",
+                "back": "<div>different back</div>",
+                "tags": ["research"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    ret = import_reviewed_cards("金融", coverage, cards_path=cards_file)
+    assert ret == 0
+    captured = coverage.read_text(encoding="utf-8")
+    assert "chunk-2" not in captured
+
+
+def test_status_reports_approve_rate(tmp_path: Path, capsys):
+    import json
+
+    from tools.research.anki_generator import main
+
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({"chunks": []}), encoding="utf-8")
+    review = tmp_path / "anki_review.jsonl"
+    with review.open("w", encoding="utf-8") as fh:
+        fh.write(json.dumps({"chunk_id": "a", "verdict": "accept"}) + "\n")
+        fh.write(json.dumps({"chunk_id": "b", "verdict": "reject", "reason": "diagram"}) + "\n")
+        fh.write(json.dumps({"chunk_id": "c", "verdict": "accept"}) + "\n")
+
+    ret = main(
+        [
+            "--status",
+            "--manifest",
+            str(manifest),
+            "--coverage",
+            str(tmp_path / "cov.json"),
+            "--review-path",
+            str(review),
+        ]
+    )
+    assert ret == 0
+    out = capsys.readouterr().out
+    assert "Approve rate" in out
+    assert "66.7%" in out

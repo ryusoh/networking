@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import hashlib
 import json
 import os
 import re
@@ -27,7 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from tools.research.anki_card_validator import validate_tsv
+from tools.research.anki_card_validator import validate_cards, validate_tsv
 from tools.research.anki_graph_bridge import AnkiGraphBridge
 from tools.research.citation_engine import CitationEngine
 from tools.research.parse_chunks import estimate_tokens
@@ -38,6 +39,9 @@ DEFAULT_RESEARCH_DIR = REPO_ROOT / "research"
 DEFAULT_MANIFEST_PATH = DEFAULT_RESEARCH_DIR / ".chunks_manifest.json"
 DEFAULT_COVERAGE_PATH = DEFAULT_RESEARCH_DIR / ".anki_coverage.json"
 DEFAULT_TSV_PATH = DEFAULT_RESEARCH_DIR / "anki_import.txt"
+DEFAULT_CANDIDATES_PATH = DEFAULT_RESEARCH_DIR / "anki_candidates.jsonl"
+DEFAULT_CARDS_PATH = DEFAULT_RESEARCH_DIR / "anki_cards.jsonl"
+DEFAULT_REVIEW_PATH = DEFAULT_RESEARCH_DIR / "anki_review.jsonl"
 FIELD_SEP = "\x1f"
 JUNK_KEYWORDS = {
     "outline",
@@ -67,6 +71,90 @@ SEMESTER_HEADING_PATTERN = re.compile(
 )
 PAGE_NUM_PATTERN = re.compile(r"^(page\s+\d+|\d+\s*/\s*\d+)$", re.IGNORECASE)
 PROGRESS_BAR_WIDTH = 40
+
+REJECT_REASONS = (
+    "title-slide",
+    "metadata-dump",
+    "author-block",
+    "diagram",
+    "ocr-fragment",
+    "date-stamp",
+    "outline",
+    "qa-mismatch",
+    "duplicate",
+    "other",
+)
+
+
+def _append_review_log(
+    review_path: Path,
+    chunk_id: str,
+    verdict: str,
+    reason: str | None = None,
+    note_id: int | None = None,
+) -> None:
+    """Append a single verdict to the review log (append-only audit artifact)."""
+    review_path.parent.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "chunk_id": chunk_id,
+        "verdict": verdict,
+    }
+    if reason:
+        entry["reason"] = reason
+    if note_id is not None:
+        entry["note_id"] = note_id
+    with review_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _front_hash(front_html: str) -> str:
+    """Stable hash of card front for duplicate detection."""
+    plain = re.sub(r"<[^>]+>", "", front_html).lower()
+    plain = re.sub(r"\s+", " ", plain).strip()
+    return hashlib.sha1(plain.encode("utf-8")).hexdigest()
+
+
+def _load_reject_rates(review_path: Path) -> dict[str, float]:
+    """Return reject rate per top-level course directory from the review log."""
+    rates: dict[str, dict[str, int]] = {}
+    if not review_path.exists():
+        return {}
+    for raw in review_path.read_text(encoding="utf-8").splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        entry = json.loads(raw)
+        chunk_id = entry.get("chunk_id", "")
+        parts = chunk_id.split("/")
+        key = parts[1] if len(parts) > 1 else "unknown"
+        bucket = rates.setdefault(key, {"accept": 0, "reject": 0})
+        if entry.get("verdict") == "accept":
+            bucket["accept"] += 1
+        elif entry.get("verdict") == "reject":
+            bucket["reject"] += 1
+    return {
+        key: bucket["reject"] / (bucket["accept"] + bucket["reject"])
+        for key, bucket in rates.items()
+        if (bucket["accept"] + bucket["reject"]) > 0
+    }
+
+
+def _approve_rate(review_path: Path, window: int = 100) -> tuple[int, int, float]:
+    """Return (accepted, total_decided, rate) over the last `window` review entries."""
+    if not review_path.exists():
+        return 0, 0, 0.0
+    entries = []
+    for raw in review_path.read_text(encoding="utf-8").splitlines():
+        raw = raw.strip()
+        if raw:
+            entries.append(json.loads(raw))
+    recent = entries[-window:]
+    accepts = sum(1 for e in recent if e.get("verdict") == "accept")
+    rejects = sum(1 for e in recent if e.get("verdict") == "reject")
+    total = accepts + rejects
+    rate = (accepts / total * 100) if total else 0.0
+    return accepts, total, rate
 
 
 def format_progress_bar(visited: int, total: int, width: int = PROGRESS_BAR_WIDTH) -> str:
@@ -398,8 +486,15 @@ class CoverageTracker:
         visited_chunks = self.data.get("visited_chunk_ids", {})
         if chunk_id in visited_chunks:
             status = visited_chunks[chunk_id].get("status")
-            # generated, pending_import, imported, and skipped all count as visited
-            return status in ("generated", "pending_import", "imported", "skipped_low_quality")
+            # Any of these statuses means the chunk has entered the pipeline
+            # and should not be selected again unless explicitly reset.
+            return status in (
+                "generated",
+                "candidate",
+                "pending_import",
+                "imported",
+                "skipped_low_quality",
+            )
         return False
 
     def mark_chunks_visited(
@@ -414,7 +509,7 @@ class CoverageTracker:
         Args:
             chunks: Chunks that were converted to cards.
             deck_name: Target deck name.
-            status: One of "generated", "pending_import", or "imported".
+            status: One of "generated", "candidate", "pending_import", or "imported".
             front_htmls: Mapping from chunk_id to the rendered front HTML.
         """
         now_str = datetime.now(timezone.utc).isoformat()
@@ -489,10 +584,12 @@ class CoverageTracker:
         manifest_chunks: list[dict[str, Any]],
         count: int = 5,
         graph_bridge: AnkiGraphBridge | None = None,
+        review_path: Path | None = None,
     ) -> list[dict[str, Any]]:
         """Select up to `count` high-quality, unvisited chunks from manifest.
 
-        Ranks candidates by directory priority and PageRank hub relevance (Vector 1).
+        Ranks candidates by directory priority and PageRank hub relevance, then
+        penalizes sources with high historical rejection rates from the review log.
         """
         unvisited = []
         skipped_low_quality = []
@@ -512,10 +609,15 @@ class CoverageTracker:
         if skipped_low_quality:
             self.mark_chunks_skipped(skipped_low_quality, reason="skipped_low_quality")
 
-        unvisited.sort(
-            key=lambda c: self._calculate_chunk_priority(c, graph_bridge=graph_bridge),
-            reverse=True,
-        )
+        reject_rates = _load_reject_rates(review_path) if review_path else {}
+
+        def _sort_key(c: dict[str, Any]) -> tuple[float, float]:
+            course = c.get("file_path", "").split("/")[1] if "/" in c.get("file_path", "") else "unknown"
+            rate = reject_rates.get(course, 0.0)
+            priority = self._calculate_chunk_priority(c, graph_bridge=graph_bridge)
+            return (rate, -priority)
+
+        unvisited.sort(key=_sort_key)
 
         return unvisited[:count]
 
@@ -735,145 +837,6 @@ def filter_duplicate_chunks(
     return filtered
 
 
-class AnkiCardFormatter:
-    """Formats research chunks into high-density (800-1800 char), multi-section Anki cards."""
-
-    def __init__(
-        self,
-        repo_root: Path = REPO_ROOT,
-        graph_bridge: AnkiGraphBridge | None = None,
-    ):
-        self.repo_root = repo_root
-        self.graph_bridge = graph_bridge or AnkiGraphBridge()
-
-    def _extract_concept_term(self, raw_heading: str, content: str, file_path: str) -> tuple[str, str]:
-        """Extract (english_term, chinese_question) from chunk heading and content."""
-        clean_heading = re.sub(r"^(of|for|in|by|with|to|from|on|at|and|or)\b\s*", "", raw_heading.strip(), flags=re.IGNORECASE)
-        clean_heading = re.sub(r"[:\(\)]+", "", clean_heading).strip()
-
-        is_generic = (
-            re.match(r"^page\s+\d+$", clean_heading, re.IGNORECASE)
-            or re.match(r"^\d+[\/\.-]\d+[\/\.-]\d+$", clean_heading)
-            or clean_heading.lower() in JUNK_KEYWORDS
-            or clean_heading.lower() in {"bytes", "bits", "answer rrs", "answer", "rrs", "question", "questions"}
-            or re.match(r"^\d+\s+", clean_heading)
-            or len(clean_heading) < 6
-        )
-
-        term = clean_heading
-        if is_generic:
-            for line in content.splitlines():
-                line_str = line.strip()
-                if (
-                    line_str
-                    and not line_str.startswith("#")
-                    and not line_str.startswith("<!--")
-                    and not re.match(r"^\d+[\/\.-]\d+[\/\.-]\d+$", line_str)
-                    and not re.match(r"^\d+$", line_str)
-                    and not SEMESTER_HEADING_PATTERN.match(line_str)
-                    and not re.match(r"^[A-Z]{2,5}\s+\d{3}[A-Z]?\s", line_str)
-                ):
-                    clean_line = re.sub(r"^[-*•\d\.\s]+", "", line_str).strip()
-                    clean_line = re.sub(r"^(of|for|in|by|with|to|from|on|at|and|or)\b\s*", "", clean_line, flags=re.IGNORECASE)
-                    if len(clean_line) > 8 and not clean_line.lower() in JUNK_KEYWORDS:
-                        term = clean_line[:60]
-                        break
-            if term == clean_heading or len(term) < 5:
-                term = Path(file_path).stem.replace("-", " ").title()
-
-        content_lower = content.lower()
-        if ("erlang b" in content_lower or "erlang c" in content_lower or ("erlang" in content_lower and "blocking" in content_lower)) and "gnutella" not in content_lower:
-            term = "Erlang B vs Erlang C Queueing Models"
-            question = "在呼叫/数据包阻塞系统中，Erlang B 公式与 Poisson 到达模型如何计算拒绝概率 (Blocking Probability)？"
-        elif "dns" in content_lower and ("resource record" in content_lower or "cname" in content_lower or "authoritative" in content_lower) and "gnutella" not in content_lower:
-            term = "DNS Protocol & Resource Records (RR)"
-            question = "DNS 报文首部 16 位标志位、4 大 RR 记录类型 (A, NS, CNAME, MX) 与 4 个 Length 字段的物理意义与解析机制是什么？"
-        elif ("sliding window" in content_lower or "sendbase" in content_lower) and "tcp" in content_lower:
-            term = "TCP Sliding Window & Flow Control"
-            question = "滑动窗口协议（Sliding Window Protocol）中发送方与接收方在 ACK 确认与 Timer 重传时的状态转换逻辑是什么？"
-        elif "chord" in content_lower and ("finger table" in content_lower or "stabilize" in content_lower):
-            term = "Chord DHT Finger Table & Node Join"
-            question = "Chord 环中路由表 Finger Table 的索引计算公式、O(log N) 查询复杂度与节点动态加入 (Stabilization) 机制是什么？"
-        elif "bgp" in content_lower and ("as-path" in content_lower or "local-pref" in content_lower):
-            term = "BGP Path Vector Protocol & Routing Policy"
-            question = "边界网关协议 (BGP) 的关键属性 (AS-PATH, NEXT-HOP, Local-Pref, MED) 及 4 级选路优先级决策链逻辑是什么？"
-        elif "bandwidth" in content_lower and "harmonics" in content_lower:
-            question = "模拟带宽 (Analog Bandwidth in Hz) 与数字信道最大数据率 (Digital Bandwidth in bps) 在物理层中是如何关联的？"
-        elif file_path.endswith(".py"):
-            filename = Path(file_path).name
-            question = f"在套接字编程 ({filename}) 中，TCP Socket 的初始化、绑定与异常处理逻辑是如何实现的？"
-        elif file_path.endswith(".c"):
-            filename = Path(file_path).name
-            question = f"C 语言网络工具 ({filename}) 中，系统调用与底层 I/O 机制是如何处理网络数据的？"
-        else:
-            question = f"【{term}】的核心技术机制、计算公式与工程应用是什么？"
-
-        return term, question
-
-    def format_card(self, chunk: dict[str, Any]) -> AnkiCard:
-        """Render a single chunk into a high-density, multi-section AnkiCard object (800-1800 chars)."""
-        raw_heading = chunk.get("heading", "System Concept")
-        file_path = chunk["file_path"]
-        start_line = chunk["start_line"]
-        end_line = chunk["end_line"]
-        content = chunk.get("content", "")
-
-        module_name = file_path.split("/")[1] if "/" in file_path else "research"
-        term, question = self._extract_concept_term(raw_heading, content, file_path)
-
-        # Plain text Front field without HTML tags, brackets, or emojis
-        front_text = f"{term}: {question}"
-
-        link_markdown = format_file_link(self.repo_root, file_path, start_line, end_line)
-
-        raw_lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith("#")]
-        
-        # Build comprehensive multi-section Back content
-        paragraphs = []
-        for line in raw_lines:
-            clean_line = re.sub(r"^[-*•\s]+", "", line).strip()
-            if clean_line:
-                paragraphs.append(clean_line)
-
-        body_text = " ".join(paragraphs) if paragraphs else "系统核心架构与分布式机制解析。"
-
-        back_html = (
-            f"<div><b>定义与物理意义 (Definition & Physical Meaning):</b></div>"
-            f"<div>{body_text}</div>"
-        )
-
-        # Extract structured points from raw lines if bullet points exist
-        bullet_lines = [
-            re.sub(r"^[-*•\s]+", "", l).strip()
-            for l in raw_lines
-            if l.startswith("-") or l.startswith("*") or l.startswith("•")
-        ]
-        clean_bullets = [b for b in bullet_lines if b]
-        if clean_bullets:
-            items_html = "".join(f"<li>{bl}</li>" for bl in clean_bullets[:5])
-            back_html += f"<div><b>核心工作机制 (Core Mechanism):</b></div><ul>{items_html}</ul>"
-
-        hubs = self.graph_bridge.get_related_hubs(content)
-        if hubs:
-            hub_labels = ", ".join(h[0] for h in hubs)
-            back_html += (
-                f'<div class="related-concepts"><b>关联知识图谱 Hub (Related Concepts):</b> {hub_labels}</div>'
-            )
-
-        back_html += f"<div><b>源码与文档引用 (Source Citation):</b> {link_markdown}</div>"
-
-        tags = ["research", module_name.replace("-", "_")]
-
-        return AnkiCard(
-            chunk_id=chunk["chunk_id"],
-            file_path=file_path,
-            heading=term,
-            front_html=front_text,
-            back_html=back_html,
-            tags=tags,
-        )
-
-
 class TSVExporter:
     """Exporter for Anki tab-separated package files (#separator:Tab, #html:true)."""
 
@@ -925,30 +888,108 @@ def _tsv_sidecar_path(tsv_path: Path) -> Path:
     return tsv_path.with_suffix(".chunks.json")
 
 
-def import_reviewed_tsv(
-    deck_name: str,
-    coverage_path: Path,
-    tsv_path: Path = DEFAULT_TSV_PATH,
-    force: bool = False,
-) -> int:
-    """Import the human/LLM-reviewed TSV draft via AnkiConnect.
+def _existing_front_hashes(coverage_path: Path) -> set[str]:
+    """Return hashes of fronts already stored in coverage (imported or draft)."""
+    hashes: set[str] = set()
+    if not coverage_path.exists():
+        return hashes
+    try:
+        data = json.loads(coverage_path.read_text(encoding="utf-8"))
+    except Exception:
+        return hashes
+    for entry in data.get("visited_chunk_ids", {}).values():
+        if entry.get("front_hash"):
+            hashes.add(entry["front_hash"])
+        elif entry.get("front_html"):
+            hashes.add(_front_hash(entry["front_html"]))
+    return hashes
 
-    This is the ONLY path from generated candidates to the deck: generation
-    always stops at a draft, and this function refuses to import anything the
-    validator flags (unless --force), so unreviewed or junk cards cannot reach
-    Anki even if the reviewing agent's judgment slips.
-    """
-    if not tsv_path.exists():
-        print(f"No TSV draft at {tsv_path}. Run the generator first to produce candidates.")
-        return 1
+
+def _load_cards_jsonl(cards_path: Path) -> list[dict[str, Any]]:
+    """Load reviewed cards from agent-authored JSONL (new contract)."""
+    cards = []
+    for raw in cards_path.read_text(encoding="utf-8").splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        card = json.loads(raw)
+        for key in ("chunk_id", "front", "back"):
+            if not card.get(key):
+                raise ValueError(f"Card missing required field {key!r}: {card}")
+        card.setdefault("tags", ["research"])
+        if isinstance(card["tags"], str):
+            card["tags"] = card["tags"].split()
+        cards.append(card)
+    return cards
+
+
+def _load_tsv_cards(tsv_path: Path) -> list[dict[str, Any]]:
+    """Load reviewed cards from legacy TSV + sidecar (kept for migration)."""
     sidecar_path = _tsv_sidecar_path(tsv_path)
     if not sidecar_path.exists():
-        print(f"Missing chunk sidecar {sidecar_path}; cannot map rows to chunks. Regenerate the draft.")
+        raise FileNotFoundError(f"Missing chunk sidecar {sidecar_path}")
+    chunk_ids = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    rows = _parse_tsv_rows(tsv_path)
+    if len(rows) != len(chunk_ids):
+        raise ValueError(
+            f"TSV has {len(rows)} data rows but sidecar tracks {len(chunk_ids)} chunks"
+        )
+    cards = []
+    for cid, (front, back, tags) in zip(chunk_ids, rows):
+        cards.append({"chunk_id": cid, "front": front, "back": back, "tags": tags})
+    return cards
+
+
+def import_reviewed_cards(
+    deck_name: str,
+    coverage_path: Path,
+    cards_path: Path = DEFAULT_CARDS_PATH,
+    tsv_path: Path = DEFAULT_TSV_PATH,
+    review_path: Path = DEFAULT_REVIEW_PATH,
+    force: bool = False,
+) -> int:
+    """Import the human/LLM-reviewed cards JSONL via AnkiConnect.
+
+    Falls back to the legacy TSV + sidecar if no cards JSONL exists.
+    This is the ONLY path from generated candidates to the deck: generation
+    emits candidates, not cards, and this function refuses to import anything
+    the validator flags (unless --force).
+    """
+    if cards_path.exists():
+        cards = _load_cards_jsonl(cards_path)
+        source_path = cards_path
+    elif tsv_path.exists():
+        try:
+            cards = _load_tsv_cards(tsv_path)
+        except FileNotFoundError as err:
+            print(f"Legacy fallback failed: {err}")
+            return 1
+        except ValueError as err:
+            print(f"Legacy TSV mismatch: {err}")
+            return 2
+        source_path = tsv_path
+    else:
+        print(f"No reviewed cards at {cards_path} (or legacy {tsv_path}). "
+              "Run candidate generation, author cards to anki_cards.jsonl, then import.")
         return 1
 
-    issues = validate_tsv(tsv_path)
+    # Drop cards whose front already exists in coverage (same content = same hash).
+    seen_hashes = _existing_front_hashes(coverage_path)
+    unique_cards: list[dict[str, Any]] = []
+    for card in cards:
+        h = _front_hash(card["front"])
+        if h in seen_hashes:
+            print(f"  skipping duplicate front (content hash match): {card['chunk_id']}")
+            continue
+        seen_hashes.add(h)
+        unique_cards.append(card)
+    if len(unique_cards) < len(cards):
+        print(f"Removed {len(cards) - len(unique_cards)} duplicate card(s) before import.")
+    cards = unique_cards
+
+    issues = validate_tsv(source_path) if str(source_path).endswith(".txt") else validate_cards(cards)
     if issues and not force:
-        print(f"Validator rejects {tsv_path}; refusing to import:")
+        print(f"Validator rejects {source_path}; refusing to import:")
         for label, card_issues in issues.items():
             print(f"\n{label}:")
             for issue in card_issues:
@@ -956,35 +997,26 @@ def import_reviewed_tsv(
         print("\nRewrite or fix the flagged cards and re-run. Override with --force (not recommended).")
         return 2
 
-    chunk_ids = json.loads(sidecar_path.read_text(encoding="utf-8"))
-    rows = _parse_tsv_rows(tsv_path)
-    if len(rows) != len(chunk_ids):
-        print(
-            f"TSV has {len(rows)} data rows but the sidecar tracks {len(chunk_ids)} chunks. "
-            "Rows were added or removed after generation; regenerate the draft instead."
-        )
-        return 2
-
     checker = AnkiConnectChecker()
     if not checker.is_available():
         print("AnkiConnect is not reachable. Open Anki (with AnkiConnect installed) and retry.")
         return 1
 
-    cards = [
+    anki_cards = [
         AnkiCard(
-            chunk_id=cid,
-            file_path=cid.split(":")[0],
-            heading=front[:60],
-            front_html=front,
-            back_html=back,
-            tags=tags,
+            chunk_id=card["chunk_id"],
+            file_path=card["chunk_id"].split(":")[0],
+            heading=card["front"][:60],
+            front_html=card["front"],
+            back_html=card["back"],
+            tags=card["tags"],
         )
-        for cid, (front, back, tags) in zip(chunk_ids, rows)
+        for card in cards
     ]
 
     # One bad row (e.g. a duplicate) must not sink the whole batch.
     note_ids: list[int | None] = []
-    for card in cards:
+    for card in anki_cards:
         try:
             ids = checker.add_notes([card], deck_name=deck_name)
             note_ids.append(ids[0] if ids else None)
@@ -996,7 +1028,7 @@ def import_reviewed_tsv(
     tracker = CoverageTracker(coverage_path=coverage_path)
     visited = tracker.data.setdefault("visited_chunk_ids", {})
     imported = 0
-    for card, nid in zip(cards, note_ids):
+    for card, nid in zip(anki_cards, note_ids):
         if nid is None:
             continue
         entry = visited.setdefault(card.chunk_id, {})
@@ -1006,13 +1038,86 @@ def import_reviewed_tsv(
                 "imported_at": now_str,
                 "deck": deck_name,
                 "front_html": card.front_html,
+                "front_hash": _front_hash(card.front_html),
+                "note_id": nid,
             }
         )
+        _append_review_log(review_path, card.chunk_id, "accept", note_id=nid)
         imported += 1
     tracker.save()
 
     print(f"Imported {imported}/{len(cards)} reviewed cards into deck '{deck_name}'.")
     print(f"Anki Note IDs: {note_ids}")
+    return 0
+
+
+def emit_candidates(
+    count: int,
+    deck_name: str,
+    manifest_path: Path,
+    coverage_path: Path,
+    candidates_path: Path = DEFAULT_CANDIDATES_PATH,
+    review_path: Path = DEFAULT_REVIEW_PATH,
+) -> int:
+    """Select unvisited, dedup-filtered, quality-gated chunks and emit JSONL."""
+    if not manifest_path.exists():
+        print(f"Manifest not found at {manifest_path}. Run parse_chunks.py first.")
+        return 1
+
+    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    chunks = manifest_data.get("chunks", [])
+
+    tracker = CoverageTracker(coverage_path=coverage_path)
+    unresolved = [cid for cid, e in tracker.data.get("visited_chunk_ids", {}).items()
+                  if e.get("status") in ("candidate", "pending_import")]
+    if unresolved:
+        print(f"ERROR: {len(unresolved)} chunk(s) are awaiting review/import:")
+        for cid in unresolved:
+            print(f"  - {cid}")
+        print("Resolve them first: --import or --reject-chunk, then regenerate candidates.")
+        return 2
+
+    graph_bridge = AnkiGraphBridge(target_deck=deck_name)
+    unvisited = tracker.select_unvisited_chunks(
+        chunks, count=count * 3, graph_bridge=graph_bridge, review_path=review_path
+    )
+    selected_chunks = filter_duplicate_chunks(unvisited, deck_name)[:count]
+
+    if not selected_chunks:
+        print("No unvisited, high-quality, non-duplicate chunks found.")
+        return 0
+
+    candidates_path.parent.mkdir(parents=True, exist_ok=True)
+    with candidates_path.open("w", encoding="utf-8") as fh:
+        for chunk in selected_chunks:
+            start = chunk.get("start_line", 1)
+            end = chunk.get("end_line", start)
+            file_path = chunk.get("file_path", "")
+            record = {
+                "chunk_id": chunk.get("chunk_id", f"{file_path}:chunk-0"),
+                "file_path": file_path,
+                "heading": chunk.get("heading", ""),
+                "start_line": start,
+                "end_line": end,
+                "content": chunk.get("content", ""),
+                "citation": f"{file_path}#L{start}-L{end}",
+            }
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    tracker.mark_chunks_visited(
+        selected_chunks,
+        deck_name=deck_name,
+        status="candidate",
+    )
+    print(f"Exported {len(selected_chunks)} candidate chunks to {candidates_path}")
+    print("Next steps:")
+    print("  1. Read candidates and author cards to research/anki_cards.jsonl")
+    print("  2. python3 tools/research/anki_card_validator.py research/anki_cards.jsonl")
+    print(f'  3. python3 tools/research/anki_generator.py --import --deck "{deck_name}"')
+
+    visited_dict = tracker.data.get("visited_chunk_ids", {})
+    active_path = selected_chunks[0]["file_path"] if selected_chunks else None
+    CoverageProgressReporter.print_report(chunks, visited_dict, active_file_path=active_path)
     return 0
 
 
@@ -1044,13 +1149,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--tsv",
         action="store_true",
-        help="Deprecated no-op: generation always stops at a TSV draft for review.",
+        help="Deprecated no-op for generation; still triggers TSV fallback in custom --front/--back path.",
+    )
+    parser.add_argument(
+        "--tsv-path",
+        default=str(DEFAULT_TSV_PATH),
+        help="Legacy TSV draft path used by --import when no cards JSONL exists.",
+    )
+    parser.add_argument(
+        "--candidates",
+        action="store_true",
+        help="Emit candidate chunks to research/anki_candidates.jsonl and exit.",
+    )
+    parser.add_argument(
+        "--cards",
+        default=str(DEFAULT_CARDS_PATH),
+        help="Path to reviewed cards JSONL for --import (default: research/anki_cards.jsonl).",
     )
     parser.add_argument(
         "--import",
         dest="import_reviewed",
         action="store_true",
-        help="Import the reviewed TSV draft via AnkiConnect (validator-gated).",
+        help="Import the reviewed cards JSONL via AnkiConnect (validator-gated).",
     )
     parser.add_argument(
         "--force",
@@ -1062,12 +1182,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         nargs="+",
         metavar="CHUNK_ID",
         default=None,
-        help="Mark pending_review chunks as skipped_low_quality after review rejection.",
+        help="Mark chunks as skipped_low_quality after review rejection.",
+    )
+    parser.add_argument(
+        "--reason",
+        default=None,
+        choices=REJECT_REASONS,
+        help="Required with --reject-chunk: rejection category (stored in review log).",
+    )
+    parser.add_argument(
+        "--review-path",
+        default=str(DEFAULT_REVIEW_PATH),
+        help="Path to append-only review log (default: research/anki_review.jsonl).",
     )
     parser.add_argument(
         "--auto-launch",
         action="store_true",
-        help="Automatically launch Anki.app if closed to enable 100% automated AnkiConnect ingestion.",
+        help="Automatically launch Anki.app if closed to enable AnkiConnect ingestion.",
     )
     parser.add_argument(
         "--front",
@@ -1092,28 +1223,45 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.import_reviewed:
-        return import_reviewed_tsv(
+        return import_reviewed_cards(
             deck_name=args.deck,
             coverage_path=Path(args.coverage).resolve(),
+            cards_path=Path(args.cards).resolve(),
+            tsv_path=Path(args.tsv_path).resolve(),
+            review_path=Path(args.review_path).resolve(),
             force=args.force,
         )
 
     if args.reject_chunk:
+        if not args.reason:
+            parser.error("--reject-chunk requires --reason CATEGORY")
         tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
         visited = tracker.data.setdefault("visited_chunk_ids", {})
         now_str = datetime.now(timezone.utc).isoformat()
         rejected = 0
+        review_path = Path(args.review_path).resolve()
         for cid in args.reject_chunk:
             if cid in visited:
                 visited[cid]["status"] = "skipped_low_quality"
                 visited[cid]["audited_at"] = now_str
+                visited[cid]["reason"] = args.reason
                 visited[cid].pop("front_html", None)
+                _append_review_log(review_path, cid, "reject", reason=args.reason)
                 rejected += 1
             else:
                 print(f"  unknown chunk id: {cid}")
         tracker.save()
         print(f"Marked {rejected} chunk(s) as skipped_low_quality.")
         return 0
+
+    if args.candidates:
+        return emit_candidates(
+            count=args.count,
+            deck_name=args.deck,
+            manifest_path=Path(args.manifest).resolve(),
+            coverage_path=Path(args.coverage).resolve(),
+            review_path=Path(args.review_path).resolve(),
+        )
 
     if args.status:
         manifest_path = Path(args.manifest).resolve()
@@ -1126,6 +1274,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
         visited_dict = tracker.data.get("visited_chunk_ids", {})
         CoverageProgressReporter.print_report(chunks, visited_dict)
+        accepts, decided, rate = _approve_rate(Path(args.review_path).resolve())
+        if decided:
+            print(f"\nApprove rate (last {decided} decisions): {rate:.1f}% ({accepts} accepted, {decided - accepts} rejected)")
         return 0
 
     # Custom Q&A card direct ingestion path
@@ -1186,79 +1337,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 pass
         return 0
 
-    manifest_path = Path(args.manifest).resolve()
-    if not manifest_path.exists():
-        parser.error(
-            f"Manifest file not found at {manifest_path}. Run 'python3 tools/research/parse_chunks.py' first."
-        )
-
-    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
-    chunks = manifest_data.get("chunks", [])
-
-    graph_bridge = AnkiGraphBridge(target_deck=args.deck)
-    tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
-
-    pending = tracker.pending_import_chunks()
-    if pending:
-        print(
-            f"ERROR: {len(pending)} chunk(s) are pending review/import. "
-            "Generating more would overwrite their TSV draft and sidecar:"
-        )
-        for cid in pending:
-            print(f"  - {cid}")
-        print("Resolve them first:")
-        print(f'  python3 tools/research/anki_generator.py --import --deck "{args.deck}"')
-        print("  python3 tools/research/anki_generator.py --reject-chunk <chunk_id> [...]")
-        return 2
-
-    unvisited = tracker.select_unvisited_chunks(
-        chunks, count=args.count * 3, graph_bridge=graph_bridge
-    )
-
-    selected_chunks = filter_duplicate_chunks(unvisited, args.deck)[: args.count]
-
-    if not selected_chunks:
-        print("No unvisited, high-quality, non-duplicate chunks found to process into Anki cards.")
-        return 0
-
-    formatter = AnkiCardFormatter(
-        repo_root=DEFAULT_RESEARCH_DIR.parent, graph_bridge=graph_bridge
-    )
-    cards = [formatter.format_card(c) for c in selected_chunks]
-
-    # Draft-first: generation NEVER imports directly. Candidates go to a TSV
-    # draft plus a chunk-mapping sidecar; only `main --import` (validator-gated,
-    # post-review) may put cards into the deck.
-    exporter = TSVExporter()
-    tsv_path = exporter.export(cards)
-    sidecar_path = _tsv_sidecar_path(tsv_path)
-    sidecar_path.write_text(
-        json.dumps([card.chunk_id for card in cards], indent=2), encoding="utf-8"
-    )
-    print(f"Exported {len(cards)} candidate cards to TSV draft (review before import):")
-    print(f"  Path: {tsv_path}")
-    print(f"  Chunk sidecar: {sidecar_path}")
-    print("Next steps (mandatory):")
-    print(f"  1. python3 tools/research/anki_card_validator.py {tsv_path}")
-    print("  2. Read every card in full; rewrite or reject junk (keep rows aligned with the sidecar).")
-    print(f'  3. python3 tools/research/anki_generator.py --import --deck "{args.deck}"')
-
-    front_htmls = {card.chunk_id: card.front_html for card in cards}
-    tracker.mark_chunks_visited(
-        selected_chunks,
+    # Default generation behavior: emit candidate chunks for the LLM to author.
+    return emit_candidates(
+        count=args.count,
         deck_name=args.deck,
-        status="pending_import",
-        front_htmls=front_htmls,
+        manifest_path=Path(args.manifest).resolve(),
+        coverage_path=Path(args.coverage).resolve(),
+        review_path=Path(args.review_path).resolve(),
     )
-    print(
-        f"Updated coverage tracking for {len(selected_chunks)} chunks in {tracker.coverage_path.name}"
-    )
-
-    visited_dict = tracker.data.get("visited_chunk_ids", {})
-    active_path = selected_chunks[0]["file_path"] if selected_chunks else None
-    CoverageProgressReporter.print_report(chunks, visited_dict, active_file_path=active_path)
-
-    return 0
 
 
 if __name__ == "__main__":

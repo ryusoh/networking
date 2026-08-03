@@ -133,13 +133,30 @@ class AnkiGraphBridge:
                 f"Warning: AnkiGraphBridge could not load graph data from {self.graph_path}: {e}\n"
             )
 
-    def get_related_hubs(self, text: str, top_n: int = 3) -> list[tuple[str, float, str]]:
+    def _course_prefix(self, chunk: dict[str, Any]) -> str | None:
+        """Extract the short course code (e.g. cs232) from a chunk file_path."""
+        fpath = chunk.get("file_path", "")
+        parts = fpath.split("/")
+        if len(parts) > 1:
+            m = re.match(r"(cs2\d\d)", parts[1], re.IGNORECASE)
+            if m:
+                return m.group(1).lower()
+        return None
+
+    def get_related_hubs(
+        self, text: str, top_n: int = 3, domain_prefix: str | None = None
+    ) -> list[tuple[str, float, str]]:
         """Scans input text for concept labels present in the target deck's knowledge graph.
 
         Uses a two-phase approach: fast index lookup for candidates, then a
         post-filter requiring >= 2 significant (>= 5 char, non-stopword) words
         from the label to appear in the input text. This prevents cross-domain
         noise from single common-word overlaps (e.g., 'model', 'rate').
+
+        If ``domain_prefix`` is provided, only hubs whose label starts with that
+        prefix are returned. This keeps related-concept suggestions inside the
+        same course (e.g. cs232 labels for a cs232 chunk). When no same-domain
+        hub matches, the caller should omit the hub section.
         """
         if not text or not self.nodes:
             return []
@@ -162,10 +179,10 @@ class AnkiGraphBridge:
             label_words = set(re.findall(r"\b[A-Za-z0-9_-]{3,}\b", label.lower()))
             significant = {w for w in label_words if len(w) >= 5} - STOPWORDS
             overlap = significant & text_words
-            
+
             if not significant:
                 continue
-            
+
             if len(significant) == 1 and len(overlap) == 1:
                 verified[nid] = node
             elif len(overlap) >= 2:
@@ -174,6 +191,12 @@ class AnkiGraphBridge:
         matches = []
         for node in verified.values():
             label = node.get("label") or node.get("l") or ""
+            node_course = node.get("course")
+            if domain_prefix and not (
+                (node_course and str(node_course).lower() == domain_prefix.lower())
+                or label.lower().startswith(domain_prefix.lower())
+            ):
+                continue
             pr = float(node.get("pagerank") or node.get("p") or 0.0)
             matches.append((label, pr, self.target_deck))
 
@@ -185,7 +208,8 @@ class AnkiGraphBridge:
         heading = chunk.get("heading", "")
         content = chunk.get("content", "")
         text = f"{heading} {content}"
-        hubs = self.get_related_hubs(text, top_n=5)
+        domain_prefix = self._course_prefix(chunk)
+        hubs = self.get_related_hubs(text, top_n=5, domain_prefix=domain_prefix)
         if not hubs:
             return 0.0
         return sum(h[1] for h in hubs)

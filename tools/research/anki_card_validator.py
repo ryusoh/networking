@@ -10,9 +10,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 FIELD_SEP = "\t"
 CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
@@ -120,6 +122,68 @@ def _is_template_front(front: str) -> bool:
     return bool(TEMPLATE_FRONT_RE.search(plain))
 
 
+def _validate_card(front: str, back: str) -> list[str]:
+    """Run all single-card quality checks."""
+    card_issues: list[str] = []
+
+    ctrl_count = _count_control_chars(front) + _count_control_chars(back)
+    if ctrl_count:
+        card_issues.append(f"Contains {ctrl_count} control character(s) (PDF extraction artifact)")
+
+    if _has_slide_title(front):
+        card_issues.append("Front looks like a slide title/page number, not a conceptual question")
+
+    if _has_diagram_artifacts(back):
+        card_issues.append("Back contains ASCII diagram/table fragments instead of explanation")
+
+    if _is_generic_topic(front):
+        card_issues.append("Front is a generic topic label, not a specific question")
+
+    if _has_ocr_errors(back):
+        card_issues.append("Back contains likely OCR/extraction errors (fragmented words)")
+
+    if _has_paper_metadata(back):
+        card_issues.append("Back contains paper metadata dump (ACM categories, section headings)")
+
+    if _has_author_block(back):
+        card_issues.append("Back contains author/affiliation block instead of explanation")
+
+    if _has_date_stamp(front) or _has_date_stamp(back):
+        card_issues.append("Contains slide date stamp (e.g. 8/13/2008)")
+
+    if _is_template_front(front):
+        card_issues.append("Front is the generator's fallback template, not a concrete question")
+
+    if not _question_matches_answer(front, back):
+        card_issues.append("Front asks for details not covered in the back")
+
+    return card_issues
+
+
+def validate_cards(cards: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """Validate a list of card dicts {front, back, chunk_id?, tags?}."""
+    issues: dict[str, list[str]] = {}
+    fronts: list[str] = []
+    for i, card in enumerate(cards, start=1):
+        front = card.get("front", "")
+        back = card.get("back", "")
+        fronts.append(front)
+        card_issues = _validate_card(front, back)
+        if card_issues:
+            issues[f"card {i}"] = card_issues
+
+    seen: dict[str, int] = {}
+    for i, front in enumerate(fronts, start=1):
+        plain = re.sub(r"<[^>]+>", "", front).split("【")[0].split(":")[0].strip()
+        if plain in seen:
+            key = f"card {i}"
+            issues.setdefault(key, []).append(f"Duplicate title within batch (first seen at card {seen[plain]})")
+        else:
+            seen[plain] = i
+
+    return issues
+
+
 def validate_tsv(tsv_path: Path) -> dict[str, list[str]]:
     """Return a dict mapping card index to list of issue descriptions."""
     text = tsv_path.read_text(encoding="utf-8")
@@ -136,39 +200,7 @@ def validate_tsv(tsv_path: Path) -> dict[str, list[str]]:
             continue
         front, back = parts[0], parts[1]
         fronts.append(front)
-        card_issues: list[str] = []
-
-        ctrl_count = _count_control_chars(front) + _count_control_chars(back)
-        if ctrl_count:
-            card_issues.append(f"Contains {ctrl_count} control character(s) (PDF extraction artifact)")
-
-        if _has_slide_title(front):
-            card_issues.append("Front looks like a slide title/page number, not a conceptual question")
-
-        if _has_diagram_artifacts(back):
-            card_issues.append("Back contains ASCII diagram/table fragments instead of explanation")
-
-        if _is_generic_topic(front):
-            card_issues.append("Front is a generic topic label, not a specific question")
-
-        if _has_ocr_errors(back):
-            card_issues.append("Back contains likely OCR/extraction errors (fragmented words)")
-
-        if _has_paper_metadata(back):
-            card_issues.append("Back contains paper metadata dump (ACM categories, section headings)")
-
-        if _has_author_block(back):
-            card_issues.append("Back contains author/affiliation block instead of explanation")
-
-        if _has_date_stamp(front) or _has_date_stamp(back):
-            card_issues.append("Contains slide date stamp (e.g. 8/13/2008)")
-
-        if _is_template_front(front):
-            card_issues.append("Front is the generator's fallback template, not a concrete question")
-
-        if not _question_matches_answer(front, back):
-            card_issues.append("Front asks for details not covered in the back")
-
+        card_issues = _validate_card(front, back)
         if card_issues:
             issues[f"card {len(fronts)} (line {idx})"] = card_issues
 
@@ -186,20 +218,29 @@ def validate_tsv(tsv_path: Path) -> dict[str, list[str]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate generated Anki TSV before import")
-    parser.add_argument("tsv_path", type=Path, default=Path("research/anki_import.txt"), nargs="?")
+    parser = argparse.ArgumentParser(description="Validate generated Anki cards before import")
+    parser.add_argument("path", type=Path, default=Path("research/anki_cards.jsonl"), nargs="?")
     args = parser.parse_args(argv)
 
-    if not args.tsv_path.exists():
-        print(f"File not found: {args.tsv_path}", file=sys.stderr)
+    if not args.path.exists():
+        print(f"File not found: {args.path}", file=sys.stderr)
         return 1
 
-    issues = validate_tsv(args.tsv_path)
+    if str(args.path).endswith(".txt") or str(args.path).endswith(".tsv"):
+        issues = validate_tsv(args.path)
+    else:
+        cards = []
+        for raw in args.path.read_text(encoding="utf-8").splitlines():
+            raw = raw.strip()
+            if raw:
+                cards.append(json.loads(raw))
+        issues = validate_cards(cards)
+
     if not issues:
-        print(f"OK: {args.tsv_path} passed quality checks.")
+        print(f"OK: {args.path} passed quality checks.")
         return 0
 
-    print(f"Quality issues found in {args.tsv_path}:")
+    print(f"Quality issues found in {args.path}:")
     for label, card_issues in issues.items():
         print(f"\n{label}:")
         for issue in card_issues:

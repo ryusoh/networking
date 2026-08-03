@@ -5,65 +5,108 @@ description: Automatically generates and ingests 5 high-quality, bilingual (Chin
 
 # Autonomous Anki Flashcard Ingestion Skill (/anki)
 
-Executes the complete Anki card generation and ingestion pipeline over `research/` courseware, generating 5 high-density, non-duplicate, citation-anchored flashcards directly into the target Anki deck (**金融**).
+Executes the complete Anki card generation and ingestion pipeline over
+`research/` courseware, generating 5 high-density, non-duplicate,
+citation-anchored flashcards into the target Anki deck (**金融**).
 
-## Quick Execution Command
+## Core rule
 
-Generation **always stops at a reviewed draft** — there is no auto-import path.
-The pipeline is a strict state machine: `generate → pending_import → (--import ⇒ imported | --reject-chunk ⇒ skipped_low_quality)`.
+**Code never writes card prose. The LLM authors cards; code only retrieves,
+validates, tracks, and imports.** The generator emits candidate chunks; the
+agent reads them and writes `research/anki_cards.jsonl`; the validator and
+`--import` gate imports.
+
+## Quick execution command
 
 ```bash
-# 1. Generate candidates (writes TSV draft + chunk sidecar, marks pending_import)
+# 1. Emit candidate chunks (JSONL) — marks chunks as "candidate"
 python3 tools/research/anki_generator.py --count 5 --deck "金融"
 
-# 2. Validate (hard gate — --import refuses to run while issues exist)
-python3 tools/research/anki_card_validator.py research/anki_import.txt
+# 2. Read research/anki_candidates.jsonl and author cards to research/anki_cards.jsonl
+#    One JSON object per line: {chunk_id, front, back, tags, citation}
 
-# 3. Reject junk chunks / rewrite salvageable ones by editing the TSV rows
-python3 tools/research/anki_generator.py --reject-chunk <chunk_id> [...]
+# 3. Validate the authored cards (hard gate — --import refuses while issues exist)
+python3 tools/research/anki_card_validator.py research/anki_cards.jsonl
 
-# 4. Import the reviewed draft via AnkiConnect (marks chunks imported)
+# 4. Reject junk chunks by id (requires --reason CATEGORY)
+python3 tools/research/anki_generator.py --reject-chunk <chunk_id> --reason <CATEGORY>
+
+# 5. Import reviewed cards via AnkiConnect (marks chunks "imported")
 python3 tools/research/anki_generator.py --import --deck "金融"
 ```
 
-## Workflow Execution Protocol
+`--reason` must be one of:
+`title-slide | metadata-dump | author-block | diagram | ocr-fragment |
+date-stamp | outline | qa-mismatch | duplicate | other`.
 
-1. **Quality & Deduplication Check:**
+## Workflow execution protocol
+
+1. **Quality & deduplication check:**
    - Select unvisited chunks using `research/.anki_coverage.json`.
-   - Inspect local SQLite `collection.anki2` and active AnkiConnect (`http://127.0.0.1:8765`) to ensure zero title collision.
-   - Enforce the **Quality Gate** (`is_high_quality_chunk`) to reject zero-info outlines, TOC dots, presenter lists, build/test instructions, figure captions, or low-density metadata.
+   - Inspect local SQLite `collection.anki2` and active AnkiConnect
+     (`http://127.0.0.1:8765`) to ensure zero title collision.
+   - Enforce the **Quality Gate** (`is_high_quality_chunk`) to reject
+     zero-info outlines, TOC dots, presenter lists, build/test instructions,
+     figure captions, or low-density metadata.
 
-2. **Agent Quality Review, Candidate Rejection & Web Enhancement Loop (MANDATORY BEFORE IMPORT):**
-   - Immediately inspect the generated candidate draft batch (`research/anki_import.txt`). **Read every card's front AND back in full — never approve from a truncated print.** If your display truncates a field, page through the whole field before judging.
-   - Run the automated validator first: `python3 tools/research/anki_card_validator.py research/anki_import.txt`. Any reported issue is a hard reject unless you rewrite the card in the TSV. `--import` re-runs the validator and refuses junk, so "validator green" is necessary, not sufficient — your full-text judgment is the second gate.
-   - Reject a card for a **bad artifact, not a bad topic**: a famous concept (e.g. a seminal paper) does not redeem a card whose front is a raw title or whose back is an abstract/metadata dump. Judge the last card of the batch as strictly as the first — quota pressure is where standards slip.
-   - Apply LLM judgment to reject any cards containing:
-     - **Presentation titles / slide numbers** (e.g., `Network Layer 4-107`, `Wireless, Mobile Networks 6-58`, `BGP basics`, `LSA Updates`).
-     - **Generic outline summaries** (e.g., topic labels without a concrete question, table of contents dots).
-     - **Slide date stamps** (e.g., `8/13/2008`, `Winter 2001 ICS 243E`).
-     - **PDF extraction artifacts**: control characters (`peers`, `path vector`, `route` with box glyphs), router ID lists (`1b 1d 1c 1a...`), slide footer text (`5-59 Network Layer: Control Plane`).
-     - **ASCII diagrams / tables** (e.g., bit-field layouts `0 8 16 24`, `type = 9 code = 0 checksum`).
-     - **OCR fragments** (`limi e due to the`, `q frequent`, `Ø Dynamics`).
-     - **Paper metadata dumps**: author/affiliation blocks, `Categories and Subject Descriptors`, `General Terms:`, numbered section headings (`1. INTRODUCTION`) spilling into the back.
-     - **C/Go code fragments without context**, build instructions, or boilerplate fallback text.
-     - **Question/answer mismatch** (e.g., front asks for "4 级选路优先级决策链" but back only lists AS-PATH/NEXT-HOP).
-   - **Never import to Anki without completing this Agentic Review step.**
-   - If any junk cards are detected, reject their chunks with `python3 tools/research/anki_generator.py --reject-chunk <chunk_id> [...]` (marks them `skipped_low_quality`) and re-run candidate selection until 5 high-value technical cards pass inspection. The generator **refuses to select new chunks while any `pending_import` chunks exist**, so resolve the current batch first.
-   - For brief or high-density technical concepts, execute `search_web` to retrieve production engineering context, RFC standards, or practical pain points to enrich the card's explanation.
+2. **Agent authoring (the only card-writing step):**
+   - Read every candidate in `research/anki_candidates.jsonl` in full,
+     including its `content` and `citation`.
+   - Author each card as one JSON line in `research/anki_cards.jsonl` with
+     fields: `chunk_id`, `front`, `back`, `tags`, `citation`.
+   - Front must be a real question (not a topic label or paper title). Back
+     must be Chinese-primary bilingual HTML with English technical terms, LaTeX
+     `\(...\)` where useful, and a line-anchored citation
+     (`[path#Lstart-Lend](file://...)`).
+   - If a candidate is too fragmented to rescue, **reject it** with
+     `--reject-chunk <chunk_id> --reason <CATEGORY>` instead of writing a bad
+     card.
 
-3. **Bilingual Card Formatting & Reviewed Import:**
-   - Render bilingual Chinese-primary HTML cards with English technical terms, LaTeX delimiters (`\(...\)`), and line-anchored citations (`[path#Lstart-Lend](file://...)`).
-   - **Rewrite in the TSV draft, then import with `--import`.** Edited rows stay mapped to their chunks via the sidecar (`research/anki_import.chunks.json`) — you may edit fields in place but must not add or remove rows (the import aborts on row-count mismatch). `--import` runs the validator again and imports row-by-row, so one duplicate cannot sink the batch.
-   - **TSV row schema:** `front ⇥ back ⇥ tags` (tab-separated, one card per line after the `#`-prefixed headers; back is HTML). Keep the existing tags field as-is.
-   - **Chunk line ranges for citations:** the sidecar lists `path:chunk-N` ids; resolve them to line ranges via `research/.chunks_manifest.json` (`chunks[].chunk_id` → `start_line`/`end_line`). Read the full chunk source before rewriting — the generated back may be truncated mid-sentence. Some sources contain NUL bytes (e.g. `05-fault-tolerance/intro.md`); if `Read`/`Grep` refuse the file, extract with `sed -n '<start>,<end>p' <file> | tr -d '\0'`.
-   - **Hand-written replacement cards** (fully rewritten front+back, e.g. after rejecting a junk candidate) can skip the TSV and go straight through the custom path: `python3 tools/research/anki_generator.py --front "..." --back "..." --deck "金融"` — the authoring _is_ the review.
-   - **Fallback (no AnkiConnect):** launch Anki with the reviewed TSV via `open -a Anki research/anki_import.txt`. Never ask the user to manually run the launch command. The user must click **Import** in the Anki import dialog. The chunk status stays `pending_import` until verified.
-   - **Verify the import immediately:** Run `python3 tools/research/anki_import_verifier.py`. It reads the local `collection.anki2`, matches the generated fronts, and flips `pending_import` → `imported`.
-   - **Do not generate a new batch while any `pending_import` chunks exist** — the generator now enforces this mechanically. If verification still shows missing cards, the previous TSV import was not completed; resolve it before continuing.
+3. **Agent quality review (mandatory before import):**
+   - Immediately inspect the authored `research/anki_cards.jsonl`. **Read every
+     card's front AND back in full — never approve from a truncated print.**
+   - Run the automated validator:
+     `python3 tools/research/anki_card_validator.py research/anki_cards.jsonl`.
+     Any reported issue is a hard reject unless you rewrite the card.
+   - `--import` re-runs the validator, so "validator green" is necessary, not
+     sufficient — your full-text judgment is the second gate.
+   - Reject a card for a **bad artifact, not a bad topic**: a famous concept
+     does not redeem a card whose front is a raw title or whose back is an
+     abstract/metadata dump. Judge the last card of the batch as strictly as
+     the first.
+   - Reject categories include:
+     - Presentation titles / slide numbers
+       (`Network Layer 4-107`, `Wireless, Mobile Networks 6-58`, `BGP basics`).
+     - Generic outline summaries or topic labels without a concrete question.
+     - Slide date stamps (`8/13/2008`, `Winter 2001 ICS 243E`).
+     - PDF extraction artifacts: control characters, router ID lists
+       (`1b 1d 1c 1a...`), slide footer text.
+     - ASCII diagrams / tables.
+     - OCR fragments (`limi e due to the`, `q frequent`, `Ø Dynamics`).
+     - Paper metadata dumps: author/affiliation blocks,
+       `Categories and Subject Descriptors`, `General Terms:`,
+       `1. INTRODUCTION` spilling into the back.
+     - Code fragments without context, build instructions, boilerplate fallback.
+     - Question/answer mismatch.
+   - **Never import to Anki without completing this review step.**
+   - For brief or high-density concepts, use `search_web` to enrich the card.
 
-4. **Database Safety Non-Negotiable:**
-   - **NEVER attempt raw SQLite `INSERT`/`UPDATE` mutations directly on live `collection.anki2` or `collection.anki21b` files.** Raw direct SQLite writes cause database lock collisions, corrupt index collations (`unicase`), and disrupt Anki's V3 scheduler database.
-   - **Always use safe ingestion mechanisms:**
-     1. AnkiConnect REST API (`http://127.0.0.1:8765`) via `addNotes`.
-     2. TSV Package Export (`research/anki_import.txt`) with `#separator:Tab` and `#html:true`, launched via `open -a Anki research/anki_import.txt`.
-   - **Automatic Backups Location:** Profile backups are safely stored at `~/Library/Application Support/Anki2/<profile>/backups/*.colpkg`.
+4. **Import & state hygiene:**
+   - Import only with `python3 tools/research/anki_generator.py --import --deck "金融"`.
+   - The generator refuses to emit new candidates while any chunks are in
+     `"candidate"` or `"pending_import"` status. Resolve the current batch
+     first.
+   - **Never hand-edit `research/.anki_coverage.json`.** Use CLI verbs only
+     (`--import`, `--reject-chunk`, verifier). This is the same discipline as
+     never writing raw SQLite to `collection.anki2`.
+   - Verify imports with `python3 tools/research/anki_import_verifier.py`.
+   - If AnkiConnect is unavailable, `--import` falls back to launching Anki
+     with the legacy TSV file (`research/anki_import.txt`). Do not ask the user
+     to run the launch command manually.
+
+5. **Database safety non-negotiable:**
+   - **Never** run raw SQLite `INSERT`/`UPDATE` on live
+     `collection.anki2` / `collection.anki21b` files.
+   - Use only AnkiConnect `addNotes` or the TSV package export path.
+   - Profile backups live at
+     `~/Library/Application Support/Anki2/<profile>/backups/*.colpkg`.

@@ -41,6 +41,34 @@ def test_anki_graph_bridge_filtering_and_hubs(tmp_path: Path) -> None:
     assert hubs[1][0] == "Paxos"
 
 
+def test_related_hubs_filtered_to_same_course_prefix(tmp_path: Path) -> None:
+    """Cross-course hubs must be excluded when a domain prefix is supplied."""
+    graph_dir = tmp_path / "graph"
+    graph_dir.mkdir(parents=True)
+    graph_data = {
+        "nodes": [
+            {"id": "n1", "l": "Paxos", "course": "cs231", "d": "金融", "p": 0.85},
+            {"id": "n2", "l": "BGP Peering", "course": "cs232", "d": "金融", "p": 0.95},
+            {"id": "n3", "l": "Vector Clocks", "course": "cs231", "d": "金融", "p": 0.90},
+        ],
+    }
+    (graph_dir / "graph_data.json").write_text(json.dumps(graph_data), encoding="utf-8")
+
+    bridge = AnkiGraphBridge(target_deck="金融", repo_root=tmp_path)
+
+    text = "This chunk covers Paxos consensus, Vector Clocks, and BGP Peering in distributed systems."
+    all_hubs = bridge.get_related_hubs(text)
+    assert len(all_hubs) == 3
+
+    cs231_hubs = bridge.get_related_hubs(text, domain_prefix="cs231")
+    labels = {h[0] for h in cs231_hubs}
+    assert labels == {"Paxos", "Vector Clocks"}
+    assert "BGP Peering" not in labels
+
+    cs232_hubs = bridge.get_related_hubs(text, domain_prefix="cs232")
+    assert [h[0] for h in cs232_hubs] == ["BGP Peering"]
+
+
 def test_score_chunk_pagerank(tmp_path: Path) -> None:
     graph_dir = tmp_path / "graph"
     graph_dir.mkdir(parents=True, exist_ok=True)

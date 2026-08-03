@@ -1,7 +1,8 @@
 """Tests for the Anki TSV card validator."""
+import json
 from pathlib import Path
 
-from tools.research.anki_card_validator import validate_tsv
+from tools.research.anki_card_validator import validate_cards, validate_tsv
 
 
 def _write_tsv(tmp_path: Path, rows: list[str]) -> Path:
@@ -158,3 +159,23 @@ def test_reviewed_bilingual_card_passes(tmp_path: Path) -> None:
     ]
     path = _write_tsv(tmp_path, rows)
     assert validate_tsv(path) == {}
+
+
+def test_golden_corpus_accepted_and_rejected() -> None:
+    """Regression fixture covering known good and bad cards from production imports."""
+    fixture = Path(__file__).parent / "fixtures" / "anki_golden.jsonl"
+    records = [json.loads(line) for line in fixture.read_text(encoding="utf-8").splitlines() if line.strip()]
+    cards = [{k: r[k] for k in ("chunk_id", "front", "back", "tags")} for r in records]
+    issues = validate_cards(cards)
+
+    rejected_chunk_ids = {r["chunk_id"] for r in records if r["expected"] == "rejected"}
+    accepted_chunk_ids = {r["chunk_id"] for r in records if r["expected"] == "accepted"}
+
+    # All rejected records must have at least one validator issue.
+    flagged_chunk_ids = {cards[int(label.split()[1]) - 1]["chunk_id"] for label in issues}
+    assert rejected_chunk_ids <= flagged_chunk_ids, f"Expected rejections missing: {rejected_chunk_ids - flagged_chunk_ids}"
+
+    # All accepted records must have zero issues.
+    for i, card in enumerate(cards, start=1):
+        if card["chunk_id"] in accepted_chunk_ids:
+            assert f"card {i}" not in issues, f"Expected {card['chunk_id']} to pass, got {issues[f'card {i}']}"

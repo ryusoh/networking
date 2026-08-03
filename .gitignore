@@ -13,6 +13,9 @@ research/.durable_memory.json
 research/.anki_coverage.json
 research/anki_import.txt
 research/anki_import.chunks.json
+research/anki_candidates.jsonl
+research/anki_cards.jsonl
+research/anki_review.jsonl
 *.so
 *.dylib
 tile_storage
