@@ -19,6 +19,22 @@ To find relevant slide sections, paper excerpts, or code blocks matching a query
 python3 tools/research/search_chunks.py "$ARGUMENTS" --limit 5
 ```
 
+#### Query tactics (BM25 is lexical, not semantic)
+
+- **Query with keywords, not the user's natural-language question.** A question
+  like "what are PHB and IntServ" ranks chunks for whichever term has the most
+  source coverage and can bury the other. Run one keyword query per concept
+  (e.g. `"IntServ integrated services RSVP"`) instead of one query for the
+  whole question.
+- **Expand terminology aliases when a term misses.** The textbooks use
+  different names for the same concept — e.g. Kurose Ch. 7 never says
+  "IntServ"; it covers it as "Per-Connection QoS Guarantees / Resource
+  Reservation and Call Admission". If BM25 returns nothing for a known term,
+  retry with the concept's alias or mechanism names (RSVP, admission control).
+- **Fall back to Grep for exact terms.** When BM25 scores bury the section you
+  know exists, `Grep` the `research/` tree directly for the term
+  (e.g. `Integrated Services|RSVP`) — an exact-string hit beats a ranking.
+
 ### 2. Assemble Bounded Study Scene Payload
 
 To build a token-bounded prompt context with mandatory line-anchored Markdown citations (`[path#Lstart-Lend](file://...)`) for an LLM session:
