@@ -183,19 +183,6 @@ def _is_template_front(front: str) -> bool:
     return bool(TEMPLATE_FRONT_RE.search(plain))
 
 
-def _front_lacks_bilingual_annotation(front: str) -> bool:
-    """Front must carry an English term annotation next to the Chinese question."""
-    plain = re.sub(r"<[^>]+>", "", front)
-    plain = re.sub(r"\\\(.*?\\\)|\\\[.*?\\\]", "", plain)
-    head = plain.split(":")[0].strip()
-    if re.match(r"^[A-Za-z][A-Za-z0-9\s\-/]+", head):
-        return False
-    for match in re.finditer(r"[（(]([^（）()]+)[)）]", plain):
-        if re.search(r"[A-Za-z]", match.group(1)):
-            return False
-    return True
-
-
 def _count_section_headers(back: str) -> int:
     """Count <b>...</b>: style section headers used in dense card backs."""
     return len(re.findall(r"<(b|strong)>[^<]*[:：]</\1>", back, re.IGNORECASE))
@@ -228,12 +215,13 @@ def _acronym_is_explained(acronym: str, text: str) -> bool:
 
     def _expansion_matches(content: str) -> bool:
         words = re.findall(r"[A-Za-z]+", content)
-        stop = {"and", "of", "the", "for", "to", "in", "on", "a", "an"}
-        core = [w for w in words if w.lower() not in stop and w.lower() != letters]
-        if len(core) < len(letters):
+        core = [w for w in words if w.lower() != letters]
+        if not core or core[0][0].lower() != letters[0]:
             return False
-        firsts = "".join(w[0].lower() for w in core[: len(letters)])
-        return firsts == letters
+        # Subsequence match: handles hyphenated and stop-word letters, e.g.
+        # MANET = Mobile Ad-hoc NETwork, IoT = Internet of Things.
+        remaining = iter("".join(core).lower())
+        return all(ch in remaining for ch in letters)
 
     for match in re.finditer(
         r"[（(]([^（）()]*\b" + re.escape(acronym) + r"\b[^（）()]*)[)）]", text
@@ -249,11 +237,12 @@ def _acronym_is_explained(acronym: str, text: str) -> bool:
 
 
 def _unexplained_acronyms(front: str, back: str) -> list[str]:
-    """Non-common acronyms in the front must be expanded somewhere in the card."""
+    """Non-common acronyms anywhere in the card must be expanded somewhere in it."""
     front_plain = re.sub(r"<[^>]+>", "", front)
     back_plain = re.sub(r"<[^>]+>", "", back)
+    back_plain = LATEX_RE.sub("", MARKDOWN_LINK_RE.sub("", back_plain))
     combined = f"{front_plain} {back_plain}"
-    acronyms = set(re.findall(r"\b[A-Z]{2,}(?:-[A-Z]+)*\b", front_plain)) - COMMON_ACRONYMS
+    acronyms = set(re.findall(r"\b[A-Z]{2,}(?:-[A-Z]+)*\b", combined)) - COMMON_ACRONYMS
     return [
         acronym
         for acronym in acronyms
@@ -295,11 +284,6 @@ def _validate_card(front: str, back: str) -> list[str]:
 
     if not _question_matches_answer(front, back):
         card_issues.append("Front asks for details not covered in the back")
-
-    if _front_lacks_bilingual_annotation(front):
-        card_issues.append(
-            "Front lacks bilingual term annotation (use 中文概念 (English Term): or English Term: ...)"
-        )
 
     if _count_section_headers(back) < 2:
         card_issues.append("Back lacks structured section headers (<b>...</b>:)")

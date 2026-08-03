@@ -19,6 +19,8 @@ validate_cards = anki_card_validator.validate_cards
 
 FRONT = "<strong>实时系统 (Real-Time System)</strong>: Stankovic 对实时系统正确性的经典定义是什么？"
 
+CHINESE_ONLY_FRONT = "<strong>物联网分析的知识层级</strong>: 从传感数据到处方决策的五个分析阶段是什么？"
+
 CLEAN_BACK = (
     "<div><b>经典定义:</b></div>"
     "<div>实时系统的正确性不仅取决于计算结果本身，还取决于<b>结果产生的时间点</b>；"
@@ -88,3 +90,32 @@ def test_latex_and_citation_link_parens_are_not_counted():
         "[research/x.md#L1-L2](file:///tmp/research/x.md#L1-L2)</div>"
     )
     assert _issues(FRONT, back) == []
+
+
+def test_chinese_only_front_is_accepted():
+    assert _issues(CHINESE_ONLY_FRONT, CLEAN_BACK) == []
+
+
+def test_unexplained_back_acronym_is_rejected():
+    back = (
+        "<div><b>层级:</b></div>"
+        "<div>该过程对应 DIKW 金字塔的层级跃迁。</div>"
+        "<div><b>代价:</b></div>"
+        "<div>每级跃迁需要更多处理与建模。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> "
+        "[research/x.md#L1-L2](file:///tmp/research/x.md#L1-L2)</div>"
+    )
+    issues = _issues(CHINESE_ONLY_FRONT, back)
+    assert any("DIKW" in issue for issue in issues)
+
+
+def test_expanded_back_acronym_is_accepted():
+    back = (
+        "<div><b>层级:</b></div>"
+        "<div>该过程对应 DIKW (Data, Information, Knowledge, Wisdom) 金字塔的层级跃迁。</div>"
+        "<div><b>代价:</b></div>"
+        "<div>每级跃迁需要更多处理与建模。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> "
+        "[research/x.md#L1-L2](file:///tmp/research/x.md#L1-L2)</div>"
+    )
+    assert _issues(CHINESE_ONLY_FRONT, back) == []

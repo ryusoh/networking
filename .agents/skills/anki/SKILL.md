@@ -68,10 +68,13 @@ date-stamp | outline | qa-mismatch | duplicate | other`.
 The validator enforces these rules; the import refuses cards that violate
 them. Author cards to this density target:
 
-- **Front:** bilingual title + concrete question. Use either
-  `<strong>中文概念 (English Term)</strong>: 具体问题？` or
-  `<strong>English Term</strong>: 中文具体问题？`.
-  Never a bare Chinese question without an English term annotation.
+- **Front:** `<strong>中文概念</strong>: 具体问题？` — a Chinese title plus a
+  concrete question. Add the English name in the title ONLY when the concept
+  has a genuine standard English name used in the source material (a
+  protocol, a named algorithm: `FFT`, `CSMA/CD`, `Bellman-Ford`). **Never
+  invent an English gloss for a Chinese title** — word-by-word calques like
+  `(IoT Analytics Knowledge Hierarchy)` are translation exercises, not
+  terminology, and are a hard reject at review.
 - **Back:** at least 3 dense sections, each introduced by a `<b>section
 name:</b>` header. Write the body in Chinese prose; use `<b>` to emphasize
   key **Chinese** terms. Do not append English glosses.
@@ -86,8 +89,8 @@ field)`). Basic vocabulary — `latency`, `deadline`, `aggregation`,
 annotations`). When in doubt, do NOT annotate.
 - **Acronyms:** expand every acronym on first use, in the front or in the
   back (e.g. `NITRD (Networking and Information Technology Research and
-Development)`). An acronym that appears in the front but is never expanded
-  anywhere is a reject.
+Development)`). The validator scans the **whole card** — an acronym that
+  appears anywhere without an expansion (e.g. a bare `DIKW`) is a reject.
 - **End with** a `源码与文档引用 (Source Citation):` section containing the
   line-anchored Markdown link.
 
@@ -96,7 +99,7 @@ Example (good):
 ```json
 {
   "chunk_id": "research/cs231/parallel-fft.md:chunk-1",
-  "front": "并行二维 FFT 的块转置 (Parallel 2D-FFT Block Transpose): 处理器 \\(P_i\\) 需要把块 \\(B_{ij}\\) 发送给谁？",
+  "front": "<strong>并行二维 FFT 的块转置</strong>: 处理器 \\(P_i\\) 需要把块 \\(B_{ij}\\) 发送给谁？",
   "back": "<div><b>通信模式:</b></div><div>\\(P_i\\) 将块 \\(B_{ij}\\) 发送给 \\(P_j\\)（\\(j \\neq i\\)），实现<b>按行分布到按列分布</b>的切换。</div><div><b>复杂度:</b></div><div>基本顺序循环需要 \\(O(k^2)\\) 次块传输；按 \\(i\\) 或 \\(j\\) 并行化仅改变启动维度，<b>不减少总传输量</b>。</div><div><b>源码与文档引用 (Source Citation):</b> [research/cs231/parallel-fft.md#L103-L167](file:///.../parallel-fft.md#L103-L167)</div>",
   "tags": ["research", "cs231"],
   "citation": "research/cs231/parallel-fft.md#L103-L167"
@@ -139,6 +142,10 @@ Example (bad — low density, no sections, English summary paragraph):
       `1. INTRODUCTION` spilling into the back.
     - Code fragments without context, build instructions, boilerplate fallback.
     - Question/answer mismatch.
+    - Invented English glosses: a front-title parenthetical that translates
+      the Chinese title word-by-word instead of naming a standard term
+      (e.g. `(IoT Analytics Knowledge Hierarchy)`), and any bare acronym
+      the card never expands (e.g. `DIKW`).
   - **Never import to Anki without completing this review step.**
   - For brief or high-density concepts, use `search_web` to enrich the card.
 
