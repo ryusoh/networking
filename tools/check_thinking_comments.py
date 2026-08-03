@@ -228,7 +228,10 @@ def iter_tracked_sources():
 def find_violations(paths):
     """Yield 'path:lineno: message' strings for every violation in the given files."""
     for path in paths:
-        src = Path(path).read_text(encoding="utf-8", errors="replace")
+        try:
+            src = Path(path).read_text(encoding="utf-8", errors="replace")
+        except FileNotFoundError:
+            continue  # tracked but deleted in the worktree; nothing to scan
         if path.endswith(".py"):
             for lineno, text in scan_python_comments(src):
                 yield f"{path}:{lineno}: thinking-out-loud comment: # {text}"

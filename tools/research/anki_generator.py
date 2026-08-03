@@ -418,6 +418,35 @@ def _is_bibliography_section(content_str: str) -> bool:
     return (cite_lines / len(lines)) > 0.4
 
 
+def _is_outline_or_agenda(content_str: str) -> bool:
+    """Agenda/outline slides: an 'Agenda'/'Outline' lead line followed by short
+    topic bullets with no explanatory sentences."""
+    lines = [
+        l.strip() for l in content_str.splitlines() if l.strip() and not l.startswith("#")
+    ]
+    if not lines:
+        return False
+    lead = lines[0].lower().strip("´•-*: ")
+    if lead not in {"agenda", "outline", "overview", "topics", "course outline", "lecture outline"}:
+        return False
+    bullets = [l for l in lines[1:] if l[0] in "´•-*"]
+    return len(bullets) >= 2 and all(len(l) < 60 for l in bullets)
+
+
+def _is_diagram_fragment(content_str: str) -> bool:
+    """Word clouds and label-only diagram pages: many short lines with almost
+    no sentence-length text (very low words per line)."""
+    lines = [
+        l.strip()
+        for l in content_str.splitlines()
+        if l.strip() and not l.startswith("#") and not l.strip().isdigit()
+    ]
+    if len(lines) < 6:
+        return False
+    total_words = sum(len(l.split()) for l in lines)
+    return total_words / len(lines) < 3
+
+
 def _has_valid_content(chunk: dict[str, Any]) -> bool:
     content_str = chunk.get("content", "").strip()
     content_lower = content_str.lower()
@@ -427,6 +456,12 @@ def _has_valid_content(chunk: dict[str, Any]) -> bool:
         return False
 
     if not _has_valid_content_semantics(content_lower):
+        return False
+
+    if _is_outline_or_agenda(content_str):
+        return False
+
+    if _is_diagram_fragment(content_str):
         return False
 
     if not _has_valid_content_density(content_str):

@@ -145,22 +145,20 @@ def test_low_density_card_is_flagged(tmp_path: Path) -> None:
     path = _write_tsv(tmp_path, rows)
     issues = validate_tsv(path)
     texts = _all_issue_texts(issues)
-    assert any("bilingual term annotation" in i for i in texts)
-    assert any("inline English term annotations" in i for i in texts)
     assert any("structured section headers" in i for i in texts)
 
 
-def test_ordinary_english_translation_is_flagged(tmp_path: Path) -> None:
+def test_sprinkled_back_is_flagged(tmp_path: Path) -> None:
     rows = [
-        "并行二维 FFT 的精巧转置调度 (Astute Parallel 2D-FFT Transpose): 处理器 \\(P_i\\) 在第 \\(j\\) 步把块发给谁？\t"
-        "<div><b>调度规则 (Schedule):</b></div><div>每一步每个处理器恰好发送并接收一个块（one block per step）。</div>"
-        "<div><b>复杂度 (Complexity):</b></div><div>精巧调度只需 \\(O(k)\\) 次块传输。</div>"
+        "并行二维 FFT 的精巧转置调度: 处理器 \\(P_i\\) 在第 \\(j\\) 步把块发给谁？\t"
+        "<div><b>调度规则:</b></div><div>每一步 (per step) 每个处理器 (per processor) 恰好发送并接收一个块（one block per step）。</div>"
+        "<div><b>复杂度:</b></div><div>精巧调度只需 \\(O(k)\\) 次块传输。</div>"
         "<div><b>源码与文档引用 (Source Citation):</b> [research/cs231/fft.md#L1-L5](file:///tmp/x.md)</div>\t"
         "research"
     ]
     path = _write_tsv(tmp_path, rows)
     issues = validate_tsv(path)
-    assert any("ordinary English" in i for i in _all_issue_texts(issues))
+    assert any("sprinkles" in i for i in _all_issue_texts(issues))
 
 
 def test_unexplained_acronym_is_flagged(tmp_path: Path) -> None:
@@ -188,9 +186,9 @@ def test_router_id_list_is_flagged(tmp_path: Path) -> None:
 def test_router_domain_name_is_not_a_diagram(tmp_path: Path) -> None:
     """A hostname like router137.cerf.edu is prose, not a router-ID diagram."""
     rows = [
-        "地址绑定到接口 (Addresses Bind to Interfaces): 为什么域名分配给接口而非主机？\t"
-        "<div><b>核心论断 (Key Claim):</b></div><div><b>域名</b>、<b>IP 地址</b>、<b>MAC 地址</b>分配给<b>网络接口</b>。</div>"
-        "<div><b>示例 (Example):</b></div><div>同一台路由器从不同接口引用时有不同域名，如 <b>router137.cerf.edu</b>。</div>"
+        "地址绑定到接口: 为什么域名分配给接口而非主机？\t"
+        "<div><b>核心论断:</b></div><div><b>域名</b>、<b>IP 地址</b>、<b>MAC 地址</b>分配给<b>网络接口</b>。</div>"
+        "<div><b>示例:</b></div><div>同一台路由器从不同接口引用时有不同域名，如 <b>router137.cerf.edu</b>。</div>"
         "<div><b>源码与文档引用 (Source Citation):</b> [research/cs233/ch0.md#L1-L5](file:///tmp/x.md)</div>\t"
         "research"
     ]
@@ -198,11 +196,11 @@ def test_router_domain_name_is_not_a_diagram(tmp_path: Path) -> None:
     assert validate_tsv(path) == {}
 
 
-def test_reviewed_bilingual_card_passes(tmp_path: Path) -> None:
+def test_reviewed_chinese_card_passes(tmp_path: Path) -> None:
     rows = [
-        "拜占庭将军问题 (Byzantine Generals Problem): 口头消息下的可解条件是什么？\t"
-        "<div><b>定义 (Definition):</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
-        "<div><b>条件 (Condition):</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
+        "拜占庭将军问题: 口头消息下的可解条件是什么？\t"
+        "<div><b>定义:</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
+        "<div><b>条件:</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
         "<div><b>源码与文档引用 (Source Citation):</b> [research/cs234/byzantine.md#L1-L5](file:///tmp/x.md)</div>\t"
         "research"
     ]
@@ -228,3 +226,108 @@ def test_golden_corpus_accepted_and_rejected() -> None:
     for i, card in enumerate(cards, start=1):
         if card["chunk_id"] in accepted_chunk_ids:
             assert f"card {i}" not in issues, f"Expected {card['chunk_id']} to pass, got {issues[f'card {i}']}"
+
+
+CLEAN_FRONT = "<strong>实时系统</strong>: Stankovic 对实时系统正确性的经典定义是什么？"
+
+CLEAN_BACK = (
+    "<div><b>经典定义:</b></div>"
+    "<div>实时系统的正确性不仅取决于计算结果本身，还取决于<b>结果产生的时间点</b>；"
+    "结果正确但超过截止期限交付仍视为失效。</div>"
+    "<div><b>分类:</b></div>"
+    "<div>按时间约束的严格程度分为<b>硬实时</b>与<b>软实时</b>。</div>"
+    "<div><b>源码与文档引用 (Source Citation):</b> "
+    "[research/x.md#L1-L2](file:///tmp/research/x.md#L1-L2)</div>"
+)
+
+
+def _issues(front: str, back: str) -> list[str]:
+    return validate_cards([{"front": front, "back": back}]).get("card 1", [])
+
+
+def test_clean_chinese_back_passes_with_zero_english_annotations() -> None:
+    assert _issues(CLEAN_FRONT, CLEAN_BACK) == []
+
+
+def test_acronym_expansions_are_exempt_from_the_cap() -> None:
+    back = (
+        "<div><b>组网形态:</b></div>"
+        "<div>WSN (Wireless Sensor Network) 与 MANET (Mobile Ad-hoc Network) "
+        "均无固定基础设施；IoT (Internet of Things) 应用常部署于其上。</div>"
+        "<div><b>交付目标:</b></div>"
+        "<div>前者交付信息，后者交付比特。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> "
+        "[research/x.md#L1-L2](file:///tmp/research/x.md#L1-L2)</div>"
+    )
+    assert _issues(CLEAN_FRONT, back) == []
+
+
+def test_section_header_english_is_exempt_from_the_cap() -> None:
+    back = (
+        "<div><b>通信模式 (Communication Pattern):</b></div>"
+        "<div>节点按块互发数据。</div>"
+        "<div><b>复杂度 (Complexity):</b></div>"
+        "<div>总传输量不随并行维度减少。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> "
+        "[research/x.md#L1-L2](file:///tmp/research/x.md#L1-L2)</div>"
+    )
+    assert _issues(CLEAN_FRONT, back) == []
+
+
+def test_latex_and_citation_link_parens_are_not_counted() -> None:
+    back = (
+        "<div><b>数学形式:</b></div>"
+        "<div>角频率 \\(\\omega = 2\\pi f\\) 决定相位 \\(e^{j(\\omega t + \\phi)}\\) 的旋转速度。</div>"
+        "<div><b>稳态:</b></div>"
+        "<div>所有点以同一频率振动。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> "
+        "[research/x.md#L1-L2](file:///tmp/research/x.md#L1-L2)</div>"
+    )
+    assert _issues(CLEAN_FRONT, back) == []
+
+
+def test_unexplained_back_acronym_is_flagged() -> None:
+    back = (
+        "<div><b>层级:</b></div>"
+        "<div>该过程对应 DIKW 金字塔的层级跃迁。</div>"
+        "<div><b>代价:</b></div>"
+        "<div>每级跃迁需要更多处理与建模。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> "
+        "[research/x.md#L1-L2](file:///tmp/research/x.md#L1-L2)</div>"
+    )
+    issues = _issues(CLEAN_FRONT, back)
+    assert any("DIKW" in issue for issue in issues)
+
+
+def test_expanded_back_acronym_is_accepted() -> None:
+    back = (
+        "<div><b>层级:</b></div>"
+        "<div>该过程对应 DIKW (Data, Information, Knowledge, Wisdom) 金字塔的层级跃迁。</div>"
+        "<div><b>代价:</b></div>"
+        "<div>每级跃迁需要更多处理与建模。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> "
+        "[research/x.md#L1-L2](file:///tmp/research/x.md#L1-L2)</div>"
+    )
+    assert _issues(CLEAN_FRONT, back) == []
+
+
+def test_multiword_front_gloss_is_flagged() -> None:
+    front = "<strong>IoT 分析部署问题 (Analytic Deployment Problem)</strong>: 优化目标是什么？"
+    issues = _issues(front, CLEAN_BACK)
+    assert any("multi-word English gloss" in issue for issue in issues)
+
+
+def test_descriptive_front_gloss_is_flagged() -> None:
+    front = "<strong>物联网分析的知识层级 (IoT Analytics Knowledge Hierarchy)</strong>: 五个阶段？"
+    issues = _issues(front, CLEAN_BACK)
+    assert any("multi-word English gloss" in issue for issue in issues)
+
+
+def test_acronym_expansion_in_front_is_allowed() -> None:
+    front = "<strong>WSN (Wireless Sensor Network) 数据聚合</strong>: 关键指标有哪些？"
+    assert _issues(front, CLEAN_BACK) == []
+
+
+def test_single_token_front_gloss_is_allowed() -> None:
+    front = "<strong>最短路径算法 (Dijkstra)</strong>: 松弛操作的不变量是什么？"
+    assert _issues(front, CLEAN_BACK) == []

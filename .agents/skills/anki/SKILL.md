@@ -62,6 +62,14 @@ date-stamp | outline | qa-mismatch | duplicate | other`.
   - If a candidate is too fragmented to rescue, **reject it** with
     `--reject-chunk <chunk_id> --reason <CATEGORY>` instead of writing a bad
     card.
+  - **Batch rejections and budget the loop.** Reject ALL junk from a round in
+    ONE call — `--reject-chunk id1 id2 id3 --reason <CATEGORY>` accepts
+    multiple ids. Then regenerate. **At most 2 regeneration rounds per run**:
+    if round 2 still yields no usable candidates, stop regenerating — author
+    cards from the best candidates seen (fewer than 5 is acceptable) or
+    report that the region is exhausted. Never loop reject→regenerate more
+    than twice; each round costs a full review and the loop otherwise burns
+    the whole session's quota on junk regions.
 
 #### Card format contract (enforce on every card)
 

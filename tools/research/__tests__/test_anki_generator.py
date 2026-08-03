@@ -604,13 +604,13 @@ def test_import_marks_reviewed_chunks_imported(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
     monkeypatch.setattr(AnkiConnectChecker, "add_notes", lambda self, cards, deck_name: [424242])
 
-    reviewed_front = "拜占庭将军问题 (Byzantine Generals Problem): 口头消息的可解条件是什么？"
+    reviewed_front = "拜占庭将军问题: 口头消息的可解条件是什么？"
     tsv = _write_draft(
         tmp_path,
         [
             f"{reviewed_front}\t"
-            "<div><b>定义 (Definition):</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
-            "<div><b>条件 (Condition):</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
+            "<div><b>定义:</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
+            "<div><b>条件:</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
             "<div><b>源码与文档引用 (Source Citation):</b> [research/x.md#L1-L5](file:///tmp/x.md)</div>\t"
             "research"
         ],
@@ -779,10 +779,10 @@ def test_import_reviewed_cards_from_jsonl(monkeypatch, tmp_path: Path):
         json.dumps(
             {
                 "chunk_id": "research/cs234/b4.md:chunk-1",
-                "front": "拜占庭将军问题 (Byzantine Generals Problem): 口头消息的可解条件是什么？",
+                "front": "拜占庭将军问题: 口头消息的可解条件是什么？",
                 "back": (
-                    "<div><b>定义 (Definition):</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
-                    "<div><b>条件 (Condition):</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
+                    "<div><b>定义:</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
+                    "<div><b>条件:</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
                     "<div><b>源码与文档引用 (Source Citation):</b> [research/cs234/b4.md#L1-L5](file:///tmp/x.md)</div>"
                 ),
                 "tags": ["research", "cs234"],
@@ -801,7 +801,7 @@ def test_import_reviewed_cards_from_jsonl(monkeypatch, tmp_path: Path):
     entry = coverage["visited_chunk_ids"]["research/cs234/b4.md:chunk-1"]
     assert entry["status"] == "imported"
     assert entry["note_id"] == 999999
-    assert entry["front_html"] == "拜占庭将军问题 (Byzantine Generals Problem): 口头消息的可解条件是什么？"
+    assert entry["front_html"] == "拜占庭将军问题: 口头消息的可解条件是什么？"
 
 
 def test_reject_chunk_requires_reason(tmp_path: Path):
@@ -868,9 +868,9 @@ def test_import_appends_accept_review_log(monkeypatch, tmp_path: Path):
         json.dumps(
             {
                 "chunk_id": "research/x.md:chunk-1",
-                "front": "Concept (English Term): what is the core mechanism?",
+                "front": "Consensus Concept: what is the core mechanism?",
                 "back": (
-                    "<div><b>定义 (Definition):</b></div><div><b>Concept</b> explanation.</div>"
+                    "<div><b>定义:</b></div><div><b>Concept</b> explanation.</div>"
                     "<div><b>机制 (Mechanism):</b></div><div><b>Term</b> details.</div>"
                     "<div><b>源码与文档引用 (Source Citation):</b> [research/x.md#L1-L5](file:///tmp/x.md)</div>"
                 ),
@@ -1034,3 +1034,73 @@ def test_status_reports_approve_rate(tmp_path: Path, capsys):
     out = capsys.readouterr().out
     assert "Approve rate" in out
     assert "66.7%" in out
+
+
+from tools.research.anki_generator import is_high_quality_chunk
+
+WORD_CLOUD = (
+    "## Page 20\n\nCPS is Multidisciplinary\n20\nComputation\nCommunication\nControl\n"
+    "Information\nEmbedded Systems\nArtificial\nintelligence\nRobotics\nWireless\nSensor\n"
+    "Networks\nReal\ntime\nSystems\nCognitive\nSciences\nMachine\nLearning\nSensor\n"
+    "Technology\nControl Systems\nInformation Security\n…\nHuman-\ncomputer\ninteraction\n"
+    "Sociology\nBehaviour\nPhilosophy\nPsychology\n…"
+)
+
+AGENDA = (
+    "## Page 22\n\nAgenda\n´Internet-of-Things (IoT)\n´IoT Versus Cyber-Physical\n"
+    "Systems (CPS)\n´IoT Data Processing\n´IoT Analytics\n22"
+)
+
+DIAGRAM_LABELS = (
+    "## Page 23\n\nIoT Networks\n23\nSink\nnode\nGateway\nCore network\ne.g. Internet\n"
+    "Gateway\nEnd-user\nComputer services\nOperating\nSystems?\nServices?\nProtocols?\n"
+    "Protocols?\nIn-node\nData\nProcessing\nData\nAggregation\n/ Fusion\nInference/\n"
+    "Processing\nof IoT data"
+)
+
+REALTIME_BULLETS = (
+    "## Page 21\n\nReal-Time Systems\n´ “In real-time computing the correctness of the "
+    "system depends not only on the logical results of the computation but also on the "
+    "time at which the results are produced” [J. Stankovic]\n´ Many real-time systems "
+    "are control systems\n´ A “thing” can be modelled as a real-time system\n"
+    "´ Classification: hard/soft time constraints\n´ Workload characteristics: "
+    "periodic/aperiodic tasks\n21"
+)
+
+IOT_CHARACTERISTICS = (
+    "## Page 24\n\nCharacteristics of IoT Devices\n´ Often inexpensive sensors "
+    "(actuators) equipped with a radio transceiver for various applications, typically "
+    "low data rate ~ 10-250 kbps (but not always).\n´ Deployed in large numbers\n"
+    "´ The sensors should coordinate to perform the desired task.\n´ The acquired "
+    "information (periodic or event-based) is reported back to the information "
+    "processing center (or some cases in-network processing is required)\n24"
+)
+
+
+def _chunk(content: str) -> dict:
+    return {
+        "file_path": "research/cs234-advanced-networks/01-slides/cs234-14/part-03.md",
+        "heading": "Page 21",
+        "content": content,
+        "token_count": 100,
+    }
+
+
+def test_quality_gate_rejects_word_cloud_chunk():
+    assert not is_high_quality_chunk(_chunk(WORD_CLOUD))
+
+
+def test_quality_gate_rejects_agenda_chunk():
+    assert not is_high_quality_chunk(_chunk(AGENDA))
+
+
+def test_quality_gate_rejects_diagram_label_chunk():
+    assert not is_high_quality_chunk(_chunk(DIAGRAM_LABELS))
+
+
+def test_quality_gate_accepts_sentence_bullets_chunk():
+    assert is_high_quality_chunk(_chunk(REALTIME_BULLETS))
+
+
+def test_quality_gate_accepts_dense_bullets_chunk():
+    assert is_high_quality_chunk(_chunk(IOT_CHARACTERISTICS))

@@ -239,6 +239,13 @@ def _acronym_is_explained(acronym: str, text: str) -> bool:
     ):
         if _expansion_matches(match.group(1)):
             return True
+    # Reversed order: Expansion (ACRONYM), e.g. Traffic Engineering (TE).
+    for match in re.finditer(r"[（(]\s*" + re.escape(acronym) + r"\s*[)）]", text):
+        preceding = re.findall(r"[A-Za-z]+", text[: match.start()])
+        for width in range(len(letters), len(letters) + 4):
+            window = preceding[-width:]
+            if len(window) == width and _expansion_matches(" ".join(window)):
+                return True
     return False
 
 
