@@ -600,10 +600,16 @@ def test_import_marks_reviewed_chunks_imported(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
     monkeypatch.setattr(AnkiConnectChecker, "add_notes", lambda self, cards, deck_name: [424242])
 
-    reviewed_front = "拜占庭将军问题中口头消息的可解条件是什么？"
+    reviewed_front = "拜占庭将军问题 (Byzantine Generals Problem): 口头消息的可解条件是什么？"
     tsv = _write_draft(
         tmp_path,
-        [f"{reviewed_front}\t<div>超过三分之二忠诚（n ≥ 3m+1）时可解。</div>\tresearch"],
+        [
+            f"{reviewed_front}\t"
+            "<div><b>定义 (Definition):</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
+            "<div><b>条件 (Condition):</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
+            "<div><b>源码与文档引用 (Source Citation):</b> [research/x.md#L1-L5](file:///tmp/x.md)</div>\t"
+            "research"
+        ],
         ["research/x.md:chunk-1"],
     )
     coverage = tmp_path / "cov.json"
@@ -621,7 +627,9 @@ def test_import_marks_reviewed_chunks_imported(monkeypatch, tmp_path: Path):
         encoding="utf-8",
     )
 
-    ret = import_reviewed_cards("金融", coverage, tsv_path=tsv)
+    ret = import_reviewed_cards(
+        "金融", coverage, cards_path=tmp_path / "anki_cards.jsonl", tsv_path=tsv
+    )
     assert ret == 0
     entry = json.loads(coverage.read_text(encoding="utf-8"))["visited_chunk_ids"][
         "research/x.md:chunk-1"
@@ -767,8 +775,12 @@ def test_import_reviewed_cards_from_jsonl(monkeypatch, tmp_path: Path):
         json.dumps(
             {
                 "chunk_id": "research/cs234/b4.md:chunk-1",
-                "front": "拜占庭将军问题中口头消息的可解条件是什么？",
-                "back": "<div>n ≥ 3m+1，超过三分之二忠诚时可解。</div>",
+                "front": "拜占庭将军问题 (Byzantine Generals Problem): 口头消息的可解条件是什么？",
+                "back": (
+                    "<div><b>定义 (Definition):</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
+                    "<div><b>条件 (Condition):</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
+                    "<div><b>源码与文档引用 (Source Citation):</b> [research/cs234/b4.md#L1-L5](file:///tmp/x.md)</div>"
+                ),
                 "tags": ["research", "cs234"],
             },
             ensure_ascii=False,
@@ -785,7 +797,7 @@ def test_import_reviewed_cards_from_jsonl(monkeypatch, tmp_path: Path):
     entry = coverage["visited_chunk_ids"]["research/cs234/b4.md:chunk-1"]
     assert entry["status"] == "imported"
     assert entry["note_id"] == 999999
-    assert entry["front_html"] == "拜占庭将军问题中口头消息的可解条件是什么？"
+    assert entry["front_html"] == "拜占庭将军问题 (Byzantine Generals Problem): 口头消息的可解条件是什么？"
 
 
 def test_reject_chunk_requires_reason(tmp_path: Path):
@@ -852,8 +864,12 @@ def test_import_appends_accept_review_log(monkeypatch, tmp_path: Path):
         json.dumps(
             {
                 "chunk_id": "research/x.md:chunk-1",
-                "front": "Question?",
-                "back": "<div>Answer</div>",
+                "front": "Concept (English Term): what is the core mechanism?",
+                "back": (
+                    "<div><b>定义 (Definition):</b></div><div><b>Concept</b> explanation.</div>"
+                    "<div><b>机制 (Mechanism):</b></div><div><b>Term</b> details.</div>"
+                    "<div><b>源码与文档引用 (Source Citation):</b> [research/x.md#L1-L5](file:///tmp/x.md)</div>"
+                ),
                 "tags": ["research"],
             }
         )

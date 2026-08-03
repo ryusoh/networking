@@ -108,8 +108,12 @@ def test_complete_research_agent_and_anki_pipeline_e2e(monkeypatch, tmp_path: Pa
         for cand in candidates:
             card = {
                 "chunk_id": cand["chunk_id"],
-                "front": f"What is {cand['heading']}?",
-                "back": f"<div>{cand['content']}</div>",
+                "front": f"{cand['heading']} (English Term): what is the core mechanism?",
+                "back": (
+                    f"<div><b>定义 (Definition):</b></div><div><b>{cand['heading']}</b> explanation.</div>"
+                    f"<div><b>机制 (Mechanism):</b></div><div><b>Term</b> details based on {cand['content']}.</div>"
+                    f"<div><b>源码与文档引用 (Source Citation):</b> [{cand['citation']}](file:///tmp/x.md)</div>"
+                ),
                 "tags": ["research", "cs234"],
                 "citation": cand["citation"],
             }

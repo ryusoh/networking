@@ -119,7 +119,25 @@ same-domain filter returns empty and ranking falls back to directory weighting.
 Adding a `course` field to graph nodes will re-enable cross-course PageRank
 filtering without code changes.
 
-## 8. Validator (`anki_card_validator.py`)
+## 8. Card format contract
+
+Cards are Chinese-primary bilingual HTML with English technical terminology.
+Every card must satisfy:
+
+- **Front:** bilingual title + concrete question, e.g.
+  `<strong>中文概念 (English Term)</strong>: 具体问题？` or
+  `<strong>English Term</strong>: 中文具体问题？`.
+- **Back:** at least 3 dense sections introduced by
+  `<b>section name (English Term):</b>` headers. English technical terms are
+  inlined in `<b>`/`<strong>` throughout the explanation, not summarized in a
+  single trailing English paragraph.
+- **Citation:** a final `源码与文档引用 (Source Citation):` section with the
+  line-anchored Markdown link.
+
+The validator enforces these rules mechanically; `--import` refuses violating
+cards unless `--force`.
+
+## 9. Validator (`anki_card_validator.py`)
 
 The validator is a hard gate. `--import` refuses to import while issues exist
 (unless `--force`). Detectors include:
@@ -136,15 +154,18 @@ The validator is a hard gate. `--import` refuses to import while issues exist
   (`【X】的核心技术机制、计算公式与工程应用是什么？`).
 - Question/answer mismatch.
 - Duplicate titles within the batch.
+- Missing bilingual front annotation.
+- Missing inline English term annotations in the back.
+- Missing structured section headers in the back.
 
-## 9. Custom one-off cards
+## 10. Custom one-off cards
 
 The `--front` and `--back` flags remain for ad-hoc ingestion:
 
 ```bash
 python3 tools/research/anki_generator.py \
-  --front "<strong>Concept</strong>: question?" \
-  --back "<div>answer</div>" \
+  --front "<strong>中文概念 (English Term)</strong>: 具体问题？" \
+  --back "<div><b>核心机制 (Core Mechanism):</b></div><div>解释…</div><div><b>源码与文档引用 (Source Citation):</b> [path#L1-L5](file://...)</div>" \
   --deck "金融" --tags "research cs234"
 ```
 

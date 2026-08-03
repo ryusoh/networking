@@ -122,6 +122,33 @@ def _is_template_front(front: str) -> bool:
     return bool(TEMPLATE_FRONT_RE.search(plain))
 
 
+def _front_lacks_bilingual_annotation(front: str) -> bool:
+    """Front must carry an English term annotation next to the Chinese question."""
+    plain = re.sub(r"<[^>]+>", "", front)
+    plain = re.sub(r"\\\(.*?\\\)|\\\[.*?\\\]", "", plain)
+    head = plain.split(":")[0].strip()
+    if re.match(r"^[A-Za-z][A-Za-z0-9\s\-/]+", head):
+        return False
+    for match in re.finditer(r"[（(]([^（）()]+)[)）]", plain):
+        if re.search(r"[A-Za-z]", match.group(1)):
+            return False
+    return True
+
+
+def _count_bold_ascii(back: str) -> int:
+    """Count <b>/<strong> segments containing ASCII technical terms."""
+    return sum(
+        1
+        for m in re.finditer(r"<(b|strong)>([^<]+)</\1>", back, re.IGNORECASE)
+        if re.search(r"[A-Za-z]", m.group(2))
+    )
+
+
+def _count_section_headers(back: str) -> int:
+    """Count <b>...</b>: style section headers used in dense card backs."""
+    return len(re.findall(r"<(b|strong)>[^<]*[:：]</\1>", back, re.IGNORECASE))
+
+
 def _validate_card(front: str, back: str) -> list[str]:
     """Run all single-card quality checks."""
     card_issues: list[str] = []
@@ -156,6 +183,17 @@ def _validate_card(front: str, back: str) -> list[str]:
 
     if not _question_matches_answer(front, back):
         card_issues.append("Front asks for details not covered in the back")
+
+    if _front_lacks_bilingual_annotation(front):
+        card_issues.append(
+            "Front lacks bilingual term annotation (use 中文概念 (English Term): or English Term: ...)"
+        )
+
+    if _count_bold_ascii(back) < 3:
+        card_issues.append("Back lacks inline English term annotations (<b>/<strong>)")
+
+    if _count_section_headers(back) < 2:
+        card_issues.append("Back lacks structured section headers (<b>...</b>:)")
 
     return card_issues
 

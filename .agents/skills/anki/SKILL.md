@@ -62,6 +62,43 @@ date-stamp | outline | qa-mismatch | duplicate | other`.
      `--reject-chunk <chunk_id> --reason <CATEGORY>` instead of writing a bad
      card.
 
+### Card format contract (enforce on every card)
+
+The validator enforces these rules; the import refuses cards that violate
+them. Author cards to this density target:
+
+- **Front:** bilingual title + concrete question. Use either
+  `<strong>中文概念 (English Term)</strong>: 具体问题？` or
+  `<strong>English Term</strong>: 中文具体问题？`.
+  Never a bare Chinese question without an English term annotation.
+- **Back:** at least 3 dense sections, each introduced by a
+  `<b>section name (English Term):</b>` header. Inline bilingual terms in
+  `<b>`/`<strong>` throughout the explanation (not a single English summary
+  paragraph at the end).
+- **End with** a `源码与文档引用 (Source Citation):` section containing the
+  line-anchored Markdown link.
+
+Example (good):
+
+```json
+{
+  "chunk_id": "research/cs231/parallel-fft.md:chunk-1",
+  "front": "并行二维 FFT 的块转置 (Parallel 2D-FFT Block Transpose): 处理器 \\(P_i\\) 需要把块 \\(B_{ij}\\) 发送给谁？",
+  "back": "<div><b>通信模式 (Communication Pattern):</b></div><div>\\(P_i\\) 将块 \\(B_{ij}\\) 发送给 \\(P_j\\)（\\(j \\neq i\\)），实现按行到按列的分布切换。</div><div><b>复杂度 (Complexity):</b></div><div>基本顺序循环需要 \\(O(k^2)\\) 次块传输；按 \\(i\\) 或 \\(j\\) 并行化仅改变启动维度，不减少总传输量。</div><div><b>源码与文档引用 (Source Citation):</b> [research/cs231/parallel-fft.md#L103-L167](file:///.../parallel-fft.md#L103-L167)</div>",
+  "tags": ["research", "cs231"],
+  "citation": "research/cs231/parallel-fft.md#L103-L167"
+}
+```
+
+Example (bad — low density, no inline terms, no sections):
+
+```json
+{
+  "front": "并行二维 FFT 中，如何将矩阵分配给多个处理器？",
+  "back": "将矩阵划分为方块，每个处理器负责一行。Data Distribution: an n×n matrix is partitioned into blocks.<br><br>来源：[...](file://...)"
+}
+```
+
 3. **Agent quality review (mandatory before import):**
    - Immediately inspect the authored `research/anki_cards.jsonl`. **Read every
      card's front AND back in full — never approve from a truncated print.**

@@ -24,7 +24,11 @@ def _all_issue_texts(issues: dict) -> list[str]:
 
 def test_clean_card_passes(tmp_path: Path) -> None:
     rows = [
-        "What is BGP?\t<div>Border Gateway Protocol</div>\tresearch networking"
+        "边界网关协议 (Border Gateway Protocol, BGP): BGP 如何通过 AS-PATH 实现域间路由？\t"
+        "<div><b>定义 (Definition):</b></div><div><b>BGP</b> 是路径向量路由协议，使用 <b>AS-PATH</b> 防止环路。</div>"
+        "<div><b>机制 (Mechanism):</b></div><div>路由通过 <b>NEXT-HOP</b> 和 <b>Local-Pref</b> 属性选择。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs232/bgp.md#L1-L5](file:///tmp/x.md)</div>\t"
+        "research networking"
     ]
     path = _write_tsv(tmp_path, rows)
     assert validate_tsv(path) == {}
@@ -131,6 +135,21 @@ def test_abstract_dump_card_is_flagged_on_multiple_detectors(tmp_path: Path) -> 
     assert any("author/affiliation" in i for i in texts)
 
 
+def test_low_density_card_is_flagged(tmp_path: Path) -> None:
+    """A short, unstructured, Chinese-only card like the post-regression batch must fail."""
+    rows = [
+        "并行二维 FFT 中，如何将矩阵分配给多个处理器？\t"
+        "将矩阵划分为方块，每个处理器负责一行。Data Distribution: an n×n matrix is partitioned into blocks.<br><br>来源：[research/cs231/parallel-fft.md#L103-L167](file:///tmp/x.md)\t"
+        "research"
+    ]
+    path = _write_tsv(tmp_path, rows)
+    issues = validate_tsv(path)
+    texts = _all_issue_texts(issues)
+    assert any("bilingual term annotation" in i for i in texts)
+    assert any("inline English term annotations" in i for i in texts)
+    assert any("structured section headers" in i for i in texts)
+
+
 def test_router_id_list_is_flagged(tmp_path: Path) -> None:
     rows = [
         "Real question about OSPF flooding?\t<div>Router1 Router2 Router3 exchange LSAs</div>\tresearch"
@@ -143,8 +162,10 @@ def test_router_id_list_is_flagged(tmp_path: Path) -> None:
 def test_router_domain_name_is_not_a_diagram(tmp_path: Path) -> None:
     """A hostname like router137.cerf.edu is prose, not a router-ID diagram."""
     rows = [
-        "为什么地址分配给接口而非主机？\t"
-        "<div>同一台路由器从不同接口引用时有不同域名，如 router137.cerf.edu。</div>\t"
+        "地址绑定到接口 (Addresses Bind to Interfaces): 为什么域名分配给接口而非主机？\t"
+        "<div><b>核心论断 (Key Claim):</b></div><div><b>域名</b>、<b>IP 地址</b>、<b>MAC 地址</b>分配给<b>网络接口</b>。</div>"
+        "<div><b>示例 (Example):</b></div><div>同一台路由器从不同接口引用时有不同域名，如 <b>router137.cerf.edu</b>。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs233/ch0.md#L1-L5](file:///tmp/x.md)</div>\t"
         "research"
     ]
     path = _write_tsv(tmp_path, rows)
@@ -153,8 +174,10 @@ def test_router_domain_name_is_not_a_diagram(tmp_path: Path) -> None:
 
 def test_reviewed_bilingual_card_passes(tmp_path: Path) -> None:
     rows = [
-        "拜占庭将军问题中，口头消息（oral messages）下的可解条件是什么？\t"
-        "<div>仅使用 oral messages 时，问题可解当且仅当超过三分之二的将军忠诚，即 n ≥ 3m+1。</div>\t"
+        "拜占庭将军问题 (Byzantine Generals Problem): 口头消息下的可解条件是什么？\t"
+        "<div><b>定义 (Definition):</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
+        "<div><b>条件 (Condition):</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs234/byzantine.md#L1-L5](file:///tmp/x.md)</div>\t"
         "research"
     ]
     path = _write_tsv(tmp_path, rows)
