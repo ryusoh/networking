@@ -172,14 +172,12 @@ class AnkiCard:
     tags: list[str]
 
 
-def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
-    """Quality Gate: Returns True if chunk has meaningful technical content; False if junk/empty."""
-    content = chunk.get("content", "").strip()
-    raw_heading = chunk.get("heading", "").strip()
-    heading_lower = raw_heading.lower()
-
-    # Reject README files, sample code repositories, test runners, and tutorial apps
+def _has_valid_file_path(chunk: dict[str, Any]) -> bool:
     fpath = chunk.get("file_path", "").lower()
+    # 4. Reject non-documentation code files and binaries (.py, .c, .sh, .gns3, .png, .jpg)
+    # Also reject README files, sample code repositories, test runners, and tutorial apps
+    if not fpath.endswith((".md", ".txt", ".rst")):
+        return False
     if (
         fpath.endswith(("readme.md", "readme.txt", "readme"))
         or "/sample-program/" in fpath
@@ -188,6 +186,11 @@ def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
         or "/gpac-temp/" in fpath
     ):
         return False
+    return True
+
+def _has_valid_heading(chunk: dict[str, Any]) -> bool:
+    raw_heading = chunk.get("heading", "").strip()
+    heading_lower = raw_heading.lower()
 
     # 1. Reject meta/junk headings like 'cs230-outline', 'toc', 'syllabus', logistics, testing, chatting
     if any(k in heading_lower for k in JUNK_KEYWORDS) or heading_lower in {"testing", "chatting", "test_end", "build", "installation", "setup"}:
@@ -197,7 +200,7 @@ def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
     if heading_lower in {"bytes", "bits", "answer rrs", "answer", "rrs", "question", "questions", "part", "slide"}:
         return False
 
-    # Reject figure captions, table headers, and chart labels (e.g. 'Fig. 1', '(a) Cache pushes', 'Nodes # Links')
+    # Reject figure captions, table headers, and chart labels
     caption_patterns = [
         r"^fig\.",
         r"^figure\b",
@@ -223,8 +226,10 @@ def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
     if SLIDE_MARKER_PATTERN.match(raw_heading):
         return False
 
+    return True
+
+def _has_valid_content_metadata(content_str: str, content_lower: str) -> bool:
     # Reject raw simulation graphs, build/run commands, and test logs
-    content_lower = content.lower()
     if any(
         term in content_lower
         for term in [
@@ -243,62 +248,98 @@ def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
         return False
 
     # 2. Reject Table of Contents pages containing dotted lines
-    if ". . . ." in content or "....." in content:
+    if ". . . ." in content_str or "....." in content_str:
         return False
 
     # Reject slide title/cover metadata, presenter lists, and PPT presentation metadata
-    content_lower = content.lower()
-    if re.search(r"^\d{1,2}/\d{1,2}/\d{4}\s+\d+\b", content) or re.search(r"\b\d{1,2}/\d{1,2}/\d{4}\b", content):
+    if re.search(r"^\d{1,2}/\d{1,2}/\d{4}\s+\d+\b", content_str) or re.search(r"\b\d{1,2}/\d{1,2}/\d{4}\b", content_str):
         return False
     if ".ppt" in content_lower or ".pptx" in content_lower or "cisco_presentation" in content_lower:
         return False
 
-    # Reject corrupted/garbage text (low ratio of alphanumeric characters)
-    alnum_count = sum(1 for c in content if c.isalnum() or c.isspace())
-    if len(content) > 0 and (alnum_count / len(content)) < 0.5:
-        return False
+    return True
 
-    # Reject ROT-1 / Caesar font-encoding artifacts from legacy PDFs (e.g. 'SBOE OFX DPOOFDUJPO')
+def _has_valid_content_semantics(content_lower: str) -> bool:
+    # Reject ROT-1 / Caesar font-encoding artifacts from legacy PDFs
     rot1_artifacts = {"sboe", "ofx", "dpoofdujpo", "ftubcmjtife", "tfswfs", "qmbdft", "nvtu", "oet"}
     if any(tok in content_lower for tok in rot1_artifacts):
         return False
 
-    # 3. Check content density if content is present
-    if content:
-        if len(content) < 80 or chunk.get("token_count", 0) < 20:
-            return False
-
-        # Reject title-only or header-only preamble chunks
-        non_header_lines = [
-            l.strip()
-            for l in content.splitlines()
-            if l.strip() and not l.strip().startswith("#") and not l.strip().startswith("<!--")
+    # Reject administrative or logistics content
+    if any(
+        term in content_lower
+        for term in [
+            "due date",
+            "office hours",
+            "grading policy",
+            "midterm exam",
+            "submission link",
         ]
-        if not non_header_lines or sum(len(l) for l in non_header_lines) < 50:
-            return False
-
-        clean_text = re.sub(r"[\s\-*#=:]+", "", content)
-        if len(clean_text) < 40:
-            return False
-
-        # Reject administrative or logistics content
-        if any(
-            term in content_lower
-            for term in [
-                "due date",
-                "office hours",
-                "grading policy",
-                "midterm exam",
-                "submission link",
-            ]
-        ):
-            return False
-
-    # 4. Reject non-documentation code files and binaries (.py, .c, .sh, .gns3, .png, .jpg)
-    fpath = chunk.get("file_path", "").lower()
-    if not fpath.endswith((".md", ".txt", ".rst")):
+    ):
         return False
 
+    return True
+
+def _has_valid_content_preamble(content_str: str) -> bool:
+    # Reject title-only or header-only preamble chunks
+    non_header_lines = [
+        l.strip()
+        for l in content_str.splitlines()
+        if l.strip() and not l.strip().startswith("#") and not l.strip().startswith("<!--")
+    ]
+    if not non_header_lines or sum(len(l) for l in non_header_lines) < 50:
+        return False
+    return True
+
+def _has_valid_content_length(content_str: str, token_count: int) -> bool:
+    if not content_str:
+        return True
+
+    if len(content_str) < 80 or token_count < 20:
+        return False
+
+    if not _has_valid_content_preamble(content_str):
+        return False
+
+    clean_text = re.sub(r"[\s\-*#=:]+", "", content_str)
+    if len(clean_text) < 40:
+        return False
+
+    return True
+
+def _has_valid_content_density(content_str: str) -> bool:
+    alnum_count = sum(1 for c in content_str if c.isalnum() or c.isspace())
+    if len(content_str) > 0 and (alnum_count / len(content_str)) < 0.5:
+        return False
+    return True
+
+def _has_valid_content(chunk: dict[str, Any]) -> bool:
+    content_str = chunk.get("content", "").strip()
+    content_lower = content_str.lower()
+    token_count = chunk.get("token_count", 0)
+
+    if not _has_valid_content_metadata(content_str, content_lower):
+        return False
+
+    if not _has_valid_content_semantics(content_lower):
+        return False
+
+    if not _has_valid_content_density(content_str):
+        return False
+
+    if not _has_valid_content_length(content_str, token_count):
+        return False
+
+    return True
+
+def is_high_quality_chunk(chunk: dict[str, Any]) -> bool:
+    """Quality Gate: Returns True if chunk has meaningful technical content; False if junk/empty."""
+    if not _has_valid_file_path(chunk):
+        return False
+    if not _has_valid_heading(chunk):
+        return False
+    if not _has_valid_content(chunk):
+        return False
     return True
 
 
