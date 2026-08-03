@@ -61,6 +61,9 @@ JUNK_KEYWORDS = {
     "course overview",
 }
 SLIDE_MARKER_PATTERN = re.compile(r"^slide\s*\(\s*line\s*\d+\s*\)$", re.IGNORECASE)
+SEMESTER_HEADING_PATTERN = re.compile(
+    r"^(winter|spring|summer|fall|autumn)\s+\d{4}", re.IGNORECASE
+)
 PAGE_NUM_PATTERN = re.compile(r"^(page\s+\d+|\d+\s*/\s*\d+)$", re.IGNORECASE)
 PROGRESS_BAR_WIDTH = 40
 
@@ -226,6 +229,9 @@ def _has_valid_heading(chunk: dict[str, Any]) -> bool:
     if SLIDE_MARKER_PATTERN.match(raw_heading):
         return False
 
+    if SEMESTER_HEADING_PATTERN.match(raw_heading):
+        return False
+
     return True
 
 def _has_valid_content_metadata(content_str: str, content_lower: str) -> bool:
@@ -313,6 +319,16 @@ def _has_valid_content_density(content_str: str) -> bool:
         return False
     return True
 
+def _is_bibliography_section(content_str: str) -> bool:
+    """Detect bibliography/reference list sections by citation pattern density."""
+    lines = [l.strip() for l in content_str.splitlines() if l.strip()]
+    if len(lines) < 5:
+        return False
+    cite_pattern = re.compile(r"\[\w[\w*]*\d{2,4}\]|\[\w+\s+\d{4}\]")
+    cite_lines = sum(1 for l in lines if cite_pattern.search(l))
+    return (cite_lines / len(lines)) > 0.4
+
+
 def _has_valid_content(chunk: dict[str, Any]) -> bool:
     content_str = chunk.get("content", "").strip()
     content_lower = content_str.lower()
@@ -325,6 +341,9 @@ def _has_valid_content(chunk: dict[str, Any]) -> bool:
         return False
 
     if not _has_valid_content_density(content_str):
+        return False
+
+    if _is_bibliography_section(content_str):
         return False
 
     if not _has_valid_content_length(content_str, token_count):
@@ -381,7 +400,7 @@ class CoverageTracker:
             if status == "generated":
                 return True
             if status == "skipped_low_quality":
-                return False
+                return True
             return True
         return False
 
@@ -628,11 +647,16 @@ def filter_duplicate_chunks(
 
     all_existing = existing_sqlite | existing_connect
 
+    seen_headings: set[str] = set()
     filtered = []
     for c in chunks:
         heading = c.get("heading", "").lower()
         if heading and heading in all_existing:
             continue
+        if heading and heading in seen_headings:
+            continue
+        if heading:
+            seen_headings.add(heading)
         filtered.append(c)
     return filtered
 
@@ -672,6 +696,8 @@ class AnkiCardFormatter:
                     and not line_str.startswith("<!--")
                     and not re.match(r"^\d+[\/\.-]\d+[\/\.-]\d+$", line_str)
                     and not re.match(r"^\d+$", line_str)
+                    and not SEMESTER_HEADING_PATTERN.match(line_str)
+                    and not re.match(r"^[A-Z]{2,5}\s+\d{3}[A-Z]?\s", line_str)
                 ):
                     clean_line = re.sub(r"^[-*•\d\.\s]+", "", line_str).strip()
                     clean_line = re.sub(r"^(of|for|in|by|with|to|from|on|at|and|or)\b\s*", "", clean_line, flags=re.IGNORECASE)

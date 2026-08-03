@@ -33,6 +33,56 @@ STOPWORDS = {
     "this",
     "does",
     "have",
+    # Common domain-agnostic words that cause cross-domain noise
+    "about",
+    "after",
+    "also",
+    "based",
+    "been",
+    "both",
+    "could",
+    "each",
+    "first",
+    "given",
+    "into",
+    "just",
+    "like",
+    "made",
+    "make",
+    "many",
+    "method",
+    "model",
+    "more",
+    "most",
+    "must",
+    "number",
+    "only",
+    "order",
+    "other",
+    "over",
+    "point",
+    "same",
+    "should",
+    "since",
+    "some",
+    "state",
+    "still",
+    "such",
+    "system",
+    "their",
+    "there",
+    "these",
+    "they",
+    "through",
+    "total",
+    "under",
+    "using",
+    "value",
+    "very",
+    "where",
+    "which",
+    "while",
+    "would",
 }
 
 
@@ -84,23 +134,45 @@ class AnkiGraphBridge:
             )
 
     def get_related_hubs(self, text: str, top_n: int = 3) -> list[tuple[str, float, str]]:
-        """Scans input text for concept labels present in the target deck's knowledge graph."""
+        """Scans input text for concept labels present in the target deck's knowledge graph.
+
+        Uses a two-phase approach: fast index lookup for candidates, then a
+        post-filter requiring >= 2 significant (>= 5 char, non-stopword) words
+        from the label to appear in the input text. This prevents cross-domain
+        noise from single common-word overlaps (e.g., 'model', 'rate').
+        """
         if not text or not self.nodes:
             return []
 
         norm_text = text.lower()
-        matched_nodes: dict[str, dict[str, Any]] = {}
+        candidate_nodes: dict[str, dict[str, Any]] = {}
 
-        # Tokenize text into words
-        words = set(re.findall(r"\b[A-Za-z0-9_-]{3,}\b", norm_text))
-        for w in words:
+        # Phase 1: fast index lookup for candidate nodes
+        text_words = set(re.findall(r"\b[A-Za-z0-9_-]{3,}\b", norm_text))
+        for w in text_words:
             if w in self.term_index:
                 for node in self.term_index[w]:
                     nid = node.get("id") or node.get("l") or ""
-                    matched_nodes[nid] = node
+                    candidate_nodes[nid] = node
+
+        # Phase 2: post-filter requiring >= 2 significant word overlap (or 1 if label is a single word)
+        verified: dict[str, dict[str, Any]] = {}
+        for nid, node in candidate_nodes.items():
+            label = node.get("label") or node.get("l") or ""
+            label_words = set(re.findall(r"\b[A-Za-z0-9_-]{3,}\b", label.lower()))
+            significant = {w for w in label_words if len(w) >= 5} - STOPWORDS
+            overlap = significant & text_words
+            
+            if not significant:
+                continue
+            
+            if len(significant) == 1 and len(overlap) == 1:
+                verified[nid] = node
+            elif len(overlap) >= 2:
+                verified[nid] = node
 
         matches = []
-        for node in matched_nodes.values():
+        for node in verified.values():
             label = node.get("label") or node.get("l") or ""
             pr = float(node.get("pagerank") or node.get("p") or 0.0)
             matches.append((label, pr, self.target_deck))
