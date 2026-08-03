@@ -27,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from tools.research.anki_card_validator import validate_tsv
 from tools.research.anki_graph_bridge import AnkiGraphBridge
 from tools.research.citation_engine import CitationEngine
 from tools.research.parse_chunks import estimate_tokens
@@ -905,6 +906,116 @@ class TSVExporter:
         return self.output_path
 
 
+def _parse_tsv_rows(tsv_path: Path) -> list[tuple[str, str, list[str]]]:
+    """Parse (front, back, tags) rows from a TSV package, skipping # headers."""
+    rows = []
+    for raw in tsv_path.read_text(encoding="utf-8").splitlines():
+        if raw.startswith("#") or not raw.strip():
+            continue
+        parts = raw.split("\t")
+        if len(parts) < 2:
+            continue
+        tags = parts[2].split() if len(parts) > 2 and parts[2].strip() else ["research"]
+        rows.append((parts[0], parts[1], tags))
+    return rows
+
+
+def _tsv_sidecar_path(tsv_path: Path) -> Path:
+    """Sidecar JSON mapping each TSV data row (in order) to its source chunk_id."""
+    return tsv_path.with_suffix(".chunks.json")
+
+
+def import_reviewed_tsv(
+    deck_name: str,
+    coverage_path: Path,
+    tsv_path: Path = DEFAULT_TSV_PATH,
+    force: bool = False,
+) -> int:
+    """Import the human/LLM-reviewed TSV draft via AnkiConnect.
+
+    This is the ONLY path from generated candidates to the deck: generation
+    always stops at a draft, and this function refuses to import anything the
+    validator flags (unless --force), so unreviewed or junk cards cannot reach
+    Anki even if the reviewing agent's judgment slips.
+    """
+    if not tsv_path.exists():
+        print(f"No TSV draft at {tsv_path}. Run the generator first to produce candidates.")
+        return 1
+    sidecar_path = _tsv_sidecar_path(tsv_path)
+    if not sidecar_path.exists():
+        print(f"Missing chunk sidecar {sidecar_path}; cannot map rows to chunks. Regenerate the draft.")
+        return 1
+
+    issues = validate_tsv(tsv_path)
+    if issues and not force:
+        print(f"Validator rejects {tsv_path}; refusing to import:")
+        for label, card_issues in issues.items():
+            print(f"\n{label}:")
+            for issue in card_issues:
+                print(f"  - {issue}")
+        print("\nRewrite or fix the flagged cards and re-run. Override with --force (not recommended).")
+        return 2
+
+    chunk_ids = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    rows = _parse_tsv_rows(tsv_path)
+    if len(rows) != len(chunk_ids):
+        print(
+            f"TSV has {len(rows)} data rows but the sidecar tracks {len(chunk_ids)} chunks. "
+            "Rows were added or removed after generation; regenerate the draft instead."
+        )
+        return 2
+
+    checker = AnkiConnectChecker()
+    if not checker.is_available():
+        print("AnkiConnect is not reachable. Open Anki (with AnkiConnect installed) and retry.")
+        return 1
+
+    cards = [
+        AnkiCard(
+            chunk_id=cid,
+            file_path=cid.split(":")[0],
+            heading=front[:60],
+            front_html=front,
+            back_html=back,
+            tags=tags,
+        )
+        for cid, (front, back, tags) in zip(chunk_ids, rows)
+    ]
+
+    # One bad row (e.g. a duplicate) must not sink the whole batch.
+    note_ids: list[int | None] = []
+    for card in cards:
+        try:
+            ids = checker.add_notes([card], deck_name=deck_name)
+            note_ids.append(ids[0] if ids else None)
+        except Exception as err:
+            print(f"  skipped {card.chunk_id}: {err}")
+            note_ids.append(None)
+
+    now_str = datetime.now(timezone.utc).isoformat()
+    tracker = CoverageTracker(coverage_path=coverage_path)
+    visited = tracker.data.setdefault("visited_chunk_ids", {})
+    imported = 0
+    for card, nid in zip(cards, note_ids):
+        if nid is None:
+            continue
+        entry = visited.setdefault(card.chunk_id, {})
+        entry.update(
+            {
+                "status": "imported",
+                "imported_at": now_str,
+                "deck": deck_name,
+                "front_html": card.front_html,
+            }
+        )
+        imported += 1
+    tracker.save()
+
+    print(f"Imported {imported}/{len(cards)} reviewed cards into deck '{deck_name}'.")
+    print(f"Anki Note IDs: {note_ids}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Autonomous Anki Flashcard Generation Pipeline (Phase 1-4 Complete Pipeline)."
@@ -933,7 +1044,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--tsv",
         action="store_true",
-        help="Force export to TSV package file instead of AnkiConnect API.",
+        help="Deprecated no-op: generation always stops at a TSV draft for review.",
+    )
+    parser.add_argument(
+        "--import",
+        dest="import_reviewed",
+        action="store_true",
+        help="Import the reviewed TSV draft via AnkiConnect (validator-gated).",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Import even when the validator reports issues (not recommended).",
+    )
+    parser.add_argument(
+        "--reject-chunk",
+        nargs="+",
+        metavar="CHUNK_ID",
+        default=None,
+        help="Mark pending_review chunks as skipped_low_quality after review rejection.",
     )
     parser.add_argument(
         "--auto-launch",
@@ -961,6 +1090,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Print multi-level courseware memorization progress report and exit.",
     )
     args = parser.parse_args(argv)
+
+    if args.import_reviewed:
+        return import_reviewed_tsv(
+            deck_name=args.deck,
+            coverage_path=Path(args.coverage).resolve(),
+            force=args.force,
+        )
+
+    if args.reject_chunk:
+        tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
+        visited = tracker.data.setdefault("visited_chunk_ids", {})
+        now_str = datetime.now(timezone.utc).isoformat()
+        rejected = 0
+        for cid in args.reject_chunk:
+            if cid in visited:
+                visited[cid]["status"] = "skipped_low_quality"
+                visited[cid]["audited_at"] = now_str
+                visited[cid].pop("front_html", None)
+                rejected += 1
+            else:
+                print(f"  unknown chunk id: {cid}")
+        tracker.save()
+        print(f"Marked {rejected} chunk(s) as skipped_low_quality.")
+        return 0
 
     if args.status:
         manifest_path = Path(args.manifest).resolve()
@@ -1048,10 +1201,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     pending = tracker.pending_import_chunks()
     if pending:
         print(
-            f"WARNING: {len(pending)} chunk(s) were previously exported to TSV but not yet verified as imported."
+            f"ERROR: {len(pending)} chunk(s) are pending review/import. "
+            "Generating more would overwrite their TSV draft and sidecar:"
         )
-        print("Run: python3 tools/research/anki_import_verifier.py")
-        print("or confirm the TSV import in Anki before generating more cards to avoid duplicates.")
+        for cid in pending:
+            print(f"  - {cid}")
+        print("Resolve them first:")
+        print(f'  python3 tools/research/anki_generator.py --import --deck "{args.deck}"')
+        print("  python3 tools/research/anki_generator.py --reject-chunk <chunk_id> [...]")
+        return 2
 
     unvisited = tracker.select_unvisited_chunks(
         chunks, count=args.count * 3, graph_bridge=graph_bridge
@@ -1068,49 +1226,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     cards = [formatter.format_card(c) for c in selected_chunks]
 
-    connect_checker = AnkiConnectChecker()
-
-    if args.auto_launch and not connect_checker.is_available():
-        print("Anki GUI is closed. Launching /Applications/Anki.app in background...")
-        os.system("open -a Anki")
-        import time
-
-        for _ in range(10):
-            time.sleep(0.5)
-            if connect_checker.is_available():
-                break
-
-    imported_via_api = False
-
-    if not args.tsv and connect_checker.is_available():
-        try:
-            note_ids = connect_checker.add_notes(cards, deck_name=args.deck)
-            print(f"🎉 100% AUTOMATED INGESTION SUCCESSFUL!")
-            print(
-                f"Directly imported {len(cards)} cards into Anki deck '{args.deck}' via AnkiConnect API."
-            )
-            print(f"Anki Note IDs: {note_ids}")
-            imported_via_api = True
-        except Exception as err:
-            print(f"AnkiConnect import warning: {err}. Falling back to TSV package export...")
-
-    if not imported_via_api:
-        exporter = TSVExporter()
-        tsv_path = exporter.export(cards)
-        print(f"Exported {len(cards)} high-density cards to TSV package file:")
-        print(f"  Path: {tsv_path}")
-        if args.auto_launch:
-            print(f"Auto-launching Anki to import TSV file: {tsv_path}")
-            os.system(f"open -a Anki '{tsv_path}'")
-        else:
-            print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
+    # Draft-first: generation NEVER imports directly. Candidates go to a TSV
+    # draft plus a chunk-mapping sidecar; only `main --import` (validator-gated,
+    # post-review) may put cards into the deck.
+    exporter = TSVExporter()
+    tsv_path = exporter.export(cards)
+    sidecar_path = _tsv_sidecar_path(tsv_path)
+    sidecar_path.write_text(
+        json.dumps([card.chunk_id for card in cards], indent=2), encoding="utf-8"
+    )
+    print(f"Exported {len(cards)} candidate cards to TSV draft (review before import):")
+    print(f"  Path: {tsv_path}")
+    print(f"  Chunk sidecar: {sidecar_path}")
+    print("Next steps (mandatory):")
+    print(f"  1. python3 tools/research/anki_card_validator.py {tsv_path}")
+    print("  2. Read every card in full; rewrite or reject junk (keep rows aligned with the sidecar).")
+    print(f'  3. python3 tools/research/anki_generator.py --import --deck "{args.deck}"')
 
     front_htmls = {card.chunk_id: card.front_html for card in cards}
-    import_status = "imported" if imported_via_api else "pending_import"
     tracker.mark_chunks_visited(
         selected_chunks,
         deck_name=args.deck,
-        status=import_status,
+        status="pending_import",
         front_htmls=front_htmls,
     )
     print(

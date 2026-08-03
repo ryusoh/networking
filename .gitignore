@@ -12,6 +12,7 @@ research/.chunks_manifest.json
 research/.durable_memory.json
 research/.anki_coverage.json
 research/anki_import.txt
+research/anki_import.chunks.json
 *.so
 *.dylib
 tile_storage

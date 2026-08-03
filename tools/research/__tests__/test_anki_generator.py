@@ -536,3 +536,140 @@ def test_coverage_tracker_imported_status_is_visited(tmp_path: Path):
     selected = tracker.select_unvisited_chunks(chunks, count=1)
     assert selected == []
 
+
+
+def test_resolve_model_name_prefers_localized_basic(monkeypatch):
+    """Japanese UI localizes 'Basic' to ベーシック; the resolver must find it."""
+    from tools.research.anki_generator import AnkiConnectChecker
+
+    models = {"トリプル": ["Front", "Back"], "ベーシック": ["Front", "Back"]}
+    monkeypatch.setattr(
+        AnkiConnectChecker,
+        "_invoke",
+        lambda self, action, params=None: (
+            list(models) if action == "modelNames" else models[params["modelName"]]
+        ),
+    )
+    assert AnkiConnectChecker().resolve_model_name("Basic") == "ベーシック"
+
+
+def test_resolve_model_name_shape_fallback(monkeypatch):
+    """Without a known alias, any Front/Back-shaped model is acceptable."""
+    from tools.research.anki_generator import AnkiConnectChecker
+
+    models = {"クローズ": ["Text", "Extra"], "マイモデル": ["Front", "Back"]}
+    monkeypatch.setattr(
+        AnkiConnectChecker,
+        "_invoke",
+        lambda self, action, params=None: (
+            list(models) if action == "modelNames" else models[params["modelName"]]
+        ),
+    )
+    assert AnkiConnectChecker().resolve_model_name("Basic") == "マイモデル"
+
+
+def _write_draft(tmp_path: Path, rows: list[str], chunk_ids: list[str]):
+    import json
+
+    tsv = tmp_path / "anki_import.txt"
+    tsv.write_text("#separator:Tab\n#html:true\n" + "\n".join(rows) + "\n", encoding="utf-8")
+    sidecar = tmp_path / "anki_import.chunks.json"
+    sidecar.write_text(json.dumps(chunk_ids), encoding="utf-8")
+    return tsv
+
+
+def test_import_refuses_validator_flagged_draft(monkeypatch, tmp_path: Path):
+    """A junk draft must not reach Anki even if the reviewer runs --import."""
+    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_tsv
+
+    def _boom(self, cards, deck_name):
+        raise AssertionError("add_notes must not be called for a flagged draft")
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(AnkiConnectChecker, "add_notes", _boom)
+
+    tsv = _write_draft(
+        tmp_path,
+        ["Paxos: 【Paxos】的核心技术机制、计算公式与工程应用是什么？\t<div>consensus</div>\tresearch"],
+        ["research/x.md:chunk-1"],
+    )
+    ret = import_reviewed_tsv("金融", tmp_path / "cov.json", tsv_path=tsv)
+    assert ret == 2
+
+
+def test_import_refuses_row_sidecar_mismatch(monkeypatch, tmp_path: Path):
+    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_tsv
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(
+        AnkiConnectChecker, "add_notes", lambda self, cards, deck_name: [1] * len(cards)
+    )
+
+    tsv = _write_draft(
+        tmp_path,
+        ["拜占庭将军问题中口头消息的可解条件是什么？\t<div>n ≥ 3m+1，超过三分之二忠诚时可解。</div>\tresearch"],
+        ["research/x.md:chunk-1", "research/x.md:chunk-2"],
+    )
+    ret = import_reviewed_tsv("金融", tmp_path / "cov.json", tsv_path=tsv)
+    assert ret == 2
+
+
+def test_import_marks_reviewed_chunks_imported(monkeypatch, tmp_path: Path):
+    """Clean reviewed rows import and flip pending_import to imported with the edited front."""
+    import json
+
+    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_tsv
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(AnkiConnectChecker, "add_notes", lambda self, cards, deck_name: [424242])
+
+    reviewed_front = "拜占庭将军问题中口头消息的可解条件是什么？"
+    tsv = _write_draft(
+        tmp_path,
+        [f"{reviewed_front}\t<div>超过三分之二忠诚（n ≥ 3m+1）时可解。</div>\tresearch"],
+        ["research/x.md:chunk-1"],
+    )
+    coverage = tmp_path / "cov.json"
+    coverage.write_text(
+        json.dumps(
+            {
+                "visited_chunk_ids": {
+                    "research/x.md:chunk-1": {
+                        "status": "pending_import",
+                        "front_html": "draft front",
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    ret = import_reviewed_tsv("金融", coverage, tsv_path=tsv)
+    assert ret == 0
+    entry = json.loads(coverage.read_text(encoding="utf-8"))["visited_chunk_ids"][
+        "research/x.md:chunk-1"
+    ]
+    assert entry["status"] == "imported"
+    assert entry["front_html"] == reviewed_front
+    assert "imported_at" in entry
+
+
+def test_reject_chunk_marks_skipped(tmp_path: Path):
+    import json
+
+    from tools.research.anki_generator import main
+
+    coverage = tmp_path / "cov.json"
+    coverage.write_text(
+        json.dumps(
+            {"visited_chunk_ids": {"research/x.md:chunk-9": {"status": "pending_import"}}}
+        ),
+        encoding="utf-8",
+    )
+    ret = main(["--reject-chunk", "research/x.md:chunk-9", "--coverage", str(coverage)])
+    assert ret == 0
+    entry = json.loads(coverage.read_text(encoding="utf-8"))["visited_chunk_ids"][
+        "research/x.md:chunk-9"
+    ]
+    assert entry["status"] == "skipped_low_quality"
+    assert "audited_at" in entry

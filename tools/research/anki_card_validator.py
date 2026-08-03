@@ -45,6 +45,19 @@ OCR_ERROR_PATTERNS = [
     re.compile(r"\bq\s+[a-z]+", re.IGNORECASE),  # q frequent
     re.compile(r"Ø\s+"),
 ]
+PAPER_METADATA_PATTERNS = [
+    re.compile(r"Categories and Subject Descriptors", re.IGNORECASE),
+    re.compile(r"\bGeneral Terms\s*:", re.IGNORECASE),
+    re.compile(r"Additional Key Words", re.IGNORECASE),
+    re.compile(r"Permission to make digital", re.IGNORECASE),
+    re.compile(r"\b\d+\.\s+(?:INTRODUCTION|BACKGROUND|CONCLUSION|RELATED WORK)\b"),
+]
+ALLCAPS_NAME_RUN_RE = re.compile(r"\b[A-Z]{2,}\s+[A-Z]\.?\s*[A-Z]{2,}\b")
+ORG_KEYWORD_RE = re.compile(
+    r"\b(?:University|Institute|Laboratories|Laboratory|International|SRI)\b"
+)
+DATE_STAMP_RE = re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b")
+TEMPLATE_FRONT_RE = re.compile(r"【.+】的核心技术机制、计算公式与工程应用是什么？?$")
 
 
 def _count_control_chars(text: str) -> int:
@@ -84,6 +97,28 @@ def _question_matches_answer(front: str, back: str) -> bool:
     return True
 
 
+def _has_paper_metadata(back: str) -> bool:
+    plain = re.sub(r"<[^>]+>", "", back)
+    return any(pat.search(plain) for pat in PAPER_METADATA_PATTERNS)
+
+
+def _has_author_block(back: str) -> bool:
+    """Author/affiliation dump: an ALL-CAPS name run next to an org keyword."""
+    plain = re.sub(r"<[^>]+>", "", back)
+    return bool(ALLCAPS_NAME_RUN_RE.search(plain) and ORG_KEYWORD_RE.search(plain))
+
+
+def _has_date_stamp(text: str) -> bool:
+    plain = re.sub(r"<[^>]+>", "", text)
+    return bool(DATE_STAMP_RE.search(plain))
+
+
+def _is_template_front(front: str) -> bool:
+    """The generator's fallback front (【topic】的核心技术机制…) is not a real question."""
+    plain = re.sub(r"<[^>]+>", "", front).strip()
+    return bool(TEMPLATE_FRONT_RE.search(plain))
+
+
 def validate_tsv(tsv_path: Path) -> dict[str, list[str]]:
     """Return a dict mapping card index to list of issue descriptions."""
     text = tsv_path.read_text(encoding="utf-8")
@@ -117,6 +152,18 @@ def validate_tsv(tsv_path: Path) -> dict[str, list[str]]:
 
         if _has_ocr_errors(back):
             card_issues.append("Back contains likely OCR/extraction errors (fragmented words)")
+
+        if _has_paper_metadata(back):
+            card_issues.append("Back contains paper metadata dump (ACM categories, section headings)")
+
+        if _has_author_block(back):
+            card_issues.append("Back contains author/affiliation block instead of explanation")
+
+        if _has_date_stamp(front) or _has_date_stamp(back):
+            card_issues.append("Contains slide date stamp (e.g. 8/13/2008)")
+
+        if _is_template_front(front):
+            card_issues.append("Front is the generator's fallback template, not a concrete question")
 
         if not _question_matches_answer(front, back):
             card_issues.append("Front asks for details not covered in the back")
