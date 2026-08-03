@@ -27,7 +27,7 @@ validates, tracks, and imports.**
 
 ### Target flow
 
-```
+```text
 anki_generator.py --candidates N   → research/anki_candidates.jsonl
 LLM agent reads candidates, writes → research/anki_cards.jsonl
 anki_card_validator.py             → gates cards (TSV and JSONL inputs)
