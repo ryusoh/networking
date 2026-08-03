@@ -17,7 +17,7 @@ _spec.loader.exec_module(anki_card_validator)
 
 validate_cards = anki_card_validator.validate_cards
 
-FRONT = "<strong>实时系统 (Real-Time System)</strong>: Stankovic 对实时系统正确性的经典定义是什么？"
+FRONT = "<strong>实时系统</strong>: Stankovic 对实时系统正确性的经典定义是什么？"
 
 CHINESE_ONLY_FRONT = "<strong>物联网分析的知识层级</strong>: 从传感数据到处方决策的五个分析阶段是什么？"
 
@@ -119,3 +119,25 @@ def test_expanded_back_acronym_is_accepted():
         "[research/x.md#L1-L2](file:///tmp/research/x.md#L1-L2)</div>"
     )
     assert _issues(CHINESE_ONLY_FRONT, back) == []
+
+
+def test_multiword_front_gloss_is_rejected():
+    front = "<strong>IoT 分析部署问题 (Analytic Deployment Problem)</strong>: 优化目标是什么？"
+    issues = _issues(front, CLEAN_BACK)
+    assert any("multi-word English gloss" in issue for issue in issues)
+
+
+def test_descriptive_front_gloss_is_rejected_even_from_source_wording():
+    front = "<strong>物联网分析的知识层级 (IoT Analytics Knowledge Hierarchy)</strong>: 五个阶段？"
+    issues = _issues(front, CLEAN_BACK)
+    assert any("multi-word English gloss" in issue for issue in issues)
+
+
+def test_acronym_expansion_in_front_is_allowed():
+    front = "<strong>WSN (Wireless Sensor Network) 数据聚合</strong>: 关键指标有哪些？"
+    assert _issues(front, CLEAN_BACK) == []
+
+
+def test_single_token_front_gloss_is_allowed():
+    front = "<strong>最短路径算法 (Dijkstra)</strong>: 松弛操作的不变量是什么？"
+    assert _issues(front, CLEAN_BACK) == []

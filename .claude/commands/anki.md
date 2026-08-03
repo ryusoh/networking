@@ -68,12 +68,13 @@ The validator enforces these rules; the import refuses cards that violate
 them. Author cards to this density target:
 
 - **Front:** `<strong>中文概念</strong>: 具体问题？` — a Chinese title plus a
-  concrete question. Add the English name in the title ONLY when the concept
-  has a genuine standard English name used in the source material (a
-  protocol, a named algorithm: `FFT`, `CSMA/CD`, `Bellman-Ford`). **Never
-  invent an English gloss for a Chinese title** — word-by-word calques like
-  `(IoT Analytics Knowledge Hierarchy)` are translation exercises, not
-  terminology, and are a hard reject at review.
+  concrete question. English in the title is limited to **acronyms and
+  single-token standard names** (`FFT`, `CSMA/CD`, `Dijkstra`) or acronym
+  expansions (`WSN (Wireless Sensor Network)`). **Multi-word English glosses
+  are machine-banned** (`Front title carries a multi-word English gloss`) —
+  phrases like `(Analytic Deployment Problem)` or `(IoT Analytics Knowledge
+Hierarchy)` are translated titles, not terminology, even when the words
+  come from the source slides. When in doubt, the title is Chinese-only.
 - **Back:** at least 3 dense sections, each introduced by a `<b>section
 name:</b>` header. Write the body in Chinese prose; use `<b>` to emphasize
   key **Chinese** terms. Do not append English glosses.

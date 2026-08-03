@@ -142,7 +142,13 @@ def _is_generic_topic(front: str) -> bool:
     plain = re.sub(r"<[^>]+>", "", front).strip().rstrip(":?").lower()
     # Extract the topic before the Chinese question part
     topic = plain.split(":")[0].strip().lower()
-    return topic in GENERIC_TOPIC_LABELS or len(topic) < 8
+    if topic in GENERIC_TOPIC_LABELS:
+        return True
+    # The length guard targets English topic labels; a short CJK title like
+    # 实时系统 is a legitimate concept name, not a generic label.
+    if re.search(r"[一-鿿]", topic):
+        return False
+    return len(topic) < 8
 
 
 def _has_ocr_errors(back: str) -> bool:
@@ -250,6 +256,27 @@ def _unexplained_acronyms(front: str, back: str) -> list[str]:
     ]
 
 
+def _front_gloss_violations(front: str) -> list[str]:
+    """Multi-word English glosses in the front that are not acronym expansions.
+    Front English is limited to acronyms and single-token standard names;
+    multi-word descriptive glosses read as translated titles, not terminology."""
+    plain = re.sub(r"<[^>]+>", "", front)
+    plain = LATEX_RE.sub("", plain)
+    violations: list[str] = []
+    for match in re.finditer(r"[（(]([^（）()]+)[)）]", plain):
+        gloss = match.group(1).strip()
+        words = re.findall(r"[A-Za-z]+", gloss)
+        if len(words) < 2:
+            continue
+        before = plain[: match.start()].rstrip()
+        if ACRONYM_TOKEN_RE.search(before):
+            continue  # acronym expansion, e.g. WSN (Wireless Sensor Network)
+        if re.search(r"\b[A-Z]{2,}\b", gloss):
+            continue  # the gloss itself carries the acronym being expanded
+        violations.append(gloss)
+    return violations
+
+
 def _validate_card(front: str, back: str) -> list[str]:
     """Run all single-card quality checks."""
     card_issues: list[str] = []
@@ -284,6 +311,14 @@ def _validate_card(front: str, back: str) -> list[str]:
 
     if not _question_matches_answer(front, back):
         card_issues.append("Front asks for details not covered in the back")
+
+    invented = _front_gloss_violations(front)
+    if invented:
+        shown = ", ".join(f"'{g}'" for g in invented[:3])
+        card_issues.append(
+            f"Front title carries a multi-word English gloss: {shown} — drop it; "
+            "front English is limited to acronyms and single-token standard names"
+        )
 
     if _count_section_headers(back) < 2:
         card_issues.append("Back lacks structured section headers (<b>...</b>:)")
