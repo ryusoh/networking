@@ -620,8 +620,62 @@ class AnkiConnectChecker:
                 pass
         return existing
 
+    def _invoke(self, action: str, params: dict[str, Any] | None = None) -> Any:
+        """Send a single AnkiConnect action and return its result."""
+        payload: dict[str, Any] = {"action": action, "version": 6}
+        if params is not None:
+            payload["params"] = params
+        req = urllib.request.Request(
+            self.url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            if res.get("error"):
+                raise RuntimeError(f"AnkiConnect error: {res['error']}")
+            return res.get("result")
+
+    def resolve_model_name(self, model_name: str = "Basic") -> str:
+        """Map a requested note type to one that exists in the local profile.
+
+        Anki localizes the stock model names (e.g. "Basic" becomes
+        "ベーシック" in a Japanese UI), so a hardcoded "Basic" is rejected
+        with "model was not found". The field names stay "Front"/"Back".
+        Resolution order: exact match, then known localized aliases of the
+        stock "Basic" model, then any available model whose fields are
+        exactly Front/Back (the Basic shape).
+        """
+        available = self._invoke("modelNames") or []
+        if model_name in available:
+            return model_name
+        if model_name == "Basic":
+            basic_aliases = (
+                "ベーシック",  # Japanese
+                "基础", "基本",  # Chinese
+                "Básico",  # Spanish / Portuguese
+                "Basique",  # French
+                "기본",  # Korean
+                "Основная",  # Russian
+                "Temel",  # Turkish
+                "Podstawowa",  # Polish
+                "Basis",  # German
+            )
+            for alias in basic_aliases:
+                if alias in available:
+                    return alias
+        for candidate in available:
+            fields = self._invoke("modelFieldNames", {"modelName": candidate})
+            if fields == ["Front", "Back"]:
+                return candidate
+        raise RuntimeError(
+            f"AnkiConnect error: no usable note type found "
+            f"(wanted {model_name!r}, profile has {available!r})"
+        )
+
     def add_notes(self, cards: list[AnkiCard], deck_name: str, model_name: str = "Basic") -> list[int | None]:
         """Dispatch addNotes API request to AnkiConnect."""
+        model_name = self.resolve_model_name(model_name)
         notes_payload = []
         for card in cards:
             notes_payload.append(
