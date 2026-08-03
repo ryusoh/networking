@@ -193,16 +193,52 @@ If validation fails, the response is rejected and returned to Layer 3 for re-par
 
 ---
 
-## 6. Quality Assurance and CI Integration
+## 6. Anki Export Integration
+
+Research-agent answers can be exported as Anki cards. The export uses the
+inverted pipeline in `tools/research/anki_generator.py`: code selects chunks,
+the LLM authors the cards, and the validator/import path gates ingestion.
+
+### 6.1 Batch card workflow
+
+```text
+python3 tools/research/anki_generator.py --count 5 --deck "金融"
+    ↓  research/anki_candidates.jsonl
+LLM authors → research/anki_cards.jsonl
+python3 tools/research/anki_card_validator.py research/anki_cards.jsonl
+python3 tools/research/anki_generator.py --import --deck "金融"
+```
+
+### 6.2 Ad-hoc answer export
+
+For a single synthesized answer, use the `--front` / `--back` path:
+
+```bash
+python3 tools/research/anki_generator.py \
+  --front "<strong>Concept</strong>: core question?" \
+  --back "<div>structured answer</div>" \
+  --deck "金融" --tags "research <module>"
+```
+
+### 6.3 State discipline
+
+- Never hand-edit `research/.anki_coverage.json`; use CLI verbs only.
+- Reject bad candidates with `--reject-chunk <id> --reason <category>` instead
+  of writing low-quality cards.
+- Verify imports with `python3 tools/research/anki_import_verifier.py`.
+
+---
+
+## 7. Quality Assurance and CI Integration
 
 The system architecture integrates directly into existing repository quality gates:
 
 1. **Pre-commit Gating (`make precommit`):** Ensures that all added scripts, configuration files, and documentation pass formatting (Prettier), linting (ESLint, Flake8), and type checking (`make type`).
-2. **Deterministic Test Suites:** Unit tests in `__tests__/` validate `SceneBuilder` context construction, `CitationEngine` URL verification, and `MemoryHost` serialization.
+2. **Deterministic Test Suites:** Unit tests in `__tests__/` validate `SceneBuilder` context construction, `CitationEngine` URL verification, `MemoryHost` serialization, and the Anki pipeline.
 
 ---
 
-## 7. Implementation Roadmap and Phased Rollout
+## 8. Implementation Roadmap and Phased Rollout
 
 ```mermaid
 flowchart TD
@@ -212,7 +248,7 @@ flowchart TD
     Step4 --> Step5["Step 5: Durable Memory & Mastery Matrix Integration"]
 ```
 
-### 7.1 Phase 1: Structural Parsing & Line Mapping Engine
+### 8.1 Phase 1: Structural Parsing & Line Mapping Engine
 
 - **Objective:** Ingest `.md` sidecars, slides, and source code while establishing accurate line-number offset maps.
 - **Key Deliverables:**
@@ -220,7 +256,7 @@ flowchart TD
   - Line-offset mapping data structure linking every text segment to its start line and end line in the source file.
   - Code block integrity handler preserving P4, Python, C, and GNS3 topology configs without mid-block truncation.
 
-### 7.2 Phase 2: Hybrid Search Indexer Construction
+### 8.2 Phase 2: Hybrid Search Indexer Construction
 
 - **Objective:** Build dual lexical and vector search indices over parsed structural chunks.
 - **Key Deliverables:**
@@ -228,21 +264,21 @@ flowchart TD
   - Dense Vector Embedding Index representing semantic conceptual similarity across course modules.
   - Reciprocal Rank Fusion (RRF) ranker combining lexical and semantic scores into a unified top-K result set.
 
-### 7.3 Phase 3: Host SceneBuilder & Token Governor MVP
+### 8.3 Phase 3: Host SceneBuilder & Token Governor MVP
 
 - **Objective:** Construct the Host-side context assembly pipeline.
 - **Key Deliverables:**
   - `SceneBuilder` context bundler assembling primary readings, prerequisite slide excerpts, and lab code.
   - `ResourceGovernor` token tracking ensuring compiled scenes remain within model context window limits.
 
-### 7.4 Phase 4: Citation Verification & Post-Processing Engine
+### 8.4 Phase 4: Citation Verification & Post-Processing Engine
 
 - **Objective:** Enforce auditable line-anchored citations on all generated outputs.
 - **Key Deliverables:**
   - `CitationEngine` URL validator checking file existence, line bounds, and snippet matching.
   - Auto-retry loop rejecting unverified or hallucinated file references before delivery to Layer 1.
 
-### 7.5 Phase 5: Durable Memory & Mastery Matrix Integration
+### 8.5 Phase 5: Durable Memory & Mastery Matrix Integration
 
 - **Objective:** Persist student progress and mastery state across evaluation sessions.
 - **Key Deliverables:**

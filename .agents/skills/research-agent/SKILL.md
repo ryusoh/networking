@@ -66,19 +66,52 @@ python3 tools/research/memory_host.py --student "default_user" --record --module
 
 ### 5. Generate & Ingest Anki Flashcards
 
-To generate high-quality, bilingual (Chinese primary with English technical terminology) Anki cards from unvisited `research/` courseware:
+The pipeline is inverted: code selects candidate chunks; the LLM authors the
+actual cards. To generate cards from unvisited `research/` courseware:
 
 ```bash
-python3 tools/research/anki_generator.py --count 5 --deck "<target_deck>"
+# 1. Emit candidate chunks (JSONL) — marks chunks as "candidate"
+python3 tools/research/anki_generator.py --count 5 --deck "金融"
+
+# 2. Read research/anki_candidates.jsonl and author cards to research/anki_cards.jsonl
+#    One JSON object per line: {chunk_id, front, back, tags, citation}
+
+# 3. Validate the authored cards (hard gate — --import refuses while issues exist)
+python3 tools/research/anki_card_validator.py research/anki_cards.jsonl
+
+# 4. Import reviewed cards via AnkiConnect (marks chunks "imported")
+python3 tools/research/anki_generator.py --import --deck "金融"
+
+# 5. Reject junk candidates instead of writing bad cards
+python3 tools/research/anki_generator.py --reject-chunk <chunk_id> --reason <CATEGORY>
+
+# 6. Check coverage + rolling approve rate
+python3 tools/research/anki_generator.py --status
 ```
+
+`--reason` must be one of:
+`title-slide | metadata-dump | author-block | diagram | ocr-fragment |
+date-stamp | outline | qa-mismatch | duplicate | other`.
 
 #### Agent Judgment & Internet Enhancement Protocol
 
 When invoking the Anki pipeline or reviewing candidate flashcards:
 
-1. **Non-Deterministic Quality Gate:** Use agent judgment to reject any trivial slides, administrative text, course schedule outlines, or low-value notes.
-2. **Web Search Enhancement:** For brief or high-density technical concepts (e.g., `B4 WAN`, `Paxos Consensus`, `NAPI`, `Clos Topology`), perform a targeted web search (`search_web`) to retrieve production engineering context, RFC specs, or practical pain points.
-3. **Card Enhancement:** Enrich the Back field with synthesized web search insights under **背景与痛点 (Motivation & Pain Points)** and **核心机制 (Core Mechanism)** alongside the primary courseware line citations.
+1. **Code never writes card prose.** Author every card yourself into
+   `research/anki_cards.jsonl`. Do not use the old TSV draft or any template
+   front like `【X】的核心技术机制、计算公式与工程应用是什么？`.
+2. **Read every card front AND back in full** before import; never approve
+   from a truncated print. `--import` re-runs the validator, so "validator
+   green" is necessary, not sufficient.
+3. **Reject a card for a bad artifact, not a bad topic.** A famous concept
+   does not redeem a raw title front or an abstract/metadata dump.
+4. **Web Search Enhancement:** For brief or high-density technical concepts
+   (e.g., `B4 WAN`, `Paxos Consensus`, `NAPI`, `Clos Topology`), perform a
+   targeted web search (`search_web`) to retrieve production engineering
+   context, RFC specs, or practical pain points.
+5. **Card Enhancement:** Enrich the Back field with synthesized web search
+   insights under **背景与痛点 (Motivation & Pain Points)** and **核心机制
+   (Core Mechanism)** alongside the primary courseware line citations.
 
 ### 6. Re-index Courseware Chunks (if files changed)
 
