@@ -9,9 +9,13 @@ Executes the complete Anki card generation and ingestion pipeline over `research
 
 ## Quick Execution Command
 
-Run the candidate generator script to output a draft package for agentic review, then validate it before import:
+Run the candidate generator script. With AnkiConnect installed it imports directly via API and marks chunks `imported`. Use `--tsv` only when you need a manual fallback:
 
 ```bash
+# AnkiConnect path (preferred - verifies import automatically)
+python3 tools/research/anki_generator.py --count 5 --deck "金融"
+
+# TSV fallback (launch Anki manually, then verify)
 python3 tools/research/anki_generator.py --count 5 --deck "金融" --tsv
 python3 tools/research/anki_card_validator.py research/anki_import.txt
 ```
@@ -41,7 +45,7 @@ python3 tools/research/anki_card_validator.py research/anki_import.txt
 
 3. **Bilingual Card Formatting & Automatic Execution:**
    - Render bilingual Chinese-primary HTML cards with English technical terms, LaTeX delimiters (`\(...\)`), and line-anchored citations (`[path#Lstart-Lend](file://...)`).
-   - **Preferred:** Inject directly into the **`金融`** deck via AnkiConnect REST API (`http://127.0.0.1:8765`) if the AnkiConnect add-on is installed. AnkiConnect gives immediate confirmation, so the chunk status becomes `imported`.
+   - **Preferred (AnkiConnect installed):** Inject directly into the **`金融`** deck via AnkiConnect REST API (`http://127.0.0.1:8765`). AnkiConnect gives immediate confirmation, so the chunk status becomes `imported`.
    - **Fallback (no AnkiConnect):** Automatically launch Anki with the TSV file via `open -a Anki research/anki_import.txt`. Never ask the user to manually run the launch command. The user must click **Import** in the Anki import dialog. The chunk status stays `pending_import` until verified.
    - **Verify the import immediately:** Run `python3 tools/research/anki_import_verifier.py`. It reads the local `collection.anki2`, matches the generated fronts, and flips `pending_import` → `imported`.
    - **Do not generate a new batch while any `pending_import` chunks exist.** If verification still shows missing cards, the previous TSV import was not completed; resolve it before continuing.
