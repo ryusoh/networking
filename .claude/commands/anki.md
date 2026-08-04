@@ -101,6 +101,14 @@ Development)`). The validator scans the **whole card** — an acronym that
   appears anywhere without an expansion (e.g. a bare `DIKW`) is a reject.
 - **End with** a `源码与文档引用 (Source Citation):` section containing the
   line-anchored Markdown link.
+- **Tags (machine-gated, canonical vocabulary only):** tag every card with
+  `research` plus the flat course code (`cs231`/`cs232`/`cs233`/`cs234`), and
+  optionally one or two concept tags from `CANONICAL_TAGS` in
+  `tools/research/anki_card_validator.py` (e.g. `tcp`, `routing`,
+  `congestion_control`, `distributed_systems`, `consensus`). Never invent
+  variants — `tcp_protocol`, `distributed-system`, `cs231-distributed-systems`
+  are all synonyms of canonical tags. The validator rejects any tag outside
+  the vocabulary (`Unknown tag '...'`); pick the closest existing tag instead.
 
 Example (good):
 

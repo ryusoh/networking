@@ -2,7 +2,12 @@
 import json
 from pathlib import Path
 
-from tools.research.anki_card_validator import validate_cards, validate_tsv
+from tools.research.anki_card_validator import (
+    canonical_tag,
+    canonicalize_tags,
+    validate_cards,
+    validate_tsv,
+)
 
 
 def _write_tsv(tmp_path: Path, rows: list[str]) -> Path:
@@ -331,3 +336,53 @@ def test_acronym_expansion_in_front_is_allowed() -> None:
 def test_single_token_front_gloss_is_allowed() -> None:
     front = "<strong>最短路径算法 (Dijkstra)</strong>: 松弛操作的不变量是什么？"
     assert _issues(front, CLEAN_BACK) == []
+
+
+def _card_with_tags(tags: object) -> dict:
+    return {"front": CLEAN_FRONT, "back": CLEAN_BACK, "tags": tags}
+
+
+def test_canonical_tags_pass() -> None:
+    issues = validate_cards([_card_with_tags(["research", "cs231", "tcp", "distributed_systems"])])
+    assert issues == {}
+
+
+def test_string_tags_are_accepted_and_checked() -> None:
+    assert validate_cards([_card_with_tags("research cs234")]) == {}
+    issues = validate_cards([_card_with_tags("research made-up-topic")])
+    assert any("Unknown tag 'made-up-topic'" in i for i in _all_issue_texts(issues))
+
+
+def test_invented_tag_is_flagged() -> None:
+    issues = validate_cards([_card_with_tags(["research", "tcpip"])])
+    texts = _all_issue_texts(issues)
+    assert any("Unknown tag 'tcpip'" in i for i in texts)
+
+
+def test_alias_and_separator_variants_are_not_flagged() -> None:
+    issues = validate_cards([_card_with_tags(["TCP", "tcp-protocol", "cs231-distributed-systems", "Distributed-System"])])
+    assert issues == {}
+
+
+def test_canonical_tag_normalization() -> None:
+    assert canonical_tag("TCP") == "tcp"
+    assert canonical_tag("tcp-protocol") == "tcp"
+    assert canonical_tag("tcp_protocol") == "tcp"
+    assert canonical_tag("Distributed-System") == "distributed_systems"
+    assert canonical_tag("cs231-distributed-systems") == "cs231"
+    assert canonical_tag("cs234_advanced_networks") == "cs234"
+    assert canonical_tag("made-up-topic") is None
+
+
+def test_canonicalize_tags_dedupes_and_drops_unknown() -> None:
+    tags = ["research", "TCP", "tcp_protocol", "made-up-topic", "cs231-distributed-systems"]
+    assert canonicalize_tags(tags) == ["research", "tcp", "cs231"]
+
+
+def test_tsv_invented_tag_is_flagged(tmp_path: Path) -> None:
+    rows = [
+        f"{CLEAN_FRONT}\t{CLEAN_BACK}\tresearch made-up-topic"
+    ]
+    path = _write_tsv(tmp_path, rows)
+    issues = validate_tsv(path)
+    assert any("Unknown tag 'made-up-topic'" in i for i in _all_issue_texts(issues))

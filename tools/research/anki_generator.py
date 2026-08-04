@@ -28,7 +28,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from tools.research.anki_card_validator import validate_cards, validate_tsv
+from tools.research.anki_card_validator import (
+    canonical_tag,
+    canonicalize_tags,
+    validate_cards,
+    validate_tsv,
+)
 from tools.research.anki_graph_bridge import AnkiGraphBridge
 from tools.research.citation_engine import CitationEngine
 from tools.research.parse_chunks import estimate_tokens
@@ -1044,7 +1049,7 @@ def import_reviewed_cards(
             heading=card["front"][:60],
             front_html=card["front"],
             back_html=card["back"],
-            tags=card["tags"],
+            tags=canonicalize_tags(card["tags"]),
         )
         for card in cards
     ]
@@ -1316,7 +1321,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Custom Q&A card direct ingestion path
     if args.front and args.back:
-        tag_list = [t for t in args.tags.split() if t]
+        raw_tags = [t for t in args.tags.split() if t]
+        tag_list = canonicalize_tags(raw_tags)
+        dropped = [t for t in raw_tags if canonical_tag(t) is None]
+        if dropped:
+            print(
+                f"Warning: dropping non-canonical tag(s) {dropped}; "
+                "use the canonical vocabulary in anki_card_validator.CANONICAL_TAGS."
+            )
         custom_card = AnkiCard(
             chunk_id="custom-qa",
             file_path="custom-qa",

@@ -804,6 +804,46 @@ def test_import_reviewed_cards_from_jsonl(monkeypatch, tmp_path: Path):
     assert entry["front_html"] == "拜占庭将军问题: 口头消息的可解条件是什么？"
 
 
+def test_import_canonicalizes_tags(monkeypatch, tmp_path: Path):
+    import json
+
+    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_cards
+
+    captured: list[list[str]] = []
+
+    def _capture(self, cards, deck_name):
+        captured.append(cards[0].tags)
+        return [555]
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(AnkiConnectChecker, "add_notes", _capture)
+
+    cards_file = tmp_path / "anki_cards.jsonl"
+    cards_file.write_text(
+        json.dumps(
+            {
+                "chunk_id": "research/cs231/paxos.md:chunk-1",
+                "front": "拜占庭将军问题: 口头消息的可解条件是什么？",
+                "back": (
+                    "<div><b>定义:</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
+                    "<div><b>条件:</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
+                    "<div><b>源码与文档引用 (Source Citation):</b> [research/cs231/paxos.md#L1-L5](file:///tmp/x.md)</div>"
+                ),
+                "tags": ["research", "cs231-distributed-systems", "TCP", "tcp_protocol"],
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    coverage_file = tmp_path / "cov.json"
+    coverage_file.write_text("{}", encoding="utf-8")
+
+    ret = import_reviewed_cards("金融", coverage_file, cards_path=cards_file)
+    assert ret == 0
+    assert captured == [["research", "cs231", "tcp"]]
+
+
 def test_reject_chunk_requires_reason(tmp_path: Path):
     import json
 

@@ -143,6 +143,12 @@ When the user confirms or requests export:
    python3 tools/research/anki_generator.py --front "<front_html>" --back "<back_html>" --deck "金融" --tags "research networking <module_name>" --auto-launch
    ```
 
+   Tags must come from the canonical vocabulary (`CANONICAL_TAGS` in
+   `tools/research/anki_card_validator.py`): `research`, `networking`, the flat
+   course code (`cs231`–`cs234`), and the listed concept tags. Do not invent
+   variants like `tcp_protocol` or `cs231-distributed-systems` — the exporter
+   canonicalizes known synonyms and drops unknown tags with a warning.
+
 4. **Append Progress Report:** Always capture and append the **📊 Anki Courseware Memorization Progress Report** printed by `anki_generator.py` at the end of your response to the user.
 
 ## Citation Requirement

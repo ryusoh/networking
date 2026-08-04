@@ -71,6 +71,101 @@ SECTION_HEADER_RE = re.compile(r"<(b|strong)>[^<]*[:：]</\1>", re.IGNORECASE)
 LATEX_RE = re.compile(r"\\\(.*?\\\)|\\\[.*?\\\]")
 MARKDOWN_LINK_RE = re.compile(r"\[[^\]]*\]\([^()]*\)")
 ACRONYM_TOKEN_RE = re.compile(r"\b(?:[A-Z]{2,}|[A-Za-z]*[A-Z][a-z]+[A-Z][A-Za-z]*)$")
+# Canonical tag vocabulary. Tags are the one free-form field the LLM authors,
+# so they are machine-gated like everything else: a card may only carry tags
+# from this set (after normalization), which keeps the Anki tag space from
+# accumulating synonyms like tcp/tcp_protocol or cs231/cs231-distributed-systems.
+COURSE_CODES = ("cs231", "cs232", "cs233", "cs234")
+CANONICAL_TAGS = frozenset(
+    {
+        # structural markers
+        "research",
+        "networking",
+        "qa_export",
+        # course tags (flat course code only, never cs231-distributed-systems)
+        *COURSE_CODES,
+        # protocols
+        "tcp",
+        "udp",
+        "ip",
+        "bgp",
+        "ospf",
+        "dns",
+        "http",
+        "tls",
+        "nat",
+        "arp",
+        "dhcp",
+        "icmp",
+        "mpls",
+        "vlan",
+        "vxlan",
+        "rdma",
+        # mechanisms and concepts
+        "qos",
+        "routing",
+        "switching",
+        "congestion_control",
+        "flow_control",
+        "reliable_transport",
+        "multicast",
+        "wireless",
+        "mobile_ip",
+        "sdn",
+        "p2p",
+        "cdn",
+        "network_security",
+        "traffic_engineering",
+        "measurement",
+        # distributed systems
+        "distributed_systems",
+        "consensus",
+        "paxos",
+        "raft",
+        "mapreduce",
+        "mpi",
+        "parallelism",
+        "scheduling",
+        "load_balancing",
+        "caching",
+        "replication",
+        "fault_tolerance",
+    }
+)
+# Known synonym spellings observed in authored cards, mapped to the canonical
+# form. Separator/case variants (tcp-protocol, TCP) normalize before this map.
+TAG_ALIASES = {
+    "tcp_protocol": "tcp",
+    "udp_protocol": "udp",
+    "ip_protocol": "ip",
+    "distributed_system": "distributed_systems",
+    "load_balancer": "load_balancing",
+}
+
+
+def canonical_tag(tag: str) -> str | None:
+    """Return the canonical form of a tag, or None if it is not in the vocabulary."""
+    norm = tag.strip().lower().replace("-", "_").replace(" ", "_")
+    if norm in CANONICAL_TAGS:
+        return norm
+    if norm in TAG_ALIASES:
+        return TAG_ALIASES[norm]
+    for code in COURSE_CODES:
+        if norm.startswith(code + "_"):  # cs231_distributed_systems -> cs231
+            return code
+    return None
+
+
+def canonicalize_tags(tags: list[str]) -> list[str]:
+    """Map tags to canonical form, dropping unknowns and deduping (order kept)."""
+    seen: dict[str, None] = {}
+    for tag in tags:
+        canon = canonical_tag(tag)
+        if canon is not None:
+            seen.setdefault(canon)
+    return list(seen)
+
+
 COMMON_ACRONYMS = {
     "FFT",
     "MPI",
@@ -348,6 +443,22 @@ def _validate_card(front: str, back: str) -> list[str]:
     return card_issues
 
 
+def _tag_issues(tags: Any) -> list[str]:
+    """Flag tags outside the canonical vocabulary; alias/separator variants pass
+    (the importer canonicalizes them) — only invented tags are rejected."""
+    if isinstance(tags, str):
+        tags = tags.split()
+    issues: list[str] = []
+    for tag in tags or []:
+        if canonical_tag(str(tag)) is None:
+            issues.append(
+                f"Unknown tag '{tag}' — tags must come from the canonical vocabulary "
+                "(CANONICAL_TAGS in anki_card_validator.py); pick the closest existing "
+                "tag instead of inventing a variant"
+            )
+    return issues
+
+
 def validate_cards(cards: list[dict[str, Any]]) -> dict[str, list[str]]:
     """Validate a list of card dicts {front, back, chunk_id?, tags?}."""
     issues: dict[str, list[str]] = {}
@@ -356,7 +467,7 @@ def validate_cards(cards: list[dict[str, Any]]) -> dict[str, list[str]]:
         front = card.get("front", "")
         back = card.get("back", "")
         fronts.append(front)
-        card_issues = _validate_card(front, back)
+        card_issues = _validate_card(front, back) + _tag_issues(card.get("tags"))
         if card_issues:
             issues[f"card {i}"] = card_issues
 
@@ -389,6 +500,7 @@ def validate_tsv(tsv_path: Path) -> dict[str, list[str]]:
         front, back = parts[0], parts[1]
         fronts.append(front)
         card_issues = _validate_card(front, back)
+        card_issues += _tag_issues(parts[2].split() if len(parts) > 2 else [])
         if card_issues:
             issues[f"card {len(fronts)} (line {idx})"] = card_issues
 
