@@ -769,45 +769,70 @@
     return h + '</table>';
   }
 
-  function injectFinancials() {
-    if (document.querySelector('.gf-u-wrap')) {
-      return true;
-    }
+  /**
+   * @typedef {Object} FinancialData
+   * @property {Array<Record<string, unknown>>} annual
+   * @property {Array<Record<string, unknown>>} quarter
+   * @property {Array<Record<string, unknown>>} ttm
+   */
 
-    const nuxt =
-      /** @type {{ state?: { stock_summary_financial?: { financials?: { annual?: Array<Record<string, unknown>>, quarter?: Array<Record<string, unknown>>, ttm?: Array<Record<string, unknown>> } } } }} */ (
-        /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))['__NUXT__']
-      );
-    if (!nuxt || !nuxt.state || !nuxt.state.stock_summary_financial) {
-      return false;
-    }
-    const fin = nuxt.state.stock_summary_financial.financials;
-    if (!fin) {
-      return false;
-    }
-
+  /**
+   * @param {{ annual?: Array<Record<string, unknown>>, quarter?: Array<Record<string, unknown>>, ttm?: Array<Record<string, unknown>> }} fin
+   * @returns {FinancialData | null}
+   */
+  function extractFinancials(fin) {
     const annual = fin.annual || [];
     const quarter = fin.quarter || [];
     const ttm = fin.ttm || [];
     if (!annual.length && !quarter.length && !ttm.length) {
-      return false;
+      return null;
+    }
+    return { annual, quarter, ttm };
+  }
+
+  /** @returns {FinancialData | null} */
+  function getFinancialData() {
+    const nuxt =
+      /** @type {{ state?: { stock_summary_financial?: { financials?: { annual?: Array<Record<string, unknown>>, quarter?: Array<Record<string, unknown>>, ttm?: Array<Record<string, unknown>> } } } }} */ (
+        /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))['__NUXT__']
+      );
+
+    if (
+      !nuxt ||
+      !nuxt.state ||
+      !nuxt.state.stock_summary_financial ||
+      !nuxt.state.stock_summary_financial.financials
+    ) {
+      return null;
     }
 
+    return extractFinancials(nuxt.state.stock_summary_financial.financials);
+  }
+
+  /**
+   * @param {FinancialData} data
+   * @returns {{tabHtml: string, panelHtml: string} | null}
+   */
+  function buildFinancialTabsAndPanels(data) {
     /** @type {string[]} */
     const tabs = [];
     /** @type {Array<{id: string, html: string}>} */
     const panels = [];
-    if (annual.length) {
+    if (data.annual.length) {
       tabs.push('Annual');
-      panels.push({ id: 'annual', html: buildTable(annual) });
+      panels.push({ id: 'annual', html: buildTable(data.annual) });
     }
-    if (quarter.length) {
+    if (data.quarter.length) {
       tabs.push('Quarterly');
-      panels.push({ id: 'quarter', html: buildTable(quarter) });
+      panels.push({ id: 'quarter', html: buildTable(data.quarter) });
     }
-    if (ttm.length) {
+    if (data.ttm.length) {
       tabs.push('TTM');
-      panels.push({ id: 'ttm', html: buildTable(ttm) });
+      panels.push({ id: 'ttm', html: buildTable(data.ttm) });
+    }
+
+    if (!tabs.length) {
+      return null;
     }
 
     let tabHtml = '<div class="gf-u-tabs">';
@@ -835,40 +860,14 @@
         '</div>';
     }
 
-    const wrap = document.createElement('div');
-    wrap.className = 'gf-u-wrap';
-    wrap.innerHTML =
-      CSS +
-      '<h3 style="margin:0 0 10px;font-size:16px;color:#333;">Financial Summary</h3>' +
-      tabHtml +
-      panelHtml;
+    return { tabHtml, panelHtml };
+  }
 
-    wrap.addEventListener('click', function (e) {
-      const tab = e.target;
-      if (!(tab instanceof HTMLElement)) {
-        return;
-      }
-      if (!tab.classList.contains('gf-u-tab')) {
-        return;
-      }
-      const id = tab.getAttribute('data-gfu');
-      const allTabs = wrap.querySelectorAll('.gf-u-tab');
-      /** @type {NodeListOf<HTMLElement>} */
-      const allPanels = wrap.querySelectorAll('.gf-u-panel');
-      for (let i = 0; i < allTabs.length; i++) {
-        allTabs[i].classList.remove('active');
-      }
-      for (let j = 0; j < allPanels.length; j++) {
-        allPanels[j].style.display = 'none';
-      }
-      tab.classList.add('active');
-      const target = wrap.querySelector('.gf-u-panel[data-gfu="' + id + '"]');
-      if (target instanceof HTMLElement) {
-        target.style.display = 'block';
-      }
-    });
-
-    // Insert into summary container or after stock header
+  /**
+   * @param {HTMLElement} wrap
+   * @returns {boolean}
+   */
+  function insertFinancialWrap(wrap) {
     const container = document.querySelector('.built-in-stock-summary');
     if (container) {
       container.appendChild(wrap);
@@ -888,6 +887,65 @@
     }
 
     return false;
+  }
+
+  /**
+   * @param {Event} e
+   * @param {HTMLElement} wrap
+   */
+  function handleFinancialTabClick(e, wrap) {
+    const tab = e.target;
+    if (!(tab instanceof HTMLElement)) {
+      return;
+    }
+    if (!tab.classList.contains('gf-u-tab')) {
+      return;
+    }
+    const id = tab.getAttribute('data-gfu');
+    const allTabs = wrap.querySelectorAll('.gf-u-tab');
+    /** @type {NodeListOf<HTMLElement>} */
+    const allPanels = wrap.querySelectorAll('.gf-u-panel');
+    for (let i = 0; i < allTabs.length; i++) {
+      allTabs[i].classList.remove('active');
+    }
+    for (let j = 0; j < allPanels.length; j++) {
+      allPanels[j].style.display = 'none';
+    }
+    tab.classList.add('active');
+    const target = wrap.querySelector('.gf-u-panel[data-gfu="' + id + '"]');
+    if (target instanceof HTMLElement) {
+      target.style.display = 'block';
+    }
+  }
+
+  function injectFinancials() {
+    if (document.querySelector('.gf-u-wrap')) {
+      return true;
+    }
+
+    const data = getFinancialData();
+    if (!data) {
+      return false;
+    }
+
+    const htmlParts = buildFinancialTabsAndPanels(data);
+    if (!htmlParts) {
+      return false;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'gf-u-wrap';
+    wrap.innerHTML =
+      CSS +
+      '<h3 style="margin:0 0 10px;font-size:16px;color:#333;">Financial Summary</h3>' +
+      htmlParts.tabHtml +
+      htmlParts.panelHtml;
+
+    wrap.addEventListener('click', function (e) {
+      handleFinancialTabClick(e, wrap);
+    });
+
+    return insertFinancialWrap(wrap);
   }
 
   // --- Run ---
