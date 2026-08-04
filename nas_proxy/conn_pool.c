@@ -389,14 +389,8 @@ done:
 
 /* --- HTTP CONNECT handler (per-thread) --- */
 
-typedef struct {
-    int client_fd;
-} ClientArg;
-
 static void *handle_client(void *arg) {
-    ClientArg *ca = (ClientArg *)arg;
-    int client_fd = ca->client_fd;
-    free(ca);
+    int client_fd = (int)(intptr_t)arg;
 
     /* Read the HTTP CONNECT request */
     char reqbuf[2048];
@@ -417,23 +411,24 @@ static void *handle_client(void *arg) {
         return NULL;
     }
 
-    char hostport[256] = {0};
-    {
-        char *hp_start = reqbuf + 8;
-        char *space = strchr(hp_start, ' ');
-        size_t hp_len = space ? (size_t)(space - hp_start) : strlen(hp_start);
-        if (hp_len >= sizeof(hostport)) hp_len = sizeof(hostport) - 1;
-        memcpy(hostport, hp_start, hp_len);
-    }
-
     char dest_host[256] = {0};
     int dest_port = 443;
-    char *colon = strrchr(hostport, ':');
+
+    char *hp_start = reqbuf + 8;
+    char *space = strchr(hp_start, ' ');
+    size_t hp_len = space ? (size_t)(space - hp_start) : strlen(hp_start);
+    if (hp_len >= sizeof(dest_host)) hp_len = sizeof(dest_host) - 1;
+
+    char *colon = memchr(hp_start, ':', hp_len);
     if (colon) {
-        *colon = '\0';
+        size_t host_len = (size_t)(colon - hp_start);
+        memcpy(dest_host, hp_start, host_len);
+        dest_host[host_len] = '\0';
         dest_port = atoi(colon + 1);
+    } else {
+        memcpy(dest_host, hp_start, hp_len);
+        dest_host[hp_len] = '\0';
     }
-    memcpy(dest_host, hostport, sizeof(dest_host));
 
     /* Acquire a pooled SOCKS5 connection */
     int remote_fd = pool_acquire(dest_host, dest_port);
@@ -569,12 +564,8 @@ int main(void) {
         int flag = 1;
         setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 
-        ClientArg *ca = malloc(sizeof(ClientArg));
-        ca->client_fd = client_fd;
-
         pthread_t tid;
-        if (pthread_create(&tid, NULL, handle_client, ca) != 0) {
-            free(ca);
+        if (pthread_create(&tid, NULL, handle_client, (void *)(intptr_t)client_fd) != 0) {
             close(client_fd);
         } else {
             pthread_detach(tid);
