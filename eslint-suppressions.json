@@ -1,9 +1,4 @@
 {
-  "adblock/content.js": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "adblock/gurufocus-unlocked.js": {
     "complexity": {
       "count": 1
