@@ -456,6 +456,168 @@
   }
 
   /**
+   * Determines if execution should be skipped for this host based on prefs.
+   * @param {any} prefs
+   * @param {string} host
+   * @returns {boolean}
+   */
+  function shouldSkipHost(prefs, host) {
+    if (!prefs || prefs.enabled === false) {
+      return true;
+    }
+    const isWhitelisted =
+      Array.isArray(prefs.whitelist) &&
+      prefs.whitelist.some((/** @type {string} */ s) => host.includes(s));
+    if (isWhitelisted) {
+      log('Site is whitelisted, skipping.');
+      return true;
+    }
+    if (prefs.mode === 'selective') {
+      const inBlacklist =
+        Array.isArray(prefs.blacklist) &&
+        prefs.blacklist.some((/** @type {string} */ s) => host.includes(s));
+      if (!inBlacklist) {
+        log('Selective mode active and site not in blacklist, skipping.');
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Restores interaction unless on specific SPAs where it breaks layout.
+   * @param {string} host
+   */
+  function restoreInteractionsIfAllowed(host) {
+    const SKIP_INTERACTIONS = [
+      'instagram.com',
+      'facebook.com',
+      'reddit.com',
+      'pinterest.com',
+      'youtube.com',
+      'x.com',
+      'twitter.com',
+      'linkedin.com',
+      'twitch.tv',
+      'google.com'
+    ];
+    if (!SKIP_INTERACTIONS.some((d) => host === d || host.endsWith('.' + d))) {
+      restoreInteractions();
+    }
+  }
+
+  /**
+   * Hide common adblock detection overlays by selector.
+   */
+  function processAdblockPopups() {
+    const ADBLOCK_POPUP_SELECTORS = [
+      '[class*="adblock" i]',
+      '[id*="adblock" i]',
+      '[class*="ad-block" i]',
+      '[id*="ad-block" i]',
+      '[class*="adblocker" i]',
+      '[id*="adblocker" i]',
+      '[class*="adblock-modal"]',
+      '[class*="adblock-overlay"]',
+      '[class*="adblock-notice"]',
+      '[class*="adblock-wall"]',
+      '[class*="anti-adblocker"]',
+      '[id*="anti-adblocker"]',
+      '.fc-consent-root',
+      '.fc-dialog-overlay',
+      '#__ABoverlay'
+    ];
+    const numAdblockSelectors = ADBLOCK_POPUP_SELECTORS.length;
+    for (let i = 0; i < numAdblockSelectors; i++) {
+      const sel = ADBLOCK_POPUP_SELECTORS[i];
+      try {
+        const els = document.querySelectorAll(sel);
+        const numEls = els.length;
+        for (let j = 0; j < numEls; j++) {
+          const el = els[j];
+          if (
+            el instanceof HTMLElement &&
+            (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none')
+          ) {
+            log('Hiding adblock popup by selector:', sel);
+            hideDetector(el);
+          }
+        }
+      } catch {
+        /* invalid selector */
+      }
+    }
+  }
+
+  /**
+   * Apply automatic text-based detection.
+   */
+  function applyTextBasedDetection() {
+    scanDOM(
+      document.body,
+      /** @param {Element} el */ (el) => {
+        if (scoreElement(el) > 0.6) {
+          hideDetector(el);
+        }
+      }
+    );
+  }
+
+  /**
+   * Hides elements matching a list of custom selectors.
+   * @param {string[]} selectors
+   */
+  function processCustomSelectors(selectors) {
+    const numSelectors = selectors.length;
+    for (let i = 0; i < numSelectors; i++) {
+      const selector = selectors[i];
+      try {
+        const els = document.querySelectorAll(selector);
+        const numEls = els.length;
+        for (let j = 0; j < numEls; j++) {
+          const el = els[j];
+          if (el instanceof HTMLElement) {
+            el.style.setProperty('display', 'none', 'important');
+          }
+        }
+      } catch {
+        log('Invalid custom selector:', selector);
+      }
+    }
+  }
+
+  /**
+   * Apply custom user-defined selectors.
+   * @param {string} host
+   */
+  function applyCustomSelectors(host) {
+    try {
+      const localStorage = chrome?.storage?.local;
+      if (!localStorage) {
+        return;
+      }
+      localStorage.get(
+        ['customSelectors'],
+        /** @param {{ customSelectors?: Record<string, string[]> }} result */ (result) => {
+          try {
+            if (!isContextValid() || chrome?.runtime?.lastError) {
+              return;
+            }
+            const selectors = result?.customSelectors ? result.customSelectors[host] : null;
+            if (selectors && Array.isArray(selectors)) {
+              processCustomSelectors(selectors);
+            }
+          } catch (e) {
+            log('Local storage callback failed:', e);
+          }
+        }
+      );
+    } catch (e) {
+      log('Local storage access failed:', e);
+    }
+  }
+
+  /**
    * Main execution loop.
    */
   function run() {
@@ -477,50 +639,16 @@
           if (!isContextValid() || chrome?.runtime?.lastError) {
             return;
           }
-          if (prefs?.enabled === false) {
-            return;
-          }
 
           const host = window.location.hostname;
 
-          // 1. Check Whitelist (highest priority)
-          if (
-            prefs &&
-            Array.isArray(prefs.whitelist) &&
-            prefs.whitelist.some((s) => host.includes(s))
-          ) {
-            log('Site is whitelisted, skipping.');
+          // 1 & 3. Check Whitelist and Execution Mode
+          if (shouldSkipHost(prefs, host)) {
             return;
           }
 
           // 2. Force Interaction Restoration (skip on SPAs where it breaks layout)
-          const SKIP_INTERACTIONS = [
-            'instagram.com',
-            'facebook.com',
-            'reddit.com',
-            'pinterest.com',
-            'youtube.com',
-            'x.com',
-            'twitter.com',
-            'linkedin.com',
-            'twitch.tv',
-            'google.com'
-          ];
-          if (!SKIP_INTERACTIONS.some((d) => host === d || host.endsWith('.' + d))) {
-            restoreInteractions();
-          }
-
-          // 3. Check Execution Mode
-          if (prefs?.mode === 'selective') {
-            const inBlacklist =
-              prefs &&
-              Array.isArray(prefs.blacklist) &&
-              prefs.blacklist.some((s) => host.includes(s));
-            if (!inBlacklist) {
-              log('Selective mode active and site not in blacklist, skipping.');
-              return;
-            }
-          }
+          restoreInteractionsIfAllowed(host);
 
           // 4. Site-specific handling
           Object.keys(SITE_MODULES).forEach((m) => {
@@ -530,99 +658,16 @@
           });
 
           // 5. Hide common adblock detection overlays by selector
-          const ADBLOCK_POPUP_SELECTORS = [
-            '[class*="adblock" i]',
-            '[id*="adblock" i]',
-            '[class*="ad-block" i]',
-            '[id*="ad-block" i]',
-            '[class*="adblocker" i]',
-            '[id*="adblocker" i]',
-            '[class*="adblock-modal"]',
-            '[class*="adblock-overlay"]',
-            '[class*="adblock-notice"]',
-            '[class*="adblock-wall"]',
-            '[class*="anti-adblocker"]',
-            '[id*="anti-adblocker"]',
-            '.fc-consent-root',
-            '.fc-dialog-overlay',
-            '#__ABoverlay'
-          ];
-
-          const numAdblockSelectors = ADBLOCK_POPUP_SELECTORS.length;
-          for (let i = 0; i < numAdblockSelectors; i++) {
-            const sel = ADBLOCK_POPUP_SELECTORS[i];
-            try {
-              const els = document.querySelectorAll(sel);
-              const numEls = els.length;
-              for (let j = 0; j < numEls; j++) {
-                const el = els[j];
-                if (
-                  el instanceof HTMLElement &&
-                  (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none')
-                ) {
-                  log('Hiding adblock popup by selector:', sel);
-                  hideDetector(el);
-                }
-              }
-            } catch {
-              /* invalid selector */
-            }
-          }
+          processAdblockPopups();
 
           // 5b. Detect Admiral anti-adblock (uses randomized classes, detect by content)
           dismissAdmiral();
 
           // 6. Apply automatic text-based detection
-          scanDOM(
-            document.body,
-            /** @param {Element} el */ (el) => {
-              if (scoreElement(el) > 0.6) {
-                hideDetector(el);
-              }
-            }
-          );
+          applyTextBasedDetection();
 
-          // 5. Apply custom user-defined selectors
-          try {
-            const localStorage = chrome?.storage?.local;
-            if (!localStorage) {
-              return;
-            }
-
-            localStorage.get(
-              ['customSelectors'],
-              /** @param {{ customSelectors?: Record<string, string[]> }} result */ (result) => {
-                try {
-                  if (!isContextValid() || chrome?.runtime?.lastError) {
-                    return;
-                  }
-                  const selectors = result?.customSelectors ? result.customSelectors[host] : null;
-                  if (selectors && Array.isArray(selectors)) {
-                    const numSelectors = selectors.length;
-                    for (let i = 0; i < numSelectors; i++) {
-                      const selector = selectors[i];
-                      try {
-                        const els = document.querySelectorAll(selector);
-                        const numEls = els.length;
-                        for (let j = 0; j < numEls; j++) {
-                          const el = els[j];
-                          if (el instanceof HTMLElement) {
-                            el.style.setProperty('display', 'none', 'important');
-                          }
-                        }
-                      } catch {
-                        log('Invalid custom selector:', selector);
-                      }
-                    }
-                  }
-                } catch (e) {
-                  log('Local storage callback failed:', e);
-                }
-              }
-            );
-          } catch (e) {
-            log('Local storage access failed:', e);
-          }
+          // 7. Apply custom user-defined selectors
+          applyCustomSelectors(host);
         } catch (e) {
           log('Sync storage callback failed:', e);
         }
