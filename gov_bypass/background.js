@@ -9,6 +9,20 @@
 const NAS_IP = '10.0.0.169';
 const BRIDGE_PORT = 3128;
 
+/**
+ * @typedef {Object} ProxySource
+ * @property {string} name
+ * @property {string} url
+ * @property {string} type
+ */
+
+/**
+ * @typedef {Object} VerifiedProxy
+ * @property {string} ip
+ * @property {number} port
+ */
+
+/** @type {ProxySource[]} */
 const SOURCES = [
   {
     name: 'NAS Verified Proxies',
@@ -19,6 +33,7 @@ const SOURCES = [
 
 const ROTATION_INTERVAL_MINS = 5;
 
+/** @type {VerifiedProxy[]} */
 let proxyList = [];
 let currentProxyIndex = 0;
 
@@ -27,9 +42,12 @@ let currentProxyIndex = 0;
  * Primary: NAS bridge proxy (HTTP CONNECT, handled efficiently by Chrome)
  * Fallback: direct SOCKS5 to verified Chinese proxies
  */
+/**
+ * @param {string} proxyChain
+ */
 function updateProxySettings(proxyChain) {
   const config = {
-    mode: 'pac_script',
+    mode: /** @type {chrome.proxy.ProxyConfig['mode']} */ ('pac_script'),
     pacScript: {
       data: `
         function FindProxyForURL(url, host) {
@@ -102,7 +120,7 @@ async function refreshProxy() {
     }
 
     applyProxyList();
-  } catch (e) {
+  } catch (/** @type {any} */ e) {
     console.error('[Tianditu] Failed to refresh proxies:', e);
   }
 }
@@ -117,13 +135,17 @@ async function ensureOffscreenDocument() {
       reasons: ['DOM_PARSER'],
       justification: 'Fetch and parse proxies'
     });
-  } catch (e) {
+  } catch (/** @type {any} */ e) {
     if (!e.message.includes('Only a single offscreen document')) {
       throw e;
     }
   }
 }
 
+/**
+ * @param {any} message
+ * @param {number} [maxRetries=3]
+ */
 async function sendMessageToOffscreen(message, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -131,7 +153,7 @@ async function sendMessageToOffscreen(message, maxRetries = 3) {
       if (response) {
         return response;
       }
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
       if (i === maxRetries - 1) {
         throw e;
       }
@@ -140,6 +162,10 @@ async function sendMessageToOffscreen(message, maxRetries = 3) {
   }
 }
 
+/**
+ * @param {ProxySource} source
+ * @returns {Promise<VerifiedProxy[]>}
+ */
 async function fetchFromSource(source) {
   try {
     await ensureOffscreenDocument();
@@ -154,7 +180,7 @@ async function fetchFromSource(source) {
       sourceType: source.type
     });
     return result.proxies || [];
-  } catch (e) {
+  } catch (/** @type {any} */ e) {
     console.error(`[Tianditu] ${source.name} failed: ${e.message}`);
     return [];
   }
