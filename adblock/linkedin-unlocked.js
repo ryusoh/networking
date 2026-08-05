@@ -143,27 +143,40 @@
       return;
     }
     const cards = document.querySelectorAll(CARD_SELECTORS);
-    cards.forEach((card) => {
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
       const premiumLinks = card.querySelectorAll('a[href*="premium"]');
       if (premiumLinks.length === 0) {
-        return;
+        continue;
       }
 
       const safeUrl = getDestinationForCard(card);
       if (safeUrl) {
-        premiumLinks.forEach((link) => {
+        for (let j = 0; j < premiumLinks.length; j++) {
+          const link = premiumLinks[j];
           if (link instanceof HTMLAnchorElement) {
             link.href = safeUrl;
             link.setAttribute('data-cleaned', 'true');
             link.removeAttribute('data-tracking-control-name');
             link.removeAttribute('data-tracking-will-navigate');
           }
-        });
+        }
       }
-    });
+    }
   }
 
-  const observer = new MutationObserver(proactivelyCleanLinks);
+  const observer = new MutationObserver((mutations) => {
+    let hasAdded = false;
+    for (let i = 0; i < mutations.length; i++) {
+      if (mutations[i].addedNodes.length > 0) {
+        hasAdded = true;
+        break;
+      }
+    }
+    if (hasAdded) {
+      proactivelyCleanLinks();
+    }
+  });
   observer.observe(document.documentElement, { childList: true, subtree: true });
   proactivelyCleanLinks();
 
