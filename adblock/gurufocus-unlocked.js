@@ -60,47 +60,56 @@
   }
 
   // --- MutationObserver: catch Vue reactivity re-applying blur ---
+  /** @param {HTMLElement} el */
+  function handleAttributeMutation(el) {
+    if (el.classList && el.classList.contains('blur')) {
+      unblur(el);
+    }
+    if (el.style && el.style.filter && el.style.filter.indexOf('blur') !== -1) {
+      unblur(el);
+    }
+  }
+
+  /** @param {HTMLElement} node */
+  function handleAddedNode(node) {
+    if (node instanceof HTMLImageElement && node.src && node.src.indexOf('blur') !== -1) {
+      node.remove();
+      return;
+    }
+    if (
+      node.classList.contains('blur') ||
+      (node.style && node.style.filter && node.style.filter.indexOf('blur') !== -1)
+    ) {
+      unblur(node);
+    }
+    /** @type {NodeListOf<HTMLElement>} */
+    const blurred = node.querySelectorAll('.blur, [style*="blur"]');
+    for (let k = 0; k < blurred.length; k++) {
+      unblur(blurred[k]);
+    }
+    /** @type {NodeListOf<HTMLImageElement>} */
+    const blurImgs = node.querySelectorAll('img[src*="blur"]');
+    for (let l = 0; l < blurImgs.length; l++) {
+      blurImgs[l].remove();
+    }
+  }
+
   const observer = new MutationObserver(function (mutations) {
+    if (typeof document === 'undefined' || !document) {
+      return;
+    }
     for (let i = 0; i < mutations.length; i++) {
       const m = mutations[i];
       if (m.type === 'attributes') {
         const el = m.target;
         if (el instanceof HTMLElement) {
-          if (el.classList && el.classList.contains('blur')) {
-            unblur(el);
-          }
-          if (el.style && el.style.filter && el.style.filter.indexOf('blur') !== -1) {
-            unblur(el);
-          }
+          handleAttributeMutation(el);
         }
-      }
-      if (m.type === 'childList') {
+      } else if (m.type === 'childList') {
         for (let j = 0; j < m.addedNodes.length; j++) {
           const node = m.addedNodes[j];
-          if (!(node instanceof HTMLElement)) {
-            continue;
-          }
-          // Remove blur overlay images
-          if (node instanceof HTMLImageElement && node.src && node.src.indexOf('blur') !== -1) {
-            node.remove();
-            continue;
-          }
-          if (
-            node.classList.contains('blur') ||
-            (node.style && node.style.filter && node.style.filter.indexOf('blur') !== -1)
-          ) {
-            unblur(node);
-          }
-          /** @type {NodeListOf<HTMLElement>} */
-          const blurred = node.querySelectorAll('.blur, [style*="blur"]');
-          for (let k = 0; k < blurred.length; k++) {
-            unblur(blurred[k]);
-          }
-          // Remove blur images inside added subtrees
-          /** @type {NodeListOf<HTMLImageElement>} */
-          const blurImgs = node.querySelectorAll('img[src*="blur"]');
-          for (let l = 0; l < blurImgs.length; l++) {
-            blurImgs[l].remove();
+          if (node instanceof HTMLElement) {
+            handleAddedNode(node);
           }
         }
       }
