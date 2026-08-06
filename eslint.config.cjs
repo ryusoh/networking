@@ -6,7 +6,8 @@ module.exports = [
       '**/coverage/**',
       '**/dist/**',
       '**/*.min.js',
-      '**/research/**'
+      '**/research/**',
+      '**/venv/**'
     ]
   },
   {

@@ -58,7 +58,18 @@
   }
 
   // Use MutationObserver to catch dynamic loads (LinkedIn loads rail content late)
-  const observer = new MutationObserver(hidePromoted);
+  const observer = new MutationObserver((mutations) => {
+    let hasAdded = false;
+    for (let i = 0; i < mutations.length; i++) {
+      if (mutations[i].addedNodes.length > 0) {
+        hasAdded = true;
+        break;
+      }
+    }
+    if (hasAdded) {
+      hidePromoted();
+    }
+  });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   // Initial run
