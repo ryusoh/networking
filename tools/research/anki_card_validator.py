@@ -214,6 +214,7 @@ COMMON_ACRONYMS = {
     "GSM",
     "LTE",
     "WiFi",
+    "GPS",
     "AS-PATH",
     "NEXT-HOP",
 }

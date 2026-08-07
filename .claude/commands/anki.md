@@ -69,6 +69,12 @@ date-stamp | outline | qa-mismatch | duplicate | other`.
     report that the region is exhausted. Never loop reject→regenerate more
     than twice; each round costs a full review and the loop otherwise burns
     the whole session's quota on junk regions.
+  - **Partial rejection does not unblock regeneration.** Rejecting some
+    candidates leaves the keepers in `"candidate"` status, and the generator
+    still refuses `--count` while any chunk is unresolved. So a mixed batch
+    is a two-phase flow: author + validate + import the keepers first, then
+    run `--count <remaining>` for replacements and author a second
+    `anki_cards.jsonl` batch.
 
 #### Card format contract (enforce on every card)
 
@@ -99,6 +105,17 @@ annotations`). When in doubt, do NOT annotate.
   back (e.g. `NITRD (Networking and Information Technology Research and
 Development)`). The validator scans the **whole card** — an acronym that
   appears anywhere without an expansion (e.g. a bare `DIKW`) is a reject.
+  Expansion gotchas (each cost a validator round-trip):
+  - The expansion must be an **English parenthetical whose word initials
+    subsequence-match** the acronym (`GPS (Global Positioning System)`). A
+    Chinese gloss in parentheses does **not** count.
+  - The acronym extractor pulls uppercase runs out of hyphenated tokens:
+    `cell-ID` surfaces a bare `ID` that you cannot expand naturally. Prefer
+    the plain Chinese rendering (`蜂窝小区标识三角测量`) over keeping the
+    Latin token.
+  - Only `COMMON_ACRONYMS` in `anki_card_validator.py` are exempt (TCP, DNS,
+    GSM, LTE, WiFi, GPS, ...). Anything else — `LBS`, `LPWAN`, and similar
+    coinages — needs an expansion even if it feels standard.
 - **End with** a `源码与文档引用 (Source Citation):` section containing the
   line-anchored Markdown link.
 - **Tags (machine-gated, canonical vocabulary only):** tag every card with
@@ -168,6 +185,10 @@ Example (bad — low density, no sections, English summary paragraph):
 ### 4. Import & state hygiene
 
 - Import only with `python3 tools/research/anki_generator.py --import --deck "金融"`.
+- **`--import` consumes every line in `research/anki_cards.jsonl` blindly.**
+  The file survives across runs, so before writing a new batch, overwrite it
+  (never append) and confirm no stale cards from a previous run remain —
+  already-imported cards would be re-imported as duplicates.
 - The generator refuses to emit new candidates while any chunks are in
   `"candidate"` or `"pending_import"` status. Resolve the current batch
   first.
