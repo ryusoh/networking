@@ -15,13 +15,7 @@
     '.text-color-icon.font-semibold'
   ].join(', ');
 
-  function hidePromoted() {
-    // The MutationObserver can fire asynchronously during page teardown/bfcache
-    // (or test environment teardown), when `document` is no longer available.
-    if (typeof document === 'undefined' || !document) {
-      return;
-    }
-
+  function hidePromotedCardsBySelector() {
     const els = document.querySelectorAll(PROMOTED_SELECTORS);
     for (let i = 0; i < els.length; i++) {
       const el = els[i];
@@ -40,21 +34,35 @@
         }
       }
     }
+  }
 
+  function hidePromotedCardsInSidebar() {
     // 2. Catch-all for any element containing ONLY the word "Promoted" inside the sidebar
     const sidebar = document.querySelector('.right-rail, [data-testid="sidebarColumn"], aside');
-    if (sidebar) {
-      const allElements = sidebar.querySelectorAll('span, p, a, div');
-      for (let i = 0; i < allElements.length; i++) {
-        const el = allElements[i];
-        if (el.children.length === 0 && el.textContent && el.textContent.trim() === 'Promoted') {
-          const card = el.closest('.artdeco-card') || el.closest('aside') || el.closest('div');
-          if (card instanceof HTMLElement && card !== sidebar) {
-            card.style.setProperty('display', 'none', 'important');
-          }
+    if (!sidebar) {
+      return;
+    }
+    const allElements = sidebar.querySelectorAll('span, p, a, div');
+    for (let i = 0; i < allElements.length; i++) {
+      const el = allElements[i];
+      if (el.children.length === 0 && el.textContent && el.textContent.trim() === 'Promoted') {
+        const card = el.closest('.artdeco-card') || el.closest('aside') || el.closest('div');
+        if (card instanceof HTMLElement && card !== sidebar) {
+          card.style.setProperty('display', 'none', 'important');
         }
       }
     }
+  }
+
+  function hidePromoted() {
+    // The MutationObserver can fire asynchronously during page teardown/bfcache
+    // (or test environment teardown), when `document` is no longer available.
+    if (typeof document === 'undefined' || !document) {
+      return;
+    }
+
+    hidePromotedCardsBySelector();
+    hidePromotedCardsInSidebar();
   }
 
   // Use MutationObserver to catch dynamic loads (LinkedIn loads rail content late)
