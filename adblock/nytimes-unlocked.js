@@ -137,27 +137,33 @@
     });
 
     // Also hide any container wrapping a regiwall iframe
-    document.querySelectorAll('div').forEach((div) => {
-      const s = window.getComputedStyle(div);
-      if ((s.position === 'fixed' || s.position === 'absolute') && s.display !== 'none') {
-        const iframe = div.querySelector(
-          'iframe[src*="regiwall"], iframe[src*="RegiWall"], iframe[src*="gateway"]'
-        );
-        if (iframe) {
-          div.style.setProperty('display', 'none', 'important');
+    document
+      .querySelectorAll('iframe[src*="regiwall"], iframe[src*="RegiWall"], iframe[src*="gateway"]')
+      .forEach((iframe) => {
+        let el = iframe.parentElement;
+        while (el && el !== document.body) {
+          if (el.tagName === 'DIV') {
+            const s = window.getComputedStyle(el);
+            if ((s.position === 'fixed' || s.position === 'absolute') && s.display !== 'none') {
+              el.style.setProperty('display', 'none', 'important');
+              break;
+            }
+          }
+          el = el.parentElement;
         }
-      }
-    });
+      });
 
     // Subscribe CTA
-    document.querySelectorAll('p[role="note"]').forEach((p) => {
-      if (
-        p instanceof HTMLElement &&
-        (p.querySelector('a[href*="subscription"]') || p.querySelector('a[href*="campaignId"]'))
-      ) {
-        p.style.setProperty('display', 'none', 'important');
-      }
-    });
+    document
+      .querySelectorAll(
+        'p[role="note"] a[href*="subscription"], p[role="note"] a[href*="campaignId"]'
+      )
+      .forEach((a) => {
+        const p = a.closest('p[role="note"]');
+        if (p instanceof HTMLElement) {
+          p.style.setProperty('display', 'none', 'important');
+        }
+      });
 
     // Restore scroll
     if (document.body) {
