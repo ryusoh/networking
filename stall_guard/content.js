@@ -103,35 +103,27 @@
     );
   }
 
-  function recover(video, now, state, reload) {
-    const stallAt = video.currentTime;
-    if (state.lastStallAt >= 0 && stallAt - state.lastStallAt < 1) {
-      state.futile += 1; // same wall again: the previous seek gained nothing
-    } else {
-      state.futile = 0;
+  function executeReload(state, now, stallAt, reload) {
+    state.reloads += 1;
+    state.lastReload = now;
+    state.futile = 0;
+    if (typeof console !== 'undefined' && console.info) {
+      console.info(
+        '[stall-guard] ' +
+          FUTILE_LIMIT +
+          ' recoveries made no progress past ~' +
+          stallAt.toFixed(1) +
+          's — reloading the page (reload #' +
+          state.reloads +
+          ')'
+      );
     }
-    state.lastStallAt = stallAt;
-    if (shouldReload(state, now)) {
-      state.reloads += 1;
-      state.lastReload = now;
-      state.futile = 0;
-      if (typeof console !== 'undefined' && console.info) {
-        console.info(
-          '[stall-guard] ' +
-            FUTILE_LIMIT +
-            ' recoveries made no progress past ~' +
-            stallAt.toFixed(1) +
-            's — reloading the page (reload #' +
-            state.reloads +
-            ')'
-        );
-      }
-      if (typeof reload === 'function') {
-        reload();
-      }
-      return;
+    if (typeof reload === 'function') {
+      reload();
     }
-    const resumeAt = computeResumeTime(video);
+  }
+
+  function executeResume(video, state, resumeAt, now) {
     state.lastRecovery = now;
     state.stalledSince = 0;
     state.lastTime = resumeAt;
@@ -155,6 +147,22 @@
     }
   }
 
+  function recover(video, now, state, reload) {
+    const stallAt = video.currentTime;
+    if (state.lastStallAt >= 0 && stallAt - state.lastStallAt < 1) {
+      state.futile += 1; // same wall again: the previous seek gained nothing
+    } else {
+      state.futile = 0;
+    }
+    state.lastStallAt = stallAt;
+    if (shouldReload(state, now)) {
+      executeReload(state, now, stallAt, reload);
+      return;
+    }
+    const resumeAt = computeResumeTime(video);
+    executeResume(video, state, resumeAt, now);
+  }
+
   function makeState() {
     return {
       lastTime: -1,
@@ -171,6 +179,8 @@
   const api = {
     shouldRecover: shouldRecover,
     shouldReload: shouldReload,
+    executeReload: executeReload,
+    executeResume: executeResume,
     computeResumeTime: computeResumeTime,
     recover: recover,
     makeState: makeState,
