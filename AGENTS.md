@@ -506,6 +506,15 @@ Any command output logs (e.g. `jest_coverage_output.txt`,
 placed within the `.gitignore`'d `coverage/` directory. Do not commit command
 logs to the repository.
 
+### The user commits reviewed changes themselves
+
+The user's work pattern is: back-and-forth in chat → they review the diff in
+VSCode → they commit it themselves and move on. So if your edits vanish from
+`git status` between turns, run `git log --oneline -3` FIRST — a fresh user
+commit containing them means the work was accepted. Don't re-verify,
+re-explain, or dig into "where did my changes go"; check the log once and
+continue from HEAD.
+
 ## Skills and slash commands
 
 - **`.agents/skills/<name>/SKILL.md` is canonical** — the open Agent Skills
