@@ -14,7 +14,8 @@
     "adblock/*.js",
     "gov_bypass/tianditu-defaults.js",
     "gov_bypass/offscreen.js",
-    "gov_bypass/background.js"
+    "gov_bypass/background.js",
+    "gov_bypass/tile-cache-page.js"
   ],
   "exclude": ["node_modules", "adblock/__tests__"]
 }

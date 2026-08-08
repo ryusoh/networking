@@ -15,9 +15,14 @@
     /^https?:\/\/[^/]*tianditu\.(gov\.)?cn\/.*\/tile/i,
     /^https?:\/\/[^/]*tianditu\.(gov\.)?cn\/.*\.(png|jpg|jpeg|webp|pbf)(\?|$)/i
   ];
+  /** @type {Record<number, (data: any) => void>} */
   const pendingRequests = {};
   let reqCounter = 0;
 
+  /**
+   * @param {string} url
+   * @returns {boolean}
+   */
   function isTileUrl(url) {
     return TILE_PATTERNS.some(function (re) {
       return re.test(url);
@@ -38,6 +43,10 @@
     }
   });
 
+  /**
+   * @param {string} url
+   * @returns {Promise<any>}
+   */
   function requestFromCache(url) {
     return new Promise(function (resolve) {
       const id = ++reqCounter;
@@ -53,9 +62,13 @@
     });
   }
 
+  /**
+   * @param {string} dataUrl
+   * @returns {Blob}
+   */
   function dataUrlToBlob(dataUrl) {
     const parts = dataUrl.split(',');
-    const mime = parts[0].match(/:(.*?);/)[1];
+    const mime = /** @type {RegExpMatchArray} */ (parts[0].match(/:(.*?);/))[1];
     const raw = atob(parts[1]);
     const arr = new Uint8Array(raw.length);
     for (let i = 0; i < raw.length; i++) {
@@ -66,7 +79,8 @@
 
   const originalFetch = window.fetch;
   window.fetch = function (input, init) {
-    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    const url =
+      typeof input === 'string' ? input : (input && /** @type {Request} */ (input).url) || '';
     if (!isTileUrl(url)) {
       return originalFetch.call(this, input, init);
     }
