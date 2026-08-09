@@ -93,6 +93,11 @@ entirely. It has **no bundler, no build step for JS**, **no SQL database**, and
   "Changed lines must be covered" in `AGENTS.md`). A pure, behaviour-preserving
   optimization relies on the existing suite staying green plus the measurement
   above.
+- Don't rerun a failed gate on an unchanged tree — a red `make precommit` (or
+  `make precommit-docker` on macOS) over an untouched worktree cannot go green.
+  `python3 tools/gate_guard.py` (`snapshot` before the run, `check <hash>`
+  before a retry); unchanged means edit something first (AGENTS.md
+  non-negotiable #1).
 
 ## Commit and pull request
 

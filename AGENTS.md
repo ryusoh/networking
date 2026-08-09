@@ -36,7 +36,11 @@ eBPF (`vps_kernel_proxy/`, Docker-only).
    (`.github/workflows/ci.yml` runs `make precommit` on `ubuntu-latest`), and the
    **Makefile is the single source of truth** — never add a check to the workflow
    instead of the Makefile. Use `make precommit-fix` while iterating (it writes
-   fixes); run `make precommit` (check-only) before opening the PR.
+   fixes); run `make precommit` (check-only) before opening the PR. And don't
+   rerun a red gate on an unchanged tree — a failed gate over an untouched
+   worktree cannot go green, so edit something first. The gate guard
+   (`python3 tools/gate_guard.py`) enforces this: `snapshot` before the run,
+   `check <hash>` before a retry (exit 1 = unchanged).
 2. **One concern, one subproject, smallest possible diff.** These subprojects are
    independent; do not span more than one in a single PR, and no drive-by edits.
    Diff size is inversely proportional to approval.
@@ -162,6 +166,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 | JS type-check (JSDoc, non-blocking)      | `make type`                              |
 | Mutation smoke, JS / Python (non-gated)  | `make mutate-js` / `make mutate-py`      |
 | Rank least-covered files (Testpilot)     | `python3 bin/coverage_rank.py --limit 5` |
+| Worktree snapshot guard (unchanged tree) | `python3 tools/gate_guard.py snapshot`   |
 | Scoped Jest while iterating              | `npx jest <path>`                        |
 | Pull an extension (retriever)            | `make pull ID=<extension_id>`            |
 | Regenerate / drift-check Claude commands | `python3 tools/sync_commands.py`         |
@@ -515,11 +520,28 @@ commit containing them means the work was accepted. Don't re-verify,
 re-explain, or dig into "where did my changes go"; check the log once and
 continue from HEAD.
 
+### Concurrent agents sharing one worktree
+
+When you run parallel subagents (swarms, background agents) in this checkout:
+stage only files you changed (`git add <specific-files>`, never `git add -A`),
+never `git stash`, `git reset --hard`, or `git commit --no-verify` — a sibling
+agent's work may be sitting in the same tree. Keep concurrent agents on
+disjoint file sets; if a rebase/conflict lands mid-run, resolve only files
+your task owns.
+
 ## Skills and slash commands
 
 - **`.agents/skills/<name>/SKILL.md` is canonical** — the open Agent Skills
   format: YAML frontmatter declaring `name` and `description` (used for
   triggering), instructions in the markdown body. Edit skills there.
+- **Progressive disclosure:** only the frontmatter `name` + `description` enter
+  an agent's system prompt; the body is read on demand once the skill triggers.
+  So the `description` is the only always-loaded surface — write it as a
+  discriminative trigger ("Use when ..."), and don't contort the body to save
+  prompt space; length there is free until the skill fires.
+- **Never put a `---` horizontal rule in a skill body** — the generator's
+  frontmatter parser is a naive `content.split("---", 2)`, so a `---` line in
+  the body mangles the generated command.
 - **`.claude/commands/<name>.md` is generated** from the skills by
   `tools/sync_commands.py` for Claude Code. Never edit the generated files by
   hand — run `python3 tools/sync_commands.py` after editing a skill, and note

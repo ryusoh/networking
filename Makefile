@@ -26,6 +26,11 @@ precommit-fix: fmt lint-fix thinking-check type test test-py test-ebpf test-nas 
 #
 # `.claude/commands/` is regenerated before `make precommit` so the sync-check
 # gate passes without requiring the host to have write access to that directory.
+#
+# The anonymous volume at /app/node_modules keeps the image's Linux-built
+# dependencies in place: the bind mount would otherwise shadow them with the
+# host's node_modules, whose native binaries are macOS-only (e.g.
+# @typescript/typescript-darwin-arm64 for `make type`).
 PRECOMMIT_DOCKER_IMAGE ?= net-tools-precommit
 precommit-docker:
 	@if ! docker info >/dev/null 2>&1; then \
@@ -35,7 +40,7 @@ precommit-docker:
 	@echo "Building precommit Docker image..."
 	@docker build -t $(PRECOMMIT_DOCKER_IMAGE) -f Dockerfile.precommit .
 	@echo "Running precommit in Docker..."
-	@docker run --rm -v "$$(pwd)":/app $(PRECOMMIT_DOCKER_IMAGE) \
+	@docker run --rm -v "$$(pwd)":/app -v /app/node_modules $(PRECOMMIT_DOCKER_IMAGE) \
 		sh -c 'make -C nas_tools clean && make -C nas_proxy clean && python3 tools/sync_commands.py && make precommit'
 
 # Stream-of-consciousness gate (AGENTS.md non-negotiable #9): deterministic scan

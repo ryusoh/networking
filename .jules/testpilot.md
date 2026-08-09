@@ -91,6 +91,11 @@ already at 100% while the worst files scroll off the top. Instead:
 - `make precommit` green (or, while iterating, `make test` for Jest and
   `make test-py` for Python). Coverage on each target file increased — state
   before → after per file. Zero production-source changes in the diff.
+- Don't rerun a failed gate on an unchanged tree — a red `make precommit` (or
+  `make precommit-docker` on macOS) over an untouched worktree cannot go green.
+  `python3 tools/gate_guard.py` (`snapshot` before the run, `check <hash>`
+  before a retry); unchanged means edit something first (AGENTS.md
+  non-negotiable #1).
 
 ## Commit and pull request
 

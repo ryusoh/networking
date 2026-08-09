@@ -58,6 +58,11 @@ pending or previously-rejected cleanups — pick a different target.
   nothing). `make precommit` green.
 - If you resolved a TODO/FIXME that adds behaviour, a test covers the changed
   lines.
+- Don't rerun a failed gate on an unchanged tree — a red `make precommit` (or
+  `make precommit-docker` on macOS) over an untouched worktree cannot go green.
+  `python3 tools/gate_guard.py` (`snapshot` before the run, `check <hash>`
+  before a retry); unchanged means edit something first (AGENTS.md
+  non-negotiable #1).
 
 ## Commit and pull request
 
