@@ -58,7 +58,7 @@ describe('shouldRecover', () => {
     const v = fakeVideo({ readyState: 2, currentTime: 100 });
     const s = makeState();
     expect(shouldRecover(v, 1000, s)).toBe(false); // starts stall clock
-    v.currentTime = 101; // progress!
+    Object.defineProperty(v, 'currentTime', { value: 101, configurable: true }); // progress!
     expect(shouldRecover(v, 1000 + GRACE_MS + 1, s)).toBe(false);
     expect(s.stalledSince).toBe(0);
   });
@@ -174,7 +174,7 @@ describe('reload escalation', () => {
     recover(v, t0, s, reload); // baseline
     recover(v, t0 + 1, s, reload); // futile 1
     recover(v, t0 + 2, s, reload); // futile 2
-    v.currentTime = 110; // the wall moved: playback advanced 10s
+    Object.defineProperty(v, 'currentTime', { value: 110, configurable: true }); // the wall moved: playback advanced 10s
     recover(v, t0 + 3, s, reload); // progress -> counter resets
     recover(v, t0 + 4, s, reload); // futile 1 at the new wall
     recover(v, t0 + 5, s, reload); // futile 2
@@ -208,5 +208,229 @@ describe('reload escalation', () => {
     now += RELOAD_COOLDOWN_MS;
     recoverUntilReload(); // cap reached: never again this page life
     expect(reload).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('content-script runtime', () => {
+  let observers = [];
+  const OriginalObserver = window.MutationObserver;
+  beforeAll(() => {
+    window.MutationObserver = function (callback) {
+      const observer = new OriginalObserver(callback);
+      observers.push(observer);
+      return observer;
+    };
+    window.MutationObserver.prototype = OriginalObserver.prototype;
+  });
+
+  afterEach(() => {
+    observers.forEach((obs) => obs.disconnect());
+    observers = [];
+    document.documentElement.innerHTML = '<head></head><body></body>';
+  });
+
+  const contentScriptPath = require('path').resolve(__dirname, '../content.js');
+  const { instrumentFile } = require('../../adblock/__tests__/helpers/instrument.js');
+
+  function loadContentScript() {
+    const code = instrumentFile(contentScriptPath);
+    // Execute the code in an environment where `module` is undefined to trigger the runtime block
+    eval(`
+      (function() {
+        const module = undefined;
+        ${code}
+      })();
+    `);
+  }
+
+  function mockVideoProperties(v, overrides = {}) {
+    const state = {
+      paused: false,
+      ended: false,
+      duration: 3600,
+      readyState: 2,
+      currentTime: 100,
+      ...overrides
+    };
+
+    // In JSDOM, HTMLVideoElement has these as readonly. We can overwrite them by
+    // wrapping them if needed, or by overriding properties on the instance directly.
+    Object.keys(state).forEach((key) => {
+      Object.defineProperty(v, key, {
+        get: () => state[key],
+        set: (val) => (state[key] = val),
+        configurable: true
+      });
+    });
+
+    Object.defineProperty(v, 'buffered', {
+      value: { length: 0, start: () => 0, end: () => 0 },
+      configurable: true
+    });
+
+    v.play = jest.fn().mockResolvedValue(undefined);
+  }
+
+  beforeEach(() => {
+    delete window.location;
+    window.location = new URL('https://example.com');
+    window.location.reload = jest.fn();
+    document.documentElement.innerHTML = '<head></head><body></body>';
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  test('scan and watch videos, recover on stall via setInterval', () => {
+    jest.useFakeTimers();
+
+    document.body.innerHTML = `
+      <video id="v1"></video>
+      <video id="v2"></video>
+    `;
+    const videos = document.querySelectorAll('video');
+
+    // Setup video state to simulate a stall on v1
+    mockVideoProperties(videos[0]);
+    // v2 is paused
+    mockVideoProperties(videos[1], { paused: true });
+
+    loadContentScript();
+
+    // The observer runs. `scan` is called. It sets up `setInterval(..., POLL_MS)`.
+    // We need to trigger `shouldRecover`, which returns true after `GRACE_MS` if `currentTime` didn't change.
+    // Let's tick POLL_MS intervals.
+    // First, let's call shouldRecover indirectly via the setInterval
+    jest.advanceTimersByTime(10000);
+
+    expect(videos[0].play).toHaveBeenCalled();
+    expect(videos[1].play).not.toHaveBeenCalled();
+
+    jest.useRealTimers();
+  });
+
+  test('requestReload reloads top frame via postMessage if in iframe', () => {
+    jest.useFakeTimers();
+
+    const originalTop = window.top;
+    const originalSelf = window.self;
+
+    const mockTop = {
+      postMessage: jest.fn()
+    };
+
+    Object.defineProperty(window, 'top', { value: mockTop, configurable: true });
+    Object.defineProperty(window, 'self', { value: window, configurable: true });
+
+    document.body.innerHTML = '<video></video>';
+    const v = document.querySelector('video');
+    mockVideoProperties(v);
+
+    loadContentScript();
+
+    for (let i = 0; i <= 6; i++) {
+      jest.advanceTimersByTime(25000);
+    }
+
+    expect(mockTop.postMessage).toHaveBeenCalledWith({ type: 'stall-guard:reload' }, '*');
+
+    // Restore
+    Object.defineProperty(window, 'top', { value: originalTop, configurable: true });
+    Object.defineProperty(window, 'self', { value: originalSelf, configurable: true });
+
+    jest.useRealTimers();
+  });
+
+  test('requestReload falls back to location.reload if postMessage throws (cross-origin)', () => {
+    jest.useFakeTimers();
+
+    const originalTop = window.top;
+
+    const mockTop = {
+      postMessage: jest.fn(() => {
+        throw new Error('cross-origin');
+      })
+    };
+
+    Object.defineProperty(window, 'top', { value: mockTop, configurable: true });
+
+    document.body.innerHTML = '<video></video>';
+    const v = document.querySelector('video');
+    mockVideoProperties(v);
+
+    loadContentScript();
+
+    for (let i = 0; i <= 6; i++) {
+      jest.advanceTimersByTime(25000);
+    }
+
+    expect(window.location.reload).toHaveBeenCalled();
+
+    Object.defineProperty(window, 'top', { value: originalTop, configurable: true });
+
+    jest.useRealTimers();
+  });
+
+  test('top frame reloads directly if requestReload is called', () => {
+    jest.useFakeTimers();
+
+    document.body.innerHTML = '<video></video>';
+    const v = document.querySelector('video');
+    mockVideoProperties(v);
+
+    loadContentScript();
+
+    for (let i = 0; i <= 6; i++) {
+      jest.advanceTimersByTime(25000);
+    }
+
+    expect(window.location.reload).toHaveBeenCalled();
+
+    jest.useRealTimers();
+  });
+
+  test('message event listener reloads top frame on stall-guard:reload', () => {
+    loadContentScript();
+
+    const event = new window.MessageEvent('message', {
+      data: { type: 'stall-guard:reload' },
+      source: window
+    });
+    window.dispatchEvent(event);
+
+    expect(window.location.reload).toHaveBeenCalled();
+  });
+
+  test('message event listener ignores irrelevant messages', () => {
+    loadContentScript();
+
+    const event = new window.MessageEvent('message', {
+      data: { type: 'other-event' },
+      source: window
+    });
+    window.dispatchEvent(event);
+
+    expect(window.location.reload).not.toHaveBeenCalled();
+  });
+
+  test('MutationObserver calls scan() for dynamically added videos', async () => {
+    jest.useFakeTimers();
+    loadContentScript();
+
+    // Add video after script loaded
+    const v = document.createElement('video');
+    mockVideoProperties(v);
+    document.body.appendChild(v);
+
+    // Give observer time to fire
+    jest.advanceTimersByTime(0);
+    await Promise.resolve(); // allow microtasks to run
+    jest.advanceTimersByTime(0);
+
+    // Advance time for stall clock
+    jest.advanceTimersByTime(10000);
+
+    expect(v.play).toHaveBeenCalled();
+
+    jest.useRealTimers();
   });
 });
