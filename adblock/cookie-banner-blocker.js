@@ -396,7 +396,8 @@
       let observerThrottled = false;
       const observer = new MutationObserver((mutations) => {
         let shouldCheck = false;
-        for (const mutation of mutations) {
+        for (let i = 0; i < mutations.length; i++) {
+          const mutation = mutations[i];
           if (mutation.addedNodes.length > 0) {
             shouldCheck = true;
             break;
