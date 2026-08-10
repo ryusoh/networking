@@ -197,13 +197,33 @@
     'i understand'
   ];
   const CONSENT_KEYWORDS = ['cookie', 'consent', 'privacy', 'tracking', 'analytics', 'gdpr'];
+  const COOKIE_BANNER_KEYWORDS = [
+    'cookie',
+    'consent',
+    'gdpr',
+    'privacy',
+    'tracking',
+    'analytics',
+    'personalize',
+    'accept',
+    'decline'
+  ];
 
   /**
    * @param {HTMLElement} el
    */
   function isConsentDialog(el) {
     const text = /** @type {string} */ (el.textContent).toLowerCase();
-    return CONSENT_KEYWORDS.filter((k) => text.includes(k)).length >= 2;
+    let matchCount = 0;
+    for (let i = 0; i < CONSENT_KEYWORDS.length; i++) {
+      if (text.includes(CONSENT_KEYWORDS[i])) {
+        matchCount++;
+        if (matchCount >= 2) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**
@@ -281,20 +301,16 @@
    */
   function isCookieBanner(element) {
     const text = /** @type {string} */ (element.textContent).toLowerCase();
-    const keywords = [
-      'cookie',
-      'consent',
-      'gdpr',
-      'privacy',
-      'tracking',
-      'analytics',
-      'personalize',
-      'accept',
-      'decline'
-    ];
-
-    const matchCount = keywords.filter((k) => text.includes(k)).length;
-    return matchCount >= 2 && element.offsetHeight > 100;
+    let matchCount = 0;
+    for (let i = 0; i < COOKIE_BANNER_KEYWORDS.length; i++) {
+      if (text.includes(COOKIE_BANNER_KEYWORDS[i])) {
+        matchCount++;
+        if (matchCount >= 2) {
+          return element.offsetHeight > 100;
+        }
+      }
+    }
+    return false;
   }
 
   /**
