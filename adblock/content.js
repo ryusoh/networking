@@ -101,6 +101,48 @@
   }
 
   /**
+   * Checks if a keyword is a strong adblock signal.
+   * @param {string} kw - The keyword to check.
+   * @returns {boolean}
+   */
+  function isStrongKeyword(kw) {
+    return (
+      kw === 'adblock' ||
+      kw === 'adblocker' ||
+      kw === 'ad blocker' ||
+      kw === 'ad block' ||
+      kw === 'detected adblock' ||
+      kw === 'werbeblocker' ||
+      kw === 'bloqueur' ||
+      kw === 'bloqueador' ||
+      kw === '广告拦截' ||
+      kw === '広告ブロック'
+    );
+  }
+
+  /**
+   * Calculates bonus score based on visual properties.
+   * @param {Element} el - The element to evaluate.
+   * @returns {number}
+   */
+  function getVisualBonus(el) {
+    let bonus = 0;
+    const style = window.getComputedStyle(el);
+    if (style.position === 'fixed' || style.position === 'absolute') {
+      bonus += 0.3;
+    }
+    if (parseInt(style.zIndex, 10) > 100) {
+      bonus += 0.2;
+    }
+
+    const rect = el.getBoundingClientRect();
+    if (rect.width > window.innerWidth * 0.5 && rect.height > window.innerHeight * 0.3) {
+      bonus += 0.2;
+    }
+    return bonus;
+  }
+
+  /**
    * Scores an element based on its text content and attributes.
    * @param {Element} el - The element to evaluate.
    * @returns {number} - The calculated score (0 to 1).
@@ -116,19 +158,7 @@
     KEYWORDS.forEach((kw) => {
       if (text.includes(kw)) {
         matches++;
-        // Two adblock-specific keywords together is a strong signal
-        if (
-          kw === 'adblock' ||
-          kw === 'adblocker' ||
-          kw === 'ad blocker' ||
-          kw === 'ad block' ||
-          kw === 'detected adblock' ||
-          kw === 'werbeblocker' ||
-          kw === 'bloqueur' ||
-          kw === 'bloqueador' ||
-          kw === '广告拦截' ||
-          kw === '広告ブロック'
-        ) {
+        if (isStrongKeyword(kw)) {
           strongMatch = true;
         }
       }
@@ -138,26 +168,12 @@
       return 0;
     }
 
-    // Calculate base score — strong adblock keywords get extra weight
     let score = matches * 0.2;
     if (strongMatch && matches >= 2) {
       score += 0.2;
     }
 
-    // Contextual bonuses
-    const style = window.getComputedStyle(el);
-    if (style.position === 'fixed' || style.position === 'absolute') {
-      score += 0.3;
-    }
-    if (parseInt(style.zIndex) > 100) {
-      score += 0.2;
-    }
-
-    // Dimension check
-    const rect = el.getBoundingClientRect();
-    if (rect.width > window.innerWidth * 0.5 && rect.height > window.innerHeight * 0.3) {
-      score += 0.2;
-    }
+    score += getVisualBonus(el);
 
     return Math.min(score, 1);
   }
