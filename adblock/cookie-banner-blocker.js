@@ -79,6 +79,7 @@
     'iframe[src*="adrecover.com"]',
     '#iframe-ad-container'
   ];
+  const COOKIE_BANNER_SELECTORS_JOINED = COOKIE_BANNER_SELECTORS.join(', ');
 
   // Button selectors for auto-dismiss
   const ACCEPT_BUTTONS = [
@@ -281,16 +282,28 @@
   }
 
   function findCookieBanner() {
-    for (const selector of COOKIE_BANNER_SELECTORS) {
-      try {
-        const elements = document.querySelectorAll(selector);
-        for (const el of elements) {
-          if (el instanceof HTMLElement && isCookieBanner(el)) {
-            return el;
-          }
+    try {
+      const elements = document.querySelectorAll(COOKIE_BANNER_SELECTORS_JOINED);
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i];
+        if (el instanceof HTMLElement && isCookieBanner(el)) {
+          return el;
         }
-      } catch {
-        // Invalid selector, skip
+      }
+    } catch {
+      // Fallback if joined selector fails
+      for (let i = 0; i < COOKIE_BANNER_SELECTORS.length; i++) {
+        try {
+          const elements = document.querySelectorAll(COOKIE_BANNER_SELECTORS[i]);
+          for (let j = 0; j < elements.length; j++) {
+            const el = elements[j];
+            if (el instanceof HTMLElement && isCookieBanner(el)) {
+              return el;
+            }
+          }
+        } catch {
+          // Invalid selector, skip
+        }
       }
     }
     return null;
