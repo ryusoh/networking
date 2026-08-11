@@ -722,41 +722,64 @@
   // --- Phase 5: MutationObserver for dynamic ads ---
 
   /**
+   * Attempts to match a node against a list of selectors safely.
+   * @param {HTMLElement} node
+   */
+  function tryMatchSelectors(node) {
+    for (const selector of FORUM_AD_SELECTORS) {
+      try {
+        if (node.matches(selector)) {
+          hideAd(node);
+        }
+      } catch {
+        /* invalid selector */
+      }
+    }
+  }
+
+  /**
+   * Processes a newly added node to check for ads or ad scripts.
+   * @param {Node} node
+   * @returns {boolean} True if a full scan is needed.
+   */
+  function handleAddedNode(node) {
+    if (node.nodeType !== 1) {
+      return false;
+    }
+
+    // Check if the added node itself is an ad
+    if (node instanceof HTMLElement) {
+      try {
+        if (node.matches(FORUM_AD_SELECTORS_JOINED)) {
+          hideAd(node);
+        }
+      } catch {
+        tryMatchSelectors(node);
+      }
+    }
+
+    // Check if it's an ad script
+    if (node instanceof HTMLScriptElement && node.src && shouldBlockScript(node.src)) {
+      node.remove();
+      return false;
+    }
+
+    // Check for ad elements inside the added node
+    if (node instanceof Element) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * @param {MutationRecord[]} mutations
    */
   function onMutation(mutations) {
     let needsFullScan = false;
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
-        if (node.nodeType !== 1) {
-          continue;
-        }
-
-        // Check if the added node itself is an ad
-        try {
-          if (node instanceof HTMLElement && node.matches(FORUM_AD_SELECTORS_JOINED)) {
-            hideAd(node);
-          }
-        } catch {
-          for (const selector of FORUM_AD_SELECTORS) {
-            try {
-              if (node instanceof HTMLElement && node.matches(selector)) {
-                hideAd(node);
-              }
-            } catch {
-              /* invalid selector */
-            }
-          }
-        }
-
-        // Check if it's an ad script
-        if (node instanceof HTMLScriptElement && node.src && shouldBlockScript(node.src)) {
-          node.remove();
-          continue;
-        }
-
-        // Check for ad elements inside the added node
-        if (node instanceof Element) {
+        if (handleAddedNode(node)) {
           needsFullScan = true;
         }
       }
