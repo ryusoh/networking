@@ -242,20 +242,10 @@ describe('video-stream-ad-blocker.js additional coverage', () => {
     const srcPath = path.resolve(__dirname, '../video-stream-ad-blocker.js');
     const instrumented = instrumentFile(srcPath);
 
-    // Test the line 144
-    // We already have a test for this but wait it's `removeAdFromVideo(null)` being called?
-    // Let's just make sure it's called
     eval(instrumented);
 
-    // Call it indirectly since it's internal
-    // If we have an ad selector that returns null for querySelector
-    // line 186 passes video to removeAdFromVideo
     const video = document.createElement('video');
     document.body.appendChild(video);
-
-    // Mock getElementsByTagName to return a list but maybe we can just make it return an element that doesn't have video
-    // Well, it's easier to mock `document.querySelector` inside ad Containers Hidden
-    // Actually the function `removeAdFromVideo` takes a `HTMLVideoElement` parameter and checks if it's truthy
   });
 
   test('XMLHttpRequest open handles less than 3 arguments', () => {

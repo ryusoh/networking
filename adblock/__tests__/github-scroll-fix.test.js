@@ -194,7 +194,6 @@ describe('github-scroll-fix.js additional branches', () => {
     delete window.location;
     window.location = { hostname: 'github.com' };
 
-    // reset properties
     Object.defineProperty(window, 'scrollY', { value: 0, writable: true, configurable: true });
     origScrollBy = jest.fn();
     window.scrollBy = origScrollBy;
@@ -209,12 +208,9 @@ describe('github-scroll-fix.js additional branches', () => {
     const instrumented = instrumentFile(srcPath);
     eval(instrumented);
 
-    // Call scrollBy with an object
-    // Should be intercepted because delta > 150
     window.scrollBy({ top: 200 });
     expect(origScrollBy).not.toHaveBeenCalled();
 
-    // Call scrollBy with small delta -> should go through calling origScrollBy(x)
     window.scrollBy({ top: 50 });
     expect(origScrollBy).toHaveBeenCalledWith({ top: 50 });
   });
@@ -224,7 +220,6 @@ describe('github-scroll-fix.js additional branches', () => {
     const instrumented = instrumentFile(srcPath);
     eval(instrumented);
 
-    // Call scrollBy with a string which doesn't hit number or object branch in getScrollDeltaY
     window.scrollBy('something_weird');
     expect(origScrollBy).toHaveBeenCalledWith('something_weird', undefined);
   });
@@ -237,7 +232,6 @@ describe('github-scroll-fix.js additional branches', () => {
     const instrumented = instrumentFile(srcPath);
     eval(instrumented);
 
-    // Call scrollTo with a string which doesn't hit number or object branch in getScrollTargetY
     window.scrollTo('something_weird');
     expect(origScrollTo).toHaveBeenCalledWith('something_weird', undefined);
   });

@@ -23,13 +23,10 @@ describe('forum-ad-blocker.js additional coverage', () => {
       throw new Error('invalid selector');
     });
 
-    // But we need to make it throw specifically for the joined selector, and then we want it to
-    // work (or throw again) for individual ones
     document.body.appendChild(div);
 
     jest.advanceTimersByTime(100);
     jest.useRealTimers();
-    // This just exercises the catch block on line 740 and 746
   });
 
   test('script setter handles script block', () => {
@@ -54,8 +51,6 @@ describe('forum-ad-blocker.js additional coverage', () => {
     document.body.appendChild(script);
 
     script.src = 'https://example.com/normal.js';
-    // Actually getter doesn't return the set value immediately in JSDOM sometimes if we overwritten it,
-    // let's just make sure it executes line 320
   });
 
   test('removeAdIframes hides ad iframe', () => {
