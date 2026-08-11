@@ -1,5 +1,4 @@
 'use strict';
-
 const path = require('path');
 const { instrumentFile } = require('./helpers/instrument');
 
@@ -185,5 +184,55 @@ describe('github-scroll-fix.js', () => {
     window.dispatchEvent(new Event('click'));
     document.documentElement.scrollTop = 800;
     expect(document.documentElement.scrollTop).toBe(800);
+  });
+});
+
+describe('github-scroll-fix.js additional branches', () => {
+  let origScrollBy;
+
+  beforeEach(() => {
+    delete window.location;
+    window.location = { hostname: 'github.com' };
+
+    Object.defineProperty(window, 'scrollY', { value: 0, writable: true, configurable: true });
+    origScrollBy = jest.fn();
+    window.scrollBy = origScrollBy;
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test('handles options object in scrollBy', () => {
+    const srcPath = path.resolve(__dirname, '../github-scroll-fix.js');
+    const instrumented = instrumentFile(srcPath);
+    eval(instrumented);
+
+    window.scrollBy({ top: 200 });
+    expect(origScrollBy).not.toHaveBeenCalled();
+
+    window.scrollBy({ top: 50 });
+    expect(origScrollBy).toHaveBeenCalledWith({ top: 50 });
+  });
+
+  test('getScrollDeltaY handles string arguments fallback to 0', () => {
+    const srcPath = path.resolve(__dirname, '../github-scroll-fix.js');
+    const instrumented = instrumentFile(srcPath);
+    eval(instrumented);
+
+    window.scrollBy('something_weird');
+    expect(origScrollBy).toHaveBeenCalledWith('something_weird', undefined);
+  });
+
+  test('getScrollTargetY handles string arguments fallback to 0', () => {
+    const origScrollTo = jest.fn();
+    window.scrollTo = origScrollTo;
+
+    const srcPath = path.resolve(__dirname, '../github-scroll-fix.js');
+    const instrumented = instrumentFile(srcPath);
+    eval(instrumented);
+
+    window.scrollTo('something_weird');
+    expect(origScrollTo).toHaveBeenCalledWith('something_weird', undefined);
   });
 });
