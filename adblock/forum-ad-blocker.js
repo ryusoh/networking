@@ -777,9 +777,13 @@
    */
   function onMutation(mutations) {
     let needsFullScan = false;
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
-        if (handleAddedNode(node)) {
+    for (let i = 0; i < mutations.length; i++) {
+      const addedNodes = mutations[i].addedNodes;
+      if (addedNodes.length === 0) {
+        continue;
+      }
+      for (let j = 0; j < addedNodes.length; j++) {
+        if (handleAddedNode(addedNodes[j])) {
           needsFullScan = true;
         }
       }
