@@ -727,23 +727,75 @@
     return filledAny || totalEmptyExpected === 0;
   }
 
-  /** @param {Array<Record<string, unknown>>} entries */
-  function buildTable(entries) {
-    if (!entries || !entries.length) {
-      return '';
-    }
+  /**
+   * @param {Array<Record<string, unknown>>} entries
+   * @returns {Record<string, unknown>}
+   */
+  function getBestEntry(entries) {
     let best = entries[0];
     for (let i = 1; i < entries.length; i++) {
       if (Object.keys(entries[i]).length > Object.keys(best).length) {
         best = entries[i];
       }
     }
+    return best;
+  }
+
+  /**
+   * @param {Record<string, unknown>} best
+   * @returns {string[]}
+   */
+  function extractMetrics(best) {
     const metrics = [];
     for (const k in best) {
       if (!SKIP[k] && best[k] !== null && best[k] !== undefined) {
         metrics.push(k);
       }
     }
+    return metrics;
+  }
+
+  /**
+   * @param {Array<Record<string, unknown>>} sorted
+   * @returns {string}
+   */
+  function buildTableHeader(sorted) {
+    let h = '<tr><th>Metric</th>';
+    for (let s = 0; s < sorted.length; s++) {
+      h += '<th>' + (sorted[s].date || '?') + '</th>';
+    }
+    h += '</tr>';
+    return h;
+  }
+
+  /**
+   * @param {string[]} metrics
+   * @param {Array<Record<string, unknown>>} sorted
+   * @returns {string}
+   */
+  function buildTableRows(metrics, sorted) {
+    let h = '';
+    for (let m = 0; m < metrics.length; m++) {
+      const label = metrics[m].replace(/_/g, ' ').replace(/\b[a-z]/g, function (c) {
+        return c.toUpperCase();
+      });
+      h += '<tr><td>' + label + '</td>';
+      for (let c = 0; c < sorted.length; c++) {
+        const cellValue = sorted[c][metrics[m]];
+        h += '<td>' + fmt(/** @type {number|string|null|undefined} */ (cellValue)) + '</td>';
+      }
+      h += '</tr>';
+    }
+    return h;
+  }
+
+  /** @param {Array<Record<string, unknown>>} entries */
+  function buildTable(entries) {
+    if (!entries || !entries.length) {
+      return '';
+    }
+    const best = getBestEntry(entries);
+    const metrics = extractMetrics(best);
     if (!metrics.length) {
       return '';
     }
@@ -759,22 +811,9 @@
       )
       .slice(0, 10);
 
-    let h = '<table class="gf-u-table"><tr><th>Metric</th>';
-    for (let s = 0; s < sorted.length; s++) {
-      h += '<th>' + (sorted[s].date || '?') + '</th>';
-    }
-    h += '</tr>';
-    for (let m = 0; m < metrics.length; m++) {
-      const label = metrics[m].replace(/_/g, ' ').replace(/\b[a-z]/g, function (c) {
-        return c.toUpperCase();
-      });
-      h += '<tr><td>' + label + '</td>';
-      for (let c = 0; c < sorted.length; c++) {
-        const cellValue = sorted[c][metrics[m]];
-        h += '<td>' + fmt(/** @type {number|string|null|undefined} */ (cellValue)) + '</td>';
-      }
-      h += '</tr>';
-    }
+    let h = '<table class="gf-u-table">';
+    h += buildTableHeader(sorted);
+    h += buildTableRows(metrics, sorted);
     return h + '</table>';
   }
 
