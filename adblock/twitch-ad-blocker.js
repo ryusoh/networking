@@ -35,6 +35,8 @@
     '[class*="sponsor"]'
   ];
 
+  const AD_SELECTORS_JOINED = AD_SELECTORS.join(', ');
+
   const AD_URL_PATTERNS = [
     /twitch\.tv\/ads/,
     /ads\.twitch\.tv/,
@@ -105,16 +107,27 @@
     }
 
     // Find and hide ad elements
-    for (const selector of AD_SELECTORS) {
-      try {
-        const elements = document.querySelectorAll(selector);
-        for (const el of elements) {
-          if (el instanceof HTMLElement) {
-            hideAd(el);
-          }
+    try {
+      const elements = document.querySelectorAll(AD_SELECTORS_JOINED);
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i];
+        if (el instanceof HTMLElement) {
+          hideAd(el);
         }
-      } catch {
-        // Invalid selector
+      }
+    } catch {
+      // Invalid selector fallback
+      for (const selector of AD_SELECTORS) {
+        try {
+          const elements = document.querySelectorAll(selector);
+          for (const el of elements) {
+            if (el instanceof HTMLElement) {
+              hideAd(el);
+            }
+          }
+        } catch {
+          // Invalid selector
+        }
       }
     }
 
@@ -205,14 +218,12 @@
    * @returns {boolean}
    */
   function isAdElement(element) {
-    for (const selector of AD_SELECTORS) {
-      try {
-        if (element.matches(selector) || element.closest(selector)) {
-          return true;
-        }
-      } catch {
-        // Invalid selector
+    try {
+      if (element.matches(AD_SELECTORS_JOINED) || element.closest(AD_SELECTORS_JOINED)) {
+        return true;
       }
+    } catch {
+      // Invalid selector
     }
     return false;
   }
