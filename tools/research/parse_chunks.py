@@ -30,6 +30,74 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
+def _finalize_chunk(
+    lines: list[str], rel_path: str, chunk_index: int, current_heading: str, start_line: int, end_line: int
+) -> dict[str, Any] | None:
+    chunk_text = "\n".join(lines).strip()
+    if not chunk_text:
+        return None
+    return {
+        "chunk_id": f"{rel_path}:chunk-{chunk_index}",
+        "file_path": rel_path,
+        "heading": current_heading,
+        "start_line": start_line,
+        "end_line": end_line,
+        "token_count": estimate_tokens(chunk_text),
+        "content": chunk_text,
+    }
+
+
+def _parse_heading_or_slide(line: str, line_idx: int) -> str | None:
+    match = HEADER_PATTERN.match(line)
+    if match:
+        return match.group(2).strip()
+    elif SLIDE_PATTERN.match(line):
+        return f"Slide (Line {line_idx})"
+    return None
+
+
+class _ParserState:
+    def __init__(self, rel_path: str):
+        self.rel_path = rel_path
+        self.chunks: list[dict[str, Any]] = []
+        self.current_heading = "Preamble"
+        self.current_start_line = 1
+        self.current_lines: list[str] = []
+        self.in_code_block = False
+        self.chunk_index = 1
+
+    def handle_line(self, line: str, line_idx: int) -> None:
+        if line.strip().startswith("```"):
+            self.in_code_block = not self.in_code_block
+
+        is_break = not self.in_code_block and (HEADER_PATTERN.match(line) or SLIDE_PATTERN.match(line))
+
+        if is_break and self.current_lines:
+            chunk = _finalize_chunk(
+                self.current_lines, self.rel_path, self.chunk_index, self.current_heading, self.current_start_line, line_idx - 1
+            )
+            if chunk:
+                self.chunks.append(chunk)
+                self.chunk_index += 1
+            self.current_lines = []
+            self.current_start_line = line_idx
+
+        if not self.in_code_block:
+            new_heading = _parse_heading_or_slide(line, line_idx)
+            if new_heading is not None:
+                self.current_heading = new_heading
+
+        self.current_lines.append(line)
+
+    def finalize(self, total_lines: int) -> None:
+        if self.current_lines:
+            chunk = _finalize_chunk(
+                self.current_lines, self.rel_path, self.chunk_index, self.current_heading, self.current_start_line, total_lines
+            )
+            if chunk:
+                self.chunks.append(chunk)
+
+
 def parse_markdown_file(file_path: Path, repo_root: Path) -> list[dict[str, Any]]:
     """Parse a Markdown file into structural heading/slide-based chunks with line offsets."""
     try:
@@ -41,71 +109,11 @@ def parse_markdown_file(file_path: Path, repo_root: Path) -> list[dict[str, Any]
     if not lines:
         return []
 
-    rel_path = str(file_path.relative_to(repo_root))
-    chunks: list[dict[str, Any]] = []
-
-    current_heading = "Preamble"
-    current_start_line = 1
-    current_lines: list[str] = []
-    in_code_block = False
-    chunk_index = 1
-
+    state = _ParserState(str(file_path.relative_to(repo_root)))
     for line_idx, line in enumerate(lines, start=1):
-        # Check code block toggle
-        if line.strip().startswith("```"):
-            in_code_block = not in_code_block
-
-        is_header = not in_code_block and HEADER_PATTERN.match(line)
-        is_slide = not in_code_block and SLIDE_PATTERN.match(line)
-
-        if (is_header or is_slide) and current_lines:
-            # Finalize previous chunk if non-empty
-            chunk_text = "\n".join(current_lines).strip()
-            if chunk_text:
-                chunk_id = f"{rel_path}:chunk-{chunk_index}"
-                chunks.append(
-                    {
-                        "chunk_id": chunk_id,
-                        "file_path": rel_path,
-                        "heading": current_heading,
-                        "start_line": current_start_line,
-                        "end_line": line_idx - 1,
-                        "token_count": estimate_tokens(chunk_text),
-                        "content": chunk_text,
-                    }
-                )
-                chunk_index += 1
-
-            current_lines = []
-            current_start_line = line_idx
-
-        if is_header:
-            match = HEADER_PATTERN.match(line)
-            if match:
-                current_heading = match.group(2).strip()
-        elif is_slide:
-            current_heading = f"Slide (Line {line_idx})"
-
-        current_lines.append(line)
-
-    # Finalize trailing chunk
-    if current_lines:
-        chunk_text = "\n".join(current_lines).strip()
-        if chunk_text:
-            chunk_id = f"{rel_path}:chunk-{chunk_index}"
-            chunks.append(
-                {
-                    "chunk_id": chunk_id,
-                    "file_path": rel_path,
-                    "heading": current_heading,
-                    "start_line": current_start_line,
-                    "end_line": len(lines),
-                    "token_count": estimate_tokens(chunk_text),
-                    "content": chunk_text,
-                }
-            )
-
-    return chunks
+        state.handle_line(line, line_idx)
+    state.finalize(len(lines))
+    return state.chunks
 
 
 def parse_source_code_file(file_path: Path, repo_root: Path) -> list[dict[str, Any]]:
