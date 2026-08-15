@@ -300,6 +300,28 @@
     restated_date: 1
   };
 
+  /**
+   * Helper to format numbers with abbreviations
+   * @param {number} n
+   * @returns {string}
+   */
+  function formatAbbreviatedNumber(n) {
+    const absN = Math.abs(n);
+    if (absN >= 1e9) {
+      return (n / 1e9).toFixed(2) + 'B';
+    }
+    if (absN >= 1e6) {
+      return (n / 1e6).toFixed(2) + 'M';
+    }
+    if (absN >= 1e3 && n % 1 === 0) {
+      return (n / 1e3).toFixed(1) + 'K';
+    }
+    if (absN < 0.01 && n !== 0) {
+      return n.toFixed(4);
+    }
+    return n.toFixed(2);
+  }
+
   /** @param {number|string|null|undefined} v */
   function fmt(v) {
     if (v === null || v === undefined || v === '') {
@@ -309,19 +331,7 @@
     if (isNaN(n)) {
       return String(v);
     }
-    if (Math.abs(n) >= 1e9) {
-      return (n / 1e9).toFixed(2) + 'B';
-    }
-    if (Math.abs(n) >= 1e6) {
-      return (n / 1e6).toFixed(2) + 'M';
-    }
-    if (Math.abs(n) >= 1e3 && n % 1 === 0) {
-      return (n / 1e3).toFixed(1) + 'K';
-    }
-    if (Math.abs(n) < 0.01 && n !== 0) {
-      return n.toFixed(4);
-    }
-    return n.toFixed(2);
+    return formatAbbreviatedNumber(n);
   }
 
   /** @type {Record<string, string>} */
