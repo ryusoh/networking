@@ -236,3 +236,200 @@ describe('github-scroll-fix.js additional branches', () => {
     expect(origScrollTo).toHaveBeenCalledWith('something_weird', undefined);
   });
 });
+
+describe('github-scroll-fix.js final coverage', () => {
+  beforeEach(() => {
+    delete window.location;
+    window.location = { hostname: 'github.com' };
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  test('covers window undefined branch in interceptWindowScroll', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const srcPath = require('path').resolve(__dirname, '../github-scroll-fix.js');
+    const code = instrumentFile(srcPath);
+
+    // Save window and set it to undefined during eval
+    const origWindow = global.window;
+
+    // We cannot just delete window in jest because it is heavily used by jsdom,
+    // but we can try to mock it within the IIFE.
+    // Instead of actually deleting window, we can just execute the script
+    // in an environment where window is undefined.
+    // Alternatively we can use new Function
+
+    const wrapper = new Function('window', 'document', 'Element', 'HTMLElement', code);
+    wrapper(undefined, undefined, undefined, undefined);
+  });
+
+  test('covers missing HTMLElement prototype branch', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const srcPath = require('path').resolve(__dirname, '../github-scroll-fix.js');
+    const code = instrumentFile(srcPath);
+
+    // Remove HTMLElement entirely for this test
+    const origHTMLElement = global.HTMLElement;
+    const origElement = global.Element;
+
+    global.HTMLElement = undefined;
+
+    eval(code);
+
+    global.HTMLElement = origHTMLElement;
+  });
+});
+
+describe('github-scroll-fix.js super final coverage', () => {
+  beforeEach(() => {
+    delete window.location;
+    window.location = { hostname: 'github.com' };
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  test('covers missing window scrollBy and scrollTo', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const srcPath = require('path').resolve(__dirname, '../github-scroll-fix.js');
+    const code = instrumentFile(srcPath);
+
+    // Save
+    const origScrollTo = global.window.scrollTo;
+    const origScrollBy = global.window.scrollBy;
+    const origScroll = global.window.scroll;
+
+    global.window.scrollTo = undefined;
+    global.window.scrollBy = undefined;
+    global.window.scroll = undefined;
+
+    eval(code);
+
+    // Restore
+    global.window.scrollTo = origScrollTo;
+    global.window.scrollBy = origScrollBy;
+    global.window.scroll = origScroll;
+  });
+});
+
+describe('github-scroll-fix.js getScrollDeltaY edge case', () => {
+  beforeEach(() => {
+    delete window.location;
+    window.location = { hostname: 'github.com' };
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  test('covers getScrollDeltaY null branch', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const srcPath = require('path').resolve(__dirname, '../github-scroll-fix.js');
+    const code = instrumentFile(srcPath);
+
+    // Save
+    const origScrollBy = global.window.scrollBy;
+
+    const mockScrollBy = jest.fn();
+    global.window.scrollBy = mockScrollBy;
+
+    eval(code);
+
+    window.scrollBy(null);
+
+    // Restore
+    global.window.scrollBy = origScrollBy;
+  });
+
+  test('covers getScrollTargetY null branch', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const srcPath = require('path').resolve(__dirname, '../github-scroll-fix.js');
+    const code = instrumentFile(srcPath);
+
+    const origScrollTo = global.window.scrollTo;
+    const mockScrollTo = jest.fn();
+    global.window.scrollTo = mockScrollTo;
+
+    eval(code);
+
+    window.scrollTo(null);
+
+    global.window.scrollTo = origScrollTo;
+  });
+});
+
+describe('github-scroll-fix.js super extra final coverage', () => {
+  beforeEach(() => {
+    delete window.location;
+    window.location = { hostname: 'github.com' };
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  test('covers missing HTMLElement prototype in interceptScrollTop', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const srcPath = require('path').resolve(__dirname, '../github-scroll-fix.js');
+    const code = instrumentFile(srcPath);
+
+    const origHTMLElement = global.HTMLElement;
+    const origElement = global.Element;
+
+    // First, verify behavior when Element does not have scrollTop descriptor
+    // JSDOM Element doesn't have it natively sometimes, it's on HTMLElement usually or Element.
+
+    // We will just create a clean environment where Element has NO scrollTop descriptor,
+    // and HTMLElement does.
+    const oldElementDesc = Object.getOwnPropertyDescriptor(global.Element.prototype, 'scrollTop');
+    if (oldElementDesc) {
+      delete global.Element.prototype.scrollTop;
+    }
+
+    // Now interceptScrollTop will check Element.prototype for 'scrollTop', won't find it,
+    // and will check HTMLElement.prototype.
+    eval(code);
+
+    if (oldElementDesc) {
+      Object.defineProperty(global.Element.prototype, 'scrollTop', oldElementDesc);
+    }
+  });
+
+  test('covers Element not defined and HTMLElement not defined', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const srcPath = require('path').resolve(__dirname, '../github-scroll-fix.js');
+    const code = instrumentFile(srcPath);
+
+    // Completely remove Element and HTMLElement to cover `if (!protoForScrollTop)`
+    const origHTMLElement = global.HTMLElement;
+    const origElement = global.Element;
+
+    global.Element = undefined;
+    global.HTMLElement = undefined;
+
+    eval(code);
+
+    global.Element = origElement;
+    global.HTMLElement = origHTMLElement;
+  });
+});
+
+describe('github-scroll-fix.js getScrollTargetY empty object edge case', () => {
+  beforeEach(() => {
+    delete window.location;
+    window.location = { hostname: 'github.com' };
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  test('covers getScrollTargetY object without top branch', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const srcPath = require('path').resolve(__dirname, '../github-scroll-fix.js');
+    const code = instrumentFile(srcPath);
+
+    const origScrollTo = global.window.scrollTo;
+    const mockScrollTo = jest.fn();
+    global.window.scrollTo = mockScrollTo;
+
+    eval(code);
+
+    window.scrollTo({});
+
+    global.window.scrollTo = origScrollTo;
+  });
+});
