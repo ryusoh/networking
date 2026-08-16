@@ -23,6 +23,18 @@
 (function () {
   'use strict';
 
+  /**
+   * @typedef {Object} StallGuardState
+   * @property {number} lastTime
+   * @property {number} stalledSince
+   * @property {number} lastRecovery
+   * @property {number} recoveries
+   * @property {number} lastStallAt
+   * @property {number} futile
+   * @property {number} lastReload
+   * @property {number} reloads
+   */
+
   const POLL_MS = 1000; // how often each video is checked
   const GRACE_MS = 4000; // continuous stall time before acting
   const SEEK_BACK_S = 8; // rewind distance on recovery
@@ -41,6 +53,12 @@
   // A video counts as stalled when it is supposed to be playing (not paused,
   // not ended), has no future data decoded (readyState < HAVE_FUTURE_DATA),
   // and currentTime has stopped advancing.
+  /**
+   * @param {HTMLVideoElement} video
+   * @param {number} now
+   * @param {StallGuardState} state
+   * @returns {boolean}
+   */
   function shouldRecover(video, now, state) {
     if (video.paused || video.ended) {
       state.stalledSince = 0;
@@ -75,6 +93,10 @@
   // timed-out segment), rewind only enough to land just inside that range
   // instead of the full SEEK_BACK_S: the seek alone re-triggers the missing
   // fetch, so a minimal rewind is less disruptive.
+  /**
+   * @param {HTMLVideoElement} video
+   * @returns {number}
+   */
   function computeResumeTime(video) {
     const t = video.currentTime;
     if (video.buffered) {
@@ -95,6 +117,11 @@
   // Escalation decision, separated for testability: true when this recovery
   // hits the same wall as the previous ones (stall point advanced < 1s) often
   // enough in a row, and the reload budget allows another reload.
+  /**
+   * @param {StallGuardState} state
+   * @param {number} now
+   * @returns {boolean}
+   */
   function shouldReload(state, now) {
     return (
       state.futile >= FUTILE_LIMIT &&
@@ -103,6 +130,12 @@
     );
   }
 
+  /**
+   * @param {StallGuardState} state
+   * @param {number} now
+   * @param {number} stallAt
+   * @param {Function} [reload]
+   */
   function executeReload(state, now, stallAt, reload) {
     state.reloads += 1;
     state.lastReload = now;
@@ -123,6 +156,12 @@
     }
   }
 
+  /**
+   * @param {HTMLVideoElement} video
+   * @param {StallGuardState} state
+   * @param {number} resumeAt
+   * @param {number} now
+   */
   function executeResume(video, state, resumeAt, now) {
     state.lastRecovery = now;
     state.stalledSince = 0;
@@ -147,6 +186,12 @@
     }
   }
 
+  /**
+   * @param {HTMLVideoElement} video
+   * @param {number} now
+   * @param {StallGuardState} state
+   * @param {Function} [reload]
+   */
   function recover(video, now, state, reload) {
     const stallAt = video.currentTime;
     if (state.lastStallAt >= 0 && stallAt - state.lastStallAt < 1) {
@@ -163,6 +208,9 @@
     executeResume(video, state, resumeAt, now);
   }
 
+  /**
+   * @returns {StallGuardState}
+   */
   function makeState() {
     return {
       lastTime: -1,
@@ -202,6 +250,9 @@
 
   const watched = new WeakMap();
 
+  /**
+   * @param {HTMLVideoElement} video
+   */
   function watch(video) {
     if (watched.has(video)) {
       return;
@@ -223,7 +274,7 @@
   // page's. This script runs in both frames, so the iframe asks the top frame
   // to reload via postMessage; a top-level video reloads directly.
   function requestReload() {
-    if (window.top !== window.self) {
+    if (window.top && window.top !== window.self) {
       try {
         window.top.postMessage({ type: 'stall-guard:reload' }, '*');
         return;

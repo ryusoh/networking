@@ -15,7 +15,8 @@
     "gov_bypass/tianditu-defaults.js",
     "gov_bypass/offscreen.js",
     "gov_bypass/background.js",
-    "gov_bypass/tile-cache-page.js"
+    "gov_bypass/tile-cache-page.js",
+    "stall_guard/*.js"
   ],
-  "exclude": ["node_modules", "adblock/__tests__"]
+  "exclude": ["node_modules", "adblock/__tests__", "stall_guard/dist"]
 }
