@@ -326,3 +326,166 @@ describe('Auto Generated Coverage', () => {
     jest.useRealTimers();
   });
 });
+
+describe('x-unlocked.js extra coverage', () => {
+  const contentScriptPath = require('path').resolve(__dirname, '../x-unlocked.js');
+  const { instrumentFile } = require('./helpers/instrument');
+
+  function loadContentScript() {
+    const code = instrumentFile(contentScriptPath);
+    eval(code);
+  }
+
+  beforeEach(() => {
+    delete window.location;
+    window.location = new URL('https://x.com/');
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  test('covers early returns in tryTabSwitch and observer on non-home path', () => {
+    window.location = new URL('https://x.com/something-else');
+    document.documentElement.innerHTML = '<head></head><body></body>';
+
+    // To cover line 89 (return if !tabs.length), we need path to be /home or / but no tabs
+    // But this test is for non-home. We'll do that in another test.
+    loadContentScript();
+
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+
+    // observer trigger
+    document.body.appendChild(document.createElement('div'));
+  });
+
+  test('covers no tabs in tryTabSwitch', () => {
+    window.location = new URL('https://x.com/');
+    document.documentElement.innerHTML = '<head></head><body></body>';
+
+    loadContentScript(); // init() -> startObserver() -> tryTabSwitch()
+    // tryTabSwitch sees path === '/' but tabs.length === 0, returns early (line 89)
+  });
+
+  test('covers document.body existing during init', () => {
+    window.location = new URL('https://x.com/');
+    document.documentElement.innerHTML = '<head></head><body></body>';
+
+    // By default JSDOM has document.body
+    loadContentScript();
+  });
+
+  test('covers click event listener logic', () => {
+    window.location = new URL('https://x.com/');
+    document.documentElement.innerHTML = '<head></head><body></body>';
+
+    loadContentScript();
+
+    // We overwrite isTrusted to true
+    const originalIsTrusted = Object.getOwnPropertyDescriptor(Event.prototype, 'isTrusted');
+    Object.defineProperty(Event.prototype, 'isTrusted', {
+      get: function () {
+        return true;
+      },
+      configurable: true
+    });
+
+    // Simulate user click
+    const clickEvent = new Event('click', { bubbles: true, cancelable: true });
+    window.dispatchEvent(clickEvent);
+
+    // restore
+    if (originalIsTrusted) {
+      Object.defineProperty(Event.prototype, 'isTrusted', originalIsTrusted);
+    }
+  });
+
+  test('covers tabs loop branches', () => {
+    window.location = new URL('https://x.com/');
+    document.body.innerHTML = `
+      <div role="presentation">
+        <div role="tab" aria-selected="false">おすすめ</div>
+      </div>
+      <div role="tab" aria-selected="true">Finance</div>
+      <div role="tab">No text</div>
+    `;
+
+    // Object define property for innerText since JSDOM doesn't support it natively
+    const tabs = document.querySelectorAll('[role="tab"]');
+
+    // 'おすすめ' (For you in Japanese)
+    Object.defineProperty(tabs[0], 'innerText', {
+      get() {
+        return 'おすすめ';
+      }
+    });
+
+    // Finance (Already selected)
+    Object.defineProperty(tabs[1], 'innerText', {
+      get() {
+        return 'finance';
+      }
+    });
+
+    // Element with no innerText property or empty
+    Object.defineProperty(tabs[2], 'innerText', {
+      get() {
+        return '';
+      }
+    });
+
+    loadContentScript();
+    // This immediately calls tryTabSwitch -> starts tabs.forEach
+    // Should hit text.includes('おすすめ') and hide it.
+    // Should find preferredTab ('finance'), but since aria-selected="true", won't click it.
+    expect(tabs[0].style.getPropertyValue('display')).toBe('none');
+    expect(tabs[0].parentElement.style.getPropertyValue('display')).toBe('none');
+  });
+
+  test('covers syncStorage missing or missing preferred tab', () => {
+    window.location = new URL('https://x.com/');
+    document.documentElement.innerHTML = '<head></head><body></body>';
+
+    global.chrome = {
+      storage: {
+        sync: { get: jest.fn((defaults, cb) => cb({ somethingElse: 'value' })) } // items doesn't have preferredTab
+      }
+    };
+
+    loadContentScript();
+  });
+});
+
+describe('x-unlocked.js extra extra coverage', () => {
+  const contentScriptPath = require('path').resolve(__dirname, '../x-unlocked.js');
+  const { instrumentFile } = require('./helpers/instrument');
+
+  function loadContentScript() {
+    const code = instrumentFile(contentScriptPath);
+    eval(code);
+  }
+
+  beforeEach(() => {
+    delete window.location;
+    window.location = new URL('https://x.com/');
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  test('covers observer throttleTimer clearTimeout flow', () => {
+    jest.useFakeTimers();
+
+    document.documentElement.innerHTML = '<head></head><body></body>';
+    window.location = new URL('https://x.com/');
+
+    loadContentScript(); // this fires startObserver() and tryTabSwitch()
+
+    // trigger observer
+    document.body.appendChild(document.createElement('div'));
+
+    // wait for throttleTimer
+    jest.advanceTimersByTime(300);
+
+    jest.useRealTimers();
+  });
+});

@@ -230,3 +230,351 @@ describe('hedgefollow-unlocked.js additional tests', () => {
     expect(addEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
   });
 });
+
+describe('hedgefollow-unlocked.js extra coverage', () => {
+  let originalWindowLocation;
+  beforeEach(() => {
+    document.documentElement.innerHTML =
+      '<html><head></head><body style="overflow: hidden;"></body></html>';
+
+    // Save original location
+    originalWindowLocation = window.location;
+    delete window.location;
+    window.location = {
+      hostname: 'www.hedgefollow.com',
+      pathname: '/test',
+      href: 'https://www.hedgefollow.com/test',
+      search: '',
+      protocol: 'https:',
+      assign: jest.fn(),
+      replace: jest.fn(),
+      reload: jest.fn()
+    };
+
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    window.location = originalWindowLocation;
+  });
+
+  it('covers Object.defineProperty already defined error', () => {
+    // Make open_login_modal non-configurable to throw error in try/catch
+    Object.defineProperty(window, 'open_login_modal', {
+      value: 'locked',
+      configurable: false
+    });
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+    eval(code);
+  });
+
+  it('covers observer id and cls conditions', () => {
+    jest.useFakeTimers();
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+    eval(code);
+
+    // Create modals with specific ids / classes to trigger branches
+    const m1 = document.createElement('div');
+    m1.id = 'loginModal';
+    document.body.appendChild(m1);
+
+    const m2 = document.createElement('div');
+    m2.id = 'simplemodal-container';
+    document.body.appendChild(m2);
+
+    const m3 = document.createElement('div');
+    m3.className = 'simplemodal-container something';
+    document.body.appendChild(m3);
+
+    const m4 = document.createElement('div');
+    m4.className = 'simplemodal-overlay';
+    document.body.appendChild(m4);
+
+    jest.advanceTimersByTime(100);
+
+    jest.useRealTimers();
+  });
+});
+
+describe('hedgefollow-unlocked.js extra extra coverage', () => {
+  let originalWindowLocation;
+  beforeEach(() => {
+    document.documentElement.innerHTML =
+      '<html><head></head><body style="overflow: hidden;"></body></html>';
+
+    originalWindowLocation = window.location;
+    delete window.location;
+    window.location = {
+      hostname: 'www.hedgefollow.com',
+      pathname: '/test',
+      href: 'https://www.hedgefollow.com/test',
+      search: '',
+      protocol: 'https:',
+      assign: jest.fn(),
+      replace: jest.fn(),
+      reload: jest.fn()
+    };
+
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    window.location = originalWindowLocation;
+  });
+
+  it('covers open_login_modal get/set branches', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+    eval(code);
+
+    const desc = Object.getOwnPropertyDescriptor(window, 'open_login_modal');
+
+    // Call set
+    if (desc && desc.set) {
+      desc.set();
+    }
+
+    // Call get -> returns function -> call the function
+    if (desc && desc.get) {
+      const fn = desc.get();
+      if (typeof fn === 'function') {
+        fn();
+      }
+    }
+  });
+
+  it('covers document.head fallback in appendChild', () => {
+    // Remove document.head
+    Object.defineProperty(document, 'head', {
+      value: null,
+      configurable: true
+    });
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+    eval(code);
+
+    expect(document.documentElement.innerHTML).toContain('hedgefollow-unlocked-css');
+  });
+});
+
+describe('hedgefollow-unlocked.js even more coverage', () => {
+  let originalWindowLocation;
+  beforeEach(() => {
+    document.documentElement.innerHTML =
+      '<html><head></head><body style="overflow: hidden;"></body></html>';
+
+    originalWindowLocation = window.location;
+    delete window.location;
+    window.location = {
+      hostname: 'www.hedgefollow.com',
+      pathname: '/test',
+      href: 'https://www.hedgefollow.com/test',
+      search: '',
+      protocol: 'https:',
+      assign: jest.fn(),
+      replace: jest.fn(),
+      reload: jest.fn()
+    };
+
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    window.location = originalWindowLocation;
+  });
+
+  it('covers removeModals non-HTMLElement loop', () => {
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+    eval(code);
+
+    // Make an element mimic non-HTMLElement
+    const nonHtml = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    nonHtml.id = 'loginModal';
+    document.body.appendChild(nonHtml);
+
+    // Trigger run()
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+  });
+
+  it('covers startObserver non-HTMLElement addedNode', () => {
+    jest.useFakeTimers();
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+    eval(code);
+
+    const nonHtml = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    document.body.appendChild(nonHtml);
+
+    jest.advanceTimersByTime(100);
+    jest.useRealTimers();
+  });
+
+  it('covers observer id/cls branches edge case (null id or cls)', () => {
+    jest.useFakeTimers();
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+    eval(code);
+
+    // Create an element and mock its id and className getters to return undefined
+    const el = document.createElement('div');
+    Object.defineProperty(el, 'id', {
+      get() {
+        return undefined;
+      }
+    });
+    Object.defineProperty(el, 'className', {
+      get() {
+        return undefined;
+      }
+    });
+
+    document.body.appendChild(el);
+
+    jest.advanceTimersByTime(100);
+    jest.useRealTimers();
+  });
+
+  it('covers document.body being null in observer', () => {
+    jest.useFakeTimers();
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+    eval(code);
+
+    // Create an element that will trigger the observer logic but mock document.body to null
+    // inside the observer's callback, we can't easily mock document.body in JSDOM dynamically
+    // without breaking the mutation observer. But we can overwrite it temporarily right before
+    // advancing timers.
+    const m1 = document.createElement('div');
+    m1.id = 'loginModal';
+    document.body.appendChild(m1);
+
+    const origBody = document.body;
+    Object.defineProperty(document, 'body', {
+      get() {
+        return null;
+      },
+      configurable: true
+    });
+
+    jest.advanceTimersByTime(100);
+
+    Object.defineProperty(document, 'body', {
+      value: origBody,
+      configurable: true
+    });
+
+    jest.useRealTimers();
+  });
+});
+
+describe('hedgefollow-unlocked.js final coverage', () => {
+  let originalWindowLocation;
+  beforeEach(() => {
+    document.documentElement.innerHTML =
+      '<html><head></head><body style="overflow: hidden;"></body></html>';
+
+    originalWindowLocation = window.location;
+    delete window.location;
+    window.location = {
+      hostname: 'www.hedgefollow.com',
+      pathname: '/test',
+      href: 'https://www.hedgefollow.com/test',
+      search: '',
+      protocol: 'https:',
+      assign: jest.fn(),
+      replace: jest.fn(),
+      reload: jest.fn()
+    };
+
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    window.location = originalWindowLocation;
+  });
+
+  it('covers observer id/cls string but false match', () => {
+    jest.useFakeTimers();
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+    eval(code);
+
+    const m = document.createElement('div');
+    m.id = 'not-a-modal';
+    m.className = 'not-a-modal-class';
+    document.body.appendChild(m);
+
+    jest.advanceTimersByTime(100);
+    jest.useRealTimers();
+  });
+});
+
+describe('hedgefollow-unlocked.js final extra coverage', () => {
+  let originalWindowLocation;
+  beforeEach(() => {
+    document.documentElement.innerHTML =
+      '<html><head></head><body style="overflow: hidden;"></body></html>';
+
+    originalWindowLocation = window.location;
+    delete window.location;
+    window.location = {
+      hostname: 'www.hedgefollow.com',
+      pathname: '/test',
+      href: 'https://www.hedgefollow.com/test',
+      search: '',
+      protocol: 'https:',
+      assign: jest.fn(),
+      replace: jest.fn(),
+      reload: jest.fn()
+    };
+
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    window.location = originalWindowLocation;
+  });
+
+  it('covers document.body undefined inside node true branch', () => {
+    jest.useFakeTimers();
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'hedgefollow-unlocked.js'));
+    eval(code);
+
+    const el = document.createElement('div');
+    el.id = 'loginModal';
+    document.body.appendChild(el);
+
+    const origBody = document.body;
+    Object.defineProperty(document, 'body', {
+      get() {
+        return null;
+      },
+      configurable: true
+    });
+
+    jest.advanceTimersByTime(100);
+
+    Object.defineProperty(document, 'body', {
+      value: origBody,
+      configurable: true
+    });
+
+    jest.useRealTimers();
+  });
+});
