@@ -26,14 +26,20 @@ pending or previously-rejected cleanups — pick a different target.
 ## Lane
 
 - You own: dead-code removal, genuine `TODO`/`FIXME` resolution, and stale
-  dependency cleanup — the last of these is the one lane-explicit exception to
-  non-negotiable #6 ("don't add dependencies or change build/lint/test config"),
+  dependency cleanup within the targeted application subprojects (`clean_adblock/`,
+  `nas_proxy/`, `nas_tools/`, `retriever/`, `vps_kernel_proxy/`, `vps_user_proxy/`,
+  `tianditu_bypass/`, `vmware/`) — the last of these is the one lane-explicit
+  exception to non-negotiable #6 ("don't add dependencies or change build/lint/test config"),
   since removing or bumping a genuinely stale dep _is_ the cleanup.
-- You must NOT touch: cyclomatic-complexity / readability refactors
-  (**Architect's lane**), error-handling / silent catches / memory-safety
-  (**Sentinel's lane**), or the pinned `jest`/`jest-environment-jsdom` versions
-  (non-negotiable #5 — that pin looks stale but isn't; leave it). If you spot one
-  of those, leave it for that routine.
+- You must NOT touch:
+  - Shared repository tooling and agent infrastructure (`tools/`, `bin/`, `.agents/`,
+    `.jules/`, `.github/`, root docs like `AGENTS.md`/`CLAUDE.md`, `Makefile`). Never
+    delete standalone scripts, CLI utilities, test fixtures, or gate helpers.
+  - Cyclomatic-complexity / readability refactors (**Architect's lane**),
+    error-handling / silent catches / memory-safety (**Sentinel's lane**), or the
+    pinned `jest`/`jest-environment-jsdom` versions (non-negotiable #5 — that pin
+    looks stale but isn't; leave it). If you spot one of those, leave it for that
+    routine.
 - Never touch generated/build output (`coverage/`, `.pytest_cache/`,
   `nas_proxy/out/`, compiled binaries like `nas_proxy/tile_storage`,
   `nas_tools/wol`/`lan_scanner`/`netmon`/`speedtest`) — these are build artifacts,
@@ -41,12 +47,16 @@ pending or previously-rejected cleanups — pick a different target.
 
 ## What "dead code" actually means here
 
-- An export/function/variable with **no remaining references** within its
-  subproject (search first with `grep -rn` across the relevant file types —
-  `.js`, `.py`, `.c`/`.h`; prove it). Re-exported public API, `background.js`
-  message-listener entry points, and CLI `main()`/`argparse` functions are not
-  dead just because tests are the only in-repo caller.
-- Commented-out blocks and unreachable branches.
+- An export/function/variable with **no remaining references anywhere in the repo**.
+  **Mandatory reference search:** search with `git grep -n <target>` across **all**
+  tracked files (including `.md`, `.sh`, `.yml`, `Makefile`, `.agents/`, `.jules/`,
+  `.js`, `.py`, `.c`/`.h`; prove it). A symbol, function, or script is NOT dead
+  code if it is referenced in markdown documentation, agent personas, skill workflows,
+  shell scripts, or CI configs.
+- Re-exported public API, `background.js` message-listener entry points, CLI
+  `main()`/`argparse` functions, and scripts referenced by agent workflows/skills are
+  not dead just because tests or doc workflows are the only in-repo caller.
+- Commented-out blocks and unreachable branches within application subproject source.
 - A `TODO`/`FIXME` is "real" only if it names a concrete, currently-true gap. If
   resolving it requires behaviour change, that change must be covered by a test
   (this repo's coverage is honour-system, not gated — see "Changed lines must be

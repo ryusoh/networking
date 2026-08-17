@@ -202,6 +202,9 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   the `add-extension` skill for the full new-extension checklist.
 - `docs/` — `ebpf-research.md`, `nas-strategy.md`. `bin/coverage_rank.py` — the
   coverage ranking helper.
+- `tools/` — shared repository tooling (`gate_guard.py`, `check_thinking_comments.py`,
+  `sync_commands.py`, `tools/research/`). Scripts referenced across agent docs and
+  skills are verified by `tools/__tests__/test_doc_tool_references.py`.
 - `tools/research/` — courseware research agent pipeline (`anki_generator.py`, `scene_builder.py`, `citation_engine.py`, `memory_host.py`). **Safety Rule:** Never execute raw SQLite `INSERT`/`UPDATE` mutations directly on live Anki collections (`collection.anki2` / `collection.anki21b`); use AnkiConnect REST API or TSV/APKG package export (`open -a Anki`) to prevent database lock collisions and collation errors.
 
 ### Shell scripts in `bin/` (macOS bash 3.2 gotchas)
@@ -554,14 +557,14 @@ your task owns.
 
 ## Lanes (keep PRs disjoint to avoid collisions)
 
-| Routine   | Owns                                                                                                         | Must NOT touch                                 |
-| --------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
-| Sentinel  | security + error-handling (proxy/SSRF, C memory safety, secrets, silent catches, jsdom unhandled exceptions) | complexity refactors, perf, tests as a feature |
-| Testpilot | test-only additions/coverage across Jest and pytest                                                          | production source under any subproject         |
-| Architect | behaviour-preserving complexity/readability refactors                                                        | error-handling, security, tests, features      |
-| Janitor   | dead code, stale deps, real TODOs                                                                            | complexity, error-handling, the Jest v29 pin   |
-| Bolt      | one measurable performance/efficiency win per run                                                            | complexity-only refactors, security, dead code |
-| Typist    | incremental JS strict-typing via JSDoc on `clean_adblock/*.js`                                               | runtime logic, tests, Python, C                |
+| Routine   | Owns                                                                                                         | Must NOT touch                                    |
+| --------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| Sentinel  | security + error-handling (proxy/SSRF, C memory safety, secrets, silent catches, jsdom unhandled exceptions) | complexity refactors, perf, tests as a feature    |
+| Testpilot | test-only additions/coverage across Jest and pytest                                                          | production source under any subproject            |
+| Architect | behaviour-preserving complexity/readability refactors                                                        | error-handling, security, tests, features         |
+| Janitor   | dead code, stale deps, real TODOs within subprojects                                                         | tools/, bin/, docs, .jules/, complexity, Jest pin |
+| Bolt      | one measurable performance/efficiency win per run                                                            | complexity-only refactors, security, dead code    |
+| Typist    | incremental JS strict-typing via JSDoc on `clean_adblock/*.js`                                               | runtime logic, tests, Python, C                   |
 
 If your finding belongs to another lane, **skip it** — that lane will get it.
 
