@@ -95,6 +95,11 @@ expected noise:
   This is a host sandbox limitation, not a code bug. Run `make precommit-docker`
   to execute the full gate inside an Ubuntu container (auto-starts Colima if
   needed).
+- **`Exec format error` or `cannot execute binary file` after Docker runs:**
+  When `nas_tools` or `nas_proxy` binaries were compiled inside a Linux container,
+  local macOS test runners fail with an architecture mismatch because `make`
+  skips rebuilding existing files. Run `make -C nas_tools clean && make -C nas_proxy clean`
+  to rebuild native macOS binaries.
 - **jsdom prints async `unhandled exception` stack traces** for errors thrown
   inside content-script code even when the test passes. These are real bugs to fix
   (Sentinel's lane), but they do not fail the suite by themselves.

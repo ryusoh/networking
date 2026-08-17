@@ -32,14 +32,14 @@ pending or previously-rejected cleanups — pick a different target.
   exception to non-negotiable #6 ("don't add dependencies or change build/lint/test config"),
   since removing or bumping a genuinely stale dep _is_ the cleanup.
 - You must NOT touch:
-  - Shared repository tooling and agent infrastructure (`tools/`, `bin/`, `.agents/`,
-    `.jules/`, `.github/`, root docs like `AGENTS.md`/`CLAUDE.md`, `Makefile`). Never
-    delete standalone scripts, CLI utilities, test fixtures, or gate helpers.
-  - Cyclomatic-complexity / readability refactors (**Architect's lane**),
-    error-handling / silent catches / memory-safety (**Sentinel's lane**), or the
-    pinned `jest`/`jest-environment-jsdom` versions (non-negotiable #5 — that pin
-    looks stale but isn't; leave it). If you spot one of those, leave it for that
-    routine.
+    - Shared repository tooling and agent infrastructure (`tools/`, `bin/`, `.agents/`,
+      `.jules/`, `.github/`, root docs like `AGENTS.md`/`CLAUDE.md`, `Makefile`). Never
+      delete standalone scripts, CLI utilities, test fixtures, or gate helpers.
+    - Cyclomatic-complexity / readability refactors (**Architect's lane**),
+      error-handling / silent catches / memory-safety (**Sentinel's lane**), or the
+      pinned `jest`/`jest-environment-jsdom` versions (non-negotiable #5 — that pin
+      looks stale but isn't; leave it). If you spot one of those, leave it for that
+      routine.
 - Never touch generated/build output (`coverage/`, `.pytest_cache/`,
   `nas_proxy/out/`, compiled binaries like `nas_proxy/tile_storage`,
   `nas_tools/wol`/`lan_scanner`/`netmon`/`speedtest`) — these are build artifacts,
