@@ -4,7 +4,7 @@ Single source of truth for agent guidance on this repo — **edit this file, not
 `CLAUDE.md`** (that is a stub that imports this one). Slash-command workflows
 live in `.agents/skills/<name>/SKILL.md` (canonical — the open Agent Skills
 format); `.claude/commands/` is generated from it by `tools/sync_commands.py`,
-and the gate drift-checks it via `make sync-check`.
+`.claude/skills` is symlinked to `.agents/skills`, and the gate drift-checks it via `make sync-check`.
 
 ## Two audiences (do not mix these up)
 
@@ -542,6 +542,10 @@ your task owns.
 - **`.agents/skills/<name>/SKILL.md` is canonical** — the open Agent Skills
   format: YAML frontmatter declaring `name` and `description` (used for
   triggering), instructions in the markdown body. Edit skills there.
+- **Self-contained skill bundles:** Each skill is a directory containing its
+  `SKILL.md`, plus any skill-scoped helper scripts (`scripts/`) or prompt/data
+  references (`references/`). Keep skill-specific logic bundled within its skill
+  directory rather than placing one-off scripts in global `tools/` or `bin/`.
 - **Progressive disclosure:** only the frontmatter `name` + `description` enter
   an agent's system prompt; the body is read on demand once the skill triggers.
   So the `description` is the only always-loaded surface — write it as a
@@ -550,11 +554,16 @@ your task owns.
 - **Never put a `---` horizontal rule in a skill body** — the generator's
   frontmatter parser is a naive `content.split("---", 2)`, so a `---` line in
   the body mangles the generated command.
+- **`.claude/skills` is symlinked to `../.agents/skills`** for autonomous agent
+  discovery across tools (Claude Code, DeepSeek Harness, etc.).
 - **`.claude/commands/<name>.md` is generated** from the skills by
-  `tools/sync_commands.py` for Claude Code. Never edit the generated files by
-  hand — run `python3 tools/sync_commands.py` after editing a skill, and note
-  that `make sync-check` (wired into `make precommit`) fails if regeneration is
-  not a no-op.
+  `tools/sync_commands.py` for Claude Code interactive slash commands. Never edit
+  the generated files by hand — run `python3 tools/sync_commands.py` after editing
+  a skill, and note that `make sync-check` (wired into `make precommit`) fails if
+  regeneration is not a no-op.
+- **Skill schema validation:** `tools/__tests__/test_skills.py` (run by `make test-py`)
+  enforces schema validity, non-empty descriptions, directory-name matching, and
+  symlink resolution across all skills.
 - **Jules scheduled routines (unattended)** are a separate system from the
   interactive skills above: their shared contract is this file and their
   per-routine personas live in `.jules/<name>.md` (currently `testpilot`,
