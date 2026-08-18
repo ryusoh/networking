@@ -611,7 +611,7 @@ def test_import_marks_reviewed_chunks_imported(monkeypatch, tmp_path: Path):
             f"{reviewed_front}\t"
             "<div><b>定义:</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
             "<div><b>条件:</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
-            "<div><b>源码与文档引用 (Source Citation):</b> [research/x.md#L1-L5](file:///tmp/x.md)</div>\t"
+            "<div><b>源码与文档引用 (Source Citation):</b> [research/x.md#L1-L5](file:///tmp/x.md#L1-L5)</div>\t"
             "research"
         ],
         ["research/x.md:chunk-1"],
@@ -783,7 +783,7 @@ def test_import_reviewed_cards_from_jsonl(monkeypatch, tmp_path: Path):
                 "back": (
                     "<div><b>定义:</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
                     "<div><b>条件:</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
-                    "<div><b>源码与文档引用 (Source Citation):</b> [research/cs234/b4.md#L1-L5](file:///tmp/x.md)</div>"
+                    "<div><b>源码与文档引用 (Source Citation):</b> [research/cs234/b4.md#L1-L5](file:///tmp/x.md#L1-L5)</div>"
                 ),
                 "tags": ["research", "cs234"],
             },
@@ -827,7 +827,7 @@ def test_import_canonicalizes_tags(monkeypatch, tmp_path: Path):
                 "back": (
                     "<div><b>定义:</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
                     "<div><b>条件:</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
-                    "<div><b>源码与文档引用 (Source Citation):</b> [research/cs231/paxos.md#L1-L5](file:///tmp/x.md)</div>"
+                    "<div><b>源码与文档引用 (Source Citation):</b> [research/cs231/paxos.md#L1-L5](file:///tmp/x.md#L1-L5)</div>"
                 ),
                 "tags": ["research", "cs231-distributed-systems", "TCP", "tcp_protocol"],
             },
@@ -912,7 +912,7 @@ def test_import_appends_accept_review_log(monkeypatch, tmp_path: Path):
                 "back": (
                     "<div><b>定义:</b></div><div><b>Concept</b> explanation.</div>"
                     "<div><b>机制 (Mechanism):</b></div><div><b>Term</b> details.</div>"
-                    "<div><b>源码与文档引用 (Source Citation):</b> [research/x.md#L1-L5](file:///tmp/x.md)</div>"
+                    "<div><b>源码与文档引用 (Source Citation):</b> [research/x.md#L1-L5](file:///tmp/x.md#L1-L5)</div>"
                 ),
                 "tags": ["research"],
             }

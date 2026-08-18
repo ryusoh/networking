@@ -32,7 +32,7 @@ def test_clean_card_passes(tmp_path: Path) -> None:
         "边界网关协议 (Border Gateway Protocol, BGP): BGP 如何通过 AS-PATH 实现域间路由？\t"
         "<div><b>定义 (Definition):</b></div><div><b>BGP</b> 是路径向量路由协议，使用 <b>AS-PATH</b> 防止环路。</div>"
         "<div><b>机制 (Mechanism):</b></div><div>路由通过 <b>NEXT-HOP</b> 和 <b>Local-Pref</b> 属性选择。</div>"
-        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs232/bgp.md#L1-L5](file:///tmp/x.md)</div>\t"
+        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs232/bgp.md#L1-L5](file:///tmp/x.md#L1-L5)</div>\t"
         "research networking"
     ]
     path = _write_tsv(tmp_path, rows)
@@ -158,7 +158,7 @@ def test_sprinkled_back_is_flagged(tmp_path: Path) -> None:
         "并行二维 FFT 的精巧转置调度: 处理器 \\(P_i\\) 在第 \\(j\\) 步把块发给谁？\t"
         "<div><b>调度规则:</b></div><div>每一步 (per step) 每个处理器 (per processor) 恰好发送并接收一个块（one block per step）。</div>"
         "<div><b>复杂度:</b></div><div>精巧调度只需 \\(O(k)\\) 次块传输。</div>"
-        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs231/fft.md#L1-L5](file:///tmp/x.md)</div>\t"
+        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs231/fft.md#L1-L5](file:///tmp/x.md#L1-L5)</div>\t"
         "research"
     ]
     path = _write_tsv(tmp_path, rows)
@@ -171,7 +171,7 @@ def test_unexplained_acronym_is_flagged(tmp_path: Path) -> None:
         "NITRD 重大挑战的进展指标 (Progress Indicators for NITRD Grand Challenges): 为什么成就难以量化？\t"
         "<div><b>定性本质 (Qualitative Nature):</b></div><div>成就本质上是定性的。</div>"
         "<div><b>指标谱系 (Indicator Spectrum):</b></div><div>指标横跨定量到定性。</div>"
-        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs231/nitrd.md#L1-L5](file:///tmp/x.md)</div>\t"
+        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs231/nitrd.md#L1-L5](file:///tmp/x.md#L1-L5)</div>\t"
         "research"
     ]
     path = _write_tsv(tmp_path, rows)
@@ -194,7 +194,7 @@ def test_router_domain_name_is_not_a_diagram(tmp_path: Path) -> None:
         "地址绑定到接口: 为什么域名分配给接口而非主机？\t"
         "<div><b>核心论断:</b></div><div><b>域名</b>、<b>IP 地址</b>、<b>MAC 地址</b>分配给<b>网络接口</b>。</div>"
         "<div><b>示例:</b></div><div>同一台路由器从不同接口引用时有不同域名，如 <b>router137.cerf.edu</b>。</div>"
-        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs233/ch0.md#L1-L5](file:///tmp/x.md)</div>\t"
+        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs233/ch0.md#L1-L5](file:///tmp/x.md#L1-L5)</div>\t"
         "research"
     ]
     path = _write_tsv(tmp_path, rows)
@@ -206,7 +206,7 @@ def test_reviewed_chinese_card_passes(tmp_path: Path) -> None:
         "拜占庭将军问题: 口头消息下的可解条件是什么？\t"
         "<div><b>定义:</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
         "<div><b>条件:</b></div><div>即 \\(n \\geq 3m+1\\)。</div>"
-        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs234/byzantine.md#L1-L5](file:///tmp/x.md)</div>\t"
+        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs234/byzantine.md#L1-L5](file:///tmp/x.md#L1-L5)</div>\t"
         "research"
     ]
     path = _write_tsv(tmp_path, rows)
@@ -362,6 +362,30 @@ def test_invented_tag_is_flagged() -> None:
 def test_alias_and_separator_variants_are_not_flagged() -> None:
     issues = validate_cards([_card_with_tags(["TCP", "tcp-protocol", "cs231-distributed-systems", "Distributed-System"])])
     assert issues == {}
+
+
+def test_missing_citation_section_is_flagged(tmp_path: Path) -> None:
+    rows = [
+        "BGP Path Vector: 如何防止环路？\t"
+        "<div><b>定义:</b></div><div>BGP 是路径向量协议。</div>"
+        "<div><b>机制:</b></div><div>使用 AS-PATH 防止环路。</div>\t"
+        "research networking"
+    ]
+    path = _write_tsv(tmp_path, rows)
+    issues = validate_tsv(path)
+    assert any("missing mandatory" in i.lower() for i in _all_issue_texts(issues))
+
+
+def test_malformed_citation_link_is_flagged(tmp_path: Path) -> None:
+    rows = [
+        "BGP Path Vector: 如何防止环路？\t"
+        "<div><b>定义:</b></div><div>BGP 是路径向量协议。</div>"
+        "<div><b>源码与文档引用 (Source Citation):</b> [research/cs232/bgp.md#L1-L5](https://example.com)</div>\t"
+        "research networking"
+    ]
+    path = _write_tsv(tmp_path, rows)
+    issues = validate_tsv(path)
+    assert any("no properly formatted file://" in i.lower() for i in _all_issue_texts(issues))
 
 
 def test_canonical_tag_normalization() -> None:

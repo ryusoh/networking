@@ -71,6 +71,8 @@ SECTION_HEADER_RE = re.compile(r"<(b|strong)>[^<]*[:：]</\1>", re.IGNORECASE)
 LATEX_RE = re.compile(r"\\\(.*?\\\)|\\\[.*?\\\]")
 MARKDOWN_LINK_RE = re.compile(r"\[[^\]]*\]\([^()]*\)")
 ACRONYM_TOKEN_RE = re.compile(r"\b(?:[A-Z]{2,}|[A-Za-z]*[A-Z][a-z]+[A-Z][A-Za-z]*)$")
+CITATION_SECTION_RE = re.compile(r"源码与文档引用\s*\(?Source Citation\)?:", re.IGNORECASE)
+CITATION_LINK_RE = re.compile(r"\[[^\]]+\]\(file://[^\s#]+#L\d+(?:-L\d+)?\)")
 # Canonical tag vocabulary. Tags are the one free-form field the LLM authors,
 # so they are machine-gated like everything else: a card may only carry tags
 # from this set (after normalization), which keeps the Anki tag space from
@@ -441,7 +443,21 @@ def _validate_card(front: str, back: str) -> list[str]:
             "Acronym(s) used but never expanded/explained: " + ", ".join(sorted(unexplained))
         )
 
+    citation_issue = _check_citation_section(back)
+    if citation_issue:
+        card_issues.append(citation_issue)
+
     return card_issues
+
+
+def _check_citation_section(back: str) -> str | None:
+    """Validate the mandatory final citation section and its line-anchored links."""
+    plain = re.sub(r"<[^>]+>", "", back)
+    if not CITATION_SECTION_RE.search(plain):
+        return "Back missing mandatory '源码与文档引用 (Source Citation):' section"
+    if not CITATION_LINK_RE.search(plain):
+        return "Citation section contains no properly formatted file:// line-anchored link"
+    return None
 
 
 def _tag_issues(tags: Any) -> list[str]:
