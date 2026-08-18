@@ -14,7 +14,7 @@ that processes it lives elsewhere.
 | Durable memory | `research/.durable_memory.json` | Student mastery records produced by `tools/research/memory_host.py`. |
 | Implementation | `tools/research/` | All Python scripts: parser, indexer, scene builder, citation engine, memory host, Anki generator/validator, etc. |
 | Specifications | `docs/anki-card-pipeline-spec.md`, `docs/research-agent-spec.md` | Canonical architecture and data-contract specs. |
-| User manual | `docs/skills-usage-guide.md` | Step-by-step usage of the `research-agent` and `anki` slash-command skills. |
+| User manual | `docs/research-anki-skills-usage-guide.md` | Step-by-step usage of the `research-agent` and `anki` slash-command skills. |
 | Skills | `.agents/skills/research-agent/SKILL.md`, `.agents/skills/anki/SKILL.md` | Interactive agent skill definitions. |
 
 ## Entry points
