@@ -16,20 +16,23 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from tools.research.memory_host import MemoryHost
 from tools.research.parse_chunks import estimate_tokens
 from tools.research.search_chunks import BM25Indexer, format_file_link, load_manifest
 
 DEFAULT_RESEARCH_DIR = Path(__file__).resolve().parent.parent.parent / "research"
 DEFAULT_MANIFEST_PATH = DEFAULT_RESEARCH_DIR / ".chunks_manifest.json"
+DEFAULT_MEMORY_PATH = DEFAULT_RESEARCH_DIR / ".durable_memory.json"
 
 
 class SceneBuilder:
     """Host SceneBuilder for assembling token-bounded Study Scenes."""
 
-    def __init__(self, chunks: list[dict[str, Any]], repo_root: Path):
+    def __init__(self, chunks: list[dict[str, Any]], repo_root: Path, memory_host: MemoryHost | None = None):
         self.chunks = chunks
         self.repo_root = repo_root
         self.indexer = BM25Indexer(chunks)
+        self.memory_host = memory_host
 
     def build_scene(self, query: str, max_tokens: int = 8192, top_k: int = 5) -> dict[str, Any]:
         """Query indexer and assemble a token-bounded Study Scene dictionary."""
@@ -39,12 +42,22 @@ class SceneBuilder:
         system_instruction_tokens = 200
         current_tokens = system_instruction_tokens
 
+        memory_context = ""
+        memory_tokens = 0
+        if self.memory_host is not None:
+            report = self.memory_host.get_student_report()
+            if report["total_topics_tracked"] > 0:
+                memory_context = self.memory_host.render_memory_context()
+                memory_section = self._render_memory_section(memory_context)
+                memory_tokens = estimate_tokens(memory_section)
+                current_tokens += memory_tokens
+
         for chunk, score in ranked:
             chunk_tokens = chunk.get("token_count", estimate_tokens(chunk.get("content", "")))
             if current_tokens + chunk_tokens > max_tokens:
                 if not selected_chunks:
                     # Truncate content to fit if first chunk exceeds max_tokens
-                    allowed_tokens = max(100, max_tokens - system_instruction_tokens)
+                    allowed_tokens = max(100, max_tokens - system_instruction_tokens - memory_tokens)
                     allowed_chars = allowed_tokens * 4
                     truncated_chunk = dict(chunk)
                     truncated_chunk["content"] = chunk["content"][:allowed_chars] + "\n... [Truncated for token budget]"
@@ -61,7 +74,9 @@ class SceneBuilder:
             if len(selected_chunks) >= top_k:
                 break
 
-        formatted_payload = self._render_markdown_scene(query, selected_chunks, current_tokens, max_tokens)
+        formatted_payload = self._render_markdown_scene(
+            query, selected_chunks, current_tokens, max_tokens, memory_context
+        )
 
         return {
             "query": query,
@@ -69,11 +84,25 @@ class SceneBuilder:
             "used_tokens": current_tokens,
             "chunk_count": len(selected_chunks),
             "chunks": selected_chunks,
+            "memory_injected": bool(memory_context),
             "markdown_payload": formatted_payload,
         }
 
+    def _render_memory_section(self, memory_context: str) -> str:
+        """Render the durable-memory context block as it appears in the payload."""
+        return "\n".join(
+            [
+                "",
+                "## DURABLE MEMORY CONTEXT",
+                "Use the student's known strengths and weaknesses below to tailor depth and emphasis.",
+                "",
+                memory_context,
+                "",
+            ]
+        )
+
     def _render_markdown_scene(
-        self, query: str, chunks: list[dict[str, Any]], used_tokens: int, max_tokens: int
+        self, query: str, chunks: list[dict[str, Any]], used_tokens: int, max_tokens: int, memory_context: str = ""
     ) -> str:
         lines: list[str] = [
             f"# STUDY SCENE CONTEXT: {query.upper()}",
@@ -82,10 +111,19 @@ class SceneBuilder:
             "## MANDATORY CITATION CONTRACT",
             "When answering or explaining concepts from this context, you MUST cite all claims and code details using exact line-anchored Markdown links in the following format:",
             "`[file_path#Lstart-Lend](file:///absolute_path#Lstart-Lend)`",
-            "",
-            "## SOURCE CONTEXT BLOCKS",
-            "",
         ]
+
+        if memory_context:
+            lines.append(self._render_memory_section(memory_context))
+        else:
+            lines.append("")
+
+        lines.extend(
+            [
+                "## SOURCE CONTEXT BLOCKS",
+                "",
+            ]
+        )
 
         for idx, chunk in enumerate(chunks, start=1):
             file_path = chunk["file_path"]
@@ -130,6 +168,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Emit JSON payload instead of Markdown text.",
     )
+    parser.add_argument(
+        "--memory",
+        default=str(DEFAULT_MEMORY_PATH),
+        help="Path to durable-memory JSON (default: research/.durable_memory.json).",
+    )
     args = parser.parse_args(argv)
 
     if not args.query:
@@ -137,6 +180,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     manifest_path = Path(args.manifest).resolve()
     repo_root = manifest_path.parent.parent
+    memory_path = Path(args.memory).resolve()
 
     if not manifest_path.exists():
         parser.error(
@@ -146,7 +190,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     manifest_data = load_manifest(manifest_path)
     chunks = manifest_data.get("chunks", [])
 
-    builder = SceneBuilder(chunks, repo_root)
+    memory_host = MemoryHost(memory_path)
+    builder = SceneBuilder(chunks, repo_root, memory_host=memory_host)
     scene = builder.build_scene(args.query, max_tokens=args.max_tokens, top_k=args.top_k)
 
     if args.json:
