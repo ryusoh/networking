@@ -7,6 +7,11 @@ This spec describes the pipeline **as implemented**. Where a component is legacy
 effectively inert, or enforced more loosely than the prose contract suggests, that
 status is stated explicitly.
 
+This pipeline consumes the same `research/` chunk manifest and line-anchored
+citation format produced by the Research & Curriculum Agent. See
+`docs/research-agent-spec.md` for the parsing, indexing, scene assembly, and
+citation-verification machinery that sit upstream of card generation.
+
 ## 1. Core principle: LLM authors, code gates
 
 Deterministic code **never writes card prose**. The pipeline does four things:
@@ -84,8 +89,9 @@ All JSONL files above are ignored by `.gitignore`.
 Notes:
 
 - The card loader requires only `chunk_id`, `front`, and `back` (tags are
-  normalized/defaulted); `citation` is an authoring convention the code neither
-  requires nor strips.
+  normalized/defaulted). `citation` is not required by the loader, but the
+  validator enforces a final `源码与文档引用 (Source Citation):` section with
+  properly formatted `file://` line-anchored links.
 - `research/anki_import.chunks.json` is a **stale artifact**: its writer was
   removed in the pipeline rework. It is only _read_ by the legacy TSV fallback
   path; nothing regenerates it. Do not rely on its contents being current.
@@ -209,8 +215,9 @@ validator — see §9 for exactly which rules are mechanical.
   (e.g. `NITRD (Networking and Information Technology Research and
 Development)`) — this one **is** machine-enforced.
 - **Citation:** a final `源码与文档引用 (Source Citation):` section with the
-  line-anchored Markdown link. This section is an authoring convention:
-  **neither the validator nor `--import` checks for its presence or format.**
+  line-anchored Markdown link. The validator now enforces the presence of this
+  section and the format of its `file://` line-anchored links; `--import` still
+  does not strip or require `citation` in the raw JSONL loader.
 
 The validator enforces the mechanical subset of these rules; `--import` refuses
 violating cards unless `--force`.
@@ -237,6 +244,8 @@ it reports issues and exits non-zero but blocks nothing by itself. Detectors:
   Catch mismatches during the required human review step, not via an automated
   gate.
 - Duplicate titles within the batch.
+- Missing or malformed final `源码与文档引用 (Source Citation):` section (must
+  contain at least one `file://` line-anchored Markdown link).
 - Multi-word English glosses in the front (banned, per §8).
 - Fewer than 2 structured section headers in the back.
 - More than 2 non-acronym English parenthetical annotations in the back.
