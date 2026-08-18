@@ -20,7 +20,7 @@ out of scope; the baseline is computed from 金融 alone.
 Score each card on the concatenation of its Front and Back fields after a fixed
 normalization pipeline, then combine three deterministic components:
 
-```math
+$$
 \begin{aligned}
 x &= \operatorname{normalize}(\text{front\_html} + \text{" "} + \text{back\_html}) \\[0.6em]
 D_{\text{comp}} &= 1 - \frac{|\operatorname{zlib}_9(\operatorname{utf8}(x))| - |\operatorname{zlib}_9(\text{""})|}{|\operatorname{utf8}(x)|} \quad &&\text{(compression density)} \\
@@ -29,7 +29,7 @@ D_{\text{concept}} &= \frac{|\text{distinct technical tokens}|}{|\operatorname{t
 D_{\text{domain}} &= \frac{|\operatorname{tokens}(x) \cap L_{\text{deck}}|}{|\operatorname{tokens}(x)|} \times 100 \quad &&\text{(domain-lexicon coverage)} \\[0.6em]
 D(\text{card}) &= 0.4 \cdot D_{\text{comp}} + 0.2 \cdot \frac{D_{\text{lex}}}{100} + 0.2 \cdot \frac{D_{\text{concept}}}{100} + 0.2 \cdot \frac{D_{\text{domain}}}{100}
 \end{aligned}
-```
+$$
 
 Weights are engineering defaults, not literature-derived constants (see §5).
 
@@ -144,9 +144,9 @@ identical pipeline — which cancels systematic bias in each component.
 
 Shannon entropy of a discrete source $X$ with symbol probabilities $p(x)$:
 
-```math
+$$
 H(X) = -\sum_{x \in \mathcal{X}} p(x) \log_2 p(x)
-```
+$$
 
 Per-card unigram entropy treats each token as an independent draw; it ignores
 sequential redundancy and therefore overestimates the information of repetitive
@@ -154,9 +154,9 @@ text.
 
 Entropy rate of a stochastic process $\{X_i\}$:
 
-```math
+$$
 H(\mathcal{X}) = \lim_{n \to \infty} \frac{1}{n} H(X_1, X_2, \dots, X_n)
-```
+$$
 
 Genzel & Charniak's entropy-rate-constancy result says $H(\mathcal{X})$ is
 roughly constant within a coherent document; large deviations signal a regime
@@ -164,9 +164,9 @@ change (e.g., a generated card sparser than its deck peers).
 
 Kolmogorov complexity of a string $x$:
 
-```math
+$$
 K(x) = \min_{p : U(p) = x} |p|
-```
+$$
 
 where $U$ is a universal Turing machine. $K(x)$ is uncomputable; any lossless
 compressor $C$ gives an upper bound $K(x) \leq |C(x)| + O(1)$, which is why
@@ -175,23 +175,23 @@ zlib is a practical proxy.
 Normalized Compression Distance (Cilibrasi & Vitányi) between strings $x$ and
 $y$:
 
-```math
+$$
 NCD(x, y) = \frac{C(xy) - \min\{C(x), C(y)\}}{\max\{C(x), C(y)\}}
-```
+$$
 
 Our per-card compression density is the one-sided analogue:
 
-```math
+$$
 D_{\text{comp}}(x) = 1 - \frac{|C(x)| - |C(\varepsilon)|}{|x|}
-```
+$$
 
 where the empty-string term removes fixed stream overhead.
 
 Surprisal (information content) of token $w_i$ in context:
 
-```math
+$$
 I(w_i) = -\log_2 P(w_i \mid w_1, \dots, w_{i-1})
-```
+$$
 
 UID-style density scoring would average $I(w_i)$ over a card; it requires a
 language model for $P$, so we approximate the same intuition with the
@@ -235,7 +235,7 @@ domain-lexicon and compression components instead.
 
 ### 3.2 Components (new modules, `tools/research/` naming style)
 
-```
+```text
 anki_density.py            pure metric; jieba for CJK, otherwise stdlib
     normalize_text(html) -> str
     tokenize(text) -> list[str]                             # jieba.cut(HMM=False) + latin regex
@@ -292,15 +292,18 @@ authoring step consumes, and every re-authored card goes back through
 
 ### 3.4 Pipeline fit (verified against the spec's §2 workflow)
 
-```
-anki_generator.py --count N        →  anki_candidates.jsonl
-LLM authors cards                  →  anki_cards.jsonl
-anki_card_validator.py             →  (existing hard gate)
-anki_density_gate.py               →  anki_density_verdicts.jsonl   ← NEW
-    accept        → continue
-    enrich        → LLM re-authors with chunk context → validator → re-gate (≤2 attempts)
-    consolidate   → LLM merges group into one card    → validator → re-gate
-anki_generator.py --import         →  AnkiConnect addNotes  (only accept-verdict cards)
+```mermaid
+flowchart TD
+    A["anki_generator.py --count N"] --> B["research/anki_candidates.jsonl"]
+    B --> C["LLM Authors Cards"]
+    C --> D["research/anki_cards.jsonl"]
+    D --> E["anki_card_validator.py<br/>(Existing Hard Gate)"]
+    E --> F["anki_density_gate.py<br/>(Density Gate)"]
+    F -->|accept| G["anki_generator.py --import<br/>(AnkiConnect addNotes)"]
+    F -->|enrich| H["LLM Re-authors with Chunk Context<br/>(≤2 attempts)"]
+    F -->|consolidate| I["LLM Merges Group into One Card"]
+    H --> E
+    I --> E
 ```
 
 The gate sits **after validation, before AnkiConnect import** — it judges a
@@ -311,24 +314,53 @@ JSONL, both repo-local artifacts.
 
 ### 3.5 Data flow
 
-```
-/ Users/lz/dev/anki ──────────────────────────┐
-  graph/graph_data.json  ──top-10 pagerank──►  anki_density_baseline
-  data/cloudflare/.../notes.json.gz ──text──►        │  BaselineReport (τ, per-card D)
-  data/anki/notes.json.gz ──guid→nid map──►          │  (+ zlib version, graph hash)
-  (AnkiConnect notesInfo — live freshness)           │
-                                                     ▼
-research/anki_cards.jsonl ──► anki_density.card_density ──► anki_density_gate
-research/anki_candidates.jsonl ──chunk context──────────►      │ verdicts
-                                                               ▼
-                                   accept ──► anki_generator --import ──► AnkiConnect addNotes
-                                   enrich/consolidate ──► LLM re-author ──► validator ──► re-gate
+```mermaid
+flowchart TD
+    subgraph SiblingRepo["/Users/lz/dev/anki"]
+        Graph["graph/graph_data.json<br/>(top-10 PageRank)"]
+        NotesR2["data/cloudflare/.../notes.json.gz<br/>(note text snapshot)"]
+        NotesID["data/anki/notes.json.gz<br/>(guid → nid map)"]
+        LiveConn["AnkiConnect notesInfo<br/>(live freshness)"]
+    end
+
+    subgraph BaselineGen["Baseline Generator"]
+        BaseScript["anki_density_baseline.py"]
+        BaseReport["BaselineReport (τ, per-card D)<br/>(+ zlib version, graph hash)"]
+    end
+
+    subgraph GateEval["Gate Evaluation"]
+        Cards["research/anki_cards.jsonl"]
+        CardDensity["anki_density.card_density"]
+        Candidates["research/anki_candidates.jsonl"]
+        Gate["anki_density_gate.py"]
+        Verdicts["research/anki_density_verdicts.jsonl"]
+    end
+
+    subgraph Actions["Pipeline Actions"]
+        AcceptPath["accept ──► anki_generator --import ──► AnkiConnect addNotes"]
+        ReauthorPath["enrich/consolidate ──► LLM re-author ──► validator ──► re-gate"]
+    end
+
+    Graph --> BaseScript
+    NotesR2 --> BaseScript
+    NotesID --> BaseScript
+    LiveConn -.-> BaseScript
+    BaseScript --> BaseReport
+
+    Cards --> CardDensity
+    CardDensity --> Gate
+    BaseReport --> Gate
+    Candidates --> Gate
+    Gate --> Verdicts
+
+    Verdicts --> AcceptPath
+    Verdicts --> ReauthorPath
 ```
 
 ## 4. Claim-by-claim evidence
 
 | # | Claim | Evidence |
-|---|-------|----------|
+| - | ----- | -------- |
 | 1 | Kolmogorov complexity is uncomputable; compressors upper-bound it | Li & Vitányi, *An Introduction to Kolmogorov Complexity and Its Applications*, Springer |
 | 2 | Compression-ratio distances are an established practical approximation | Cilibrasi & Vitányi, "Clustering by compression", *IEEE Trans. Inf. Theory* 51(4):1523–1545, 2005; Li, Chen, Li, Ma & Vitányi, "The similarity metric", *IEEE Trans. Inf. Theory* 50(12):3250–3264, 2004 |
 | 3 | zlib/DEFLATE format is fully specified and stdlib-available | [RFC 1950 (zlib)](https://www.rfc-editor.org/rfc/rfc1950), RFC 1951 (DEFLATE) |
@@ -407,6 +439,7 @@ AnkiConnect) and to produce a committed result (a JSON artifact under
 it include the note `guid`?
 
 **Method:**
+
 1. Start Anki with AnkiConnect enabled.
 2. Pick 5 known note ids from `data/anki/notes.json.gz` (guids sampled from
    the 金融 deck top-100 PageRank).
@@ -422,6 +455,7 @@ if `guid` is present, the guid→nid map step can be dropped from the design.
 staged-export baseline?
 
 **Method:**
+
 1. Compute `compute_baseline(金融, k=10)` using the staged export.
 2. Compute the same baseline using AnkiConnect live fetch.
 3. Compare per-card densities and the resulting τ.
@@ -435,6 +469,7 @@ becomes the default.
 for the 金融 deck?
 
 **Method:**
+
 1. Score all existing 金融 cards with the density metric.
 2. Plot the distribution; identify the top-10 hub cards' scores.
 3. Generate 20 candidate cards with the current pipeline, score them, and
@@ -451,6 +486,7 @@ gate remains report-only until this passes.
 lexical scores?
 
 **Method:**
+
 1. Construct synthetic cards of 10–100 tokens with known lexical diversity.
 2. Score them with and without the fallback.
 3. Verify the composite remains stable when `D_lex` is dropped.
@@ -464,6 +500,7 @@ lexical scores?
 runs and jieba patch releases?
 
 **Method:**
+
 1. Tokenize 100 real 金融 cards with the pinned jieba version.
 2. Repeat after a clean reinstall of the same version.
 3. Compare token sequences and dictionary hash.
@@ -477,6 +514,7 @@ recorded in baseline artifact.
 prose?
 
 **Method:**
+
 1. Build the lexicon from top-10 金融 hub cards.
 2. Score 20 real 金融 cards and 20 generic-knowledge cards (e.g., language-deck
    cards or hand-written general facts).
@@ -490,6 +528,7 @@ cards at least 2× that of generic cards.
 **Question:** Does the full gate behave sensibly on a real batch?
 
 **Method:**
+
 1. Run the existing pipeline to generate 5 cards.
 2. Run `anki_density_gate.py` in report-only mode.
 3. Inspect verdicts: are low-density cards the ones a human would also flag?
