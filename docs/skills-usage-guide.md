@@ -6,10 +6,10 @@ This manual provides complete step-by-step instructions, operational workflows, 
 
 ## 1. Executive Summary & Quick Reference
 
-| Skill                | Primary Purpose                                                                                                                                    | Trigger / Command                                                         | Core Tools & Deliverables                                                      |
-| :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------ | :----------------------------------------------------------------------------- |
-| **`research-agent`** | Search, parse, assemble token-bounded context, and verify line-anchored citations over `research/` courseware (`cs231`..`cs234`).                  | Slash command: `/research-agent` or prompt: `@research-agent <topic>`     | `search_chunks.py`, `scene_builder.py`, `citation_engine.py`, `memory_host.py` |
-| **`anki`**           | Select unvisited courseware chunks, deduplicate, link to PageRank hubs in `金融` deck, render bilingual HTML cards, and ingest directly into Anki. | Slash command: `/anki` or CLI: `python3 tools/research/anki_generator.py` | `anki_generator.py`, `AnkiGraphBridge`, AnkiConnect REST API, TSV packages     |
+| Skill                | Primary Purpose                                                                                                                                    | Trigger / Command                                                         | Core Tools & Deliverables                                                                                                                                                                      |
+| :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`research-agent`** | Search, parse, assemble token-bounded context, and verify line-anchored citations over `research/` courseware (`cs231`..`cs234`).                  | Slash command: `/research-agent` or prompt: `@research-agent <topic>`     | `search_chunks.py`, `scene_builder.py`, `citation_engine.py`, `memory_host.py`, `dense_indexer.py`, `curriculum_service.py`, `synthesis_service.py`, `batch_runner.py`, `resource_governor.py` |
+| **`anki`**           | Select unvisited courseware chunks, deduplicate, link to PageRank hubs in `金融` deck, render bilingual HTML cards, and ingest directly into Anki. | Slash command: `/anki` or CLI: `python3 tools/research/anki_generator.py` | `anki_generator.py`, `anki_card_validator.py`, `AnkiGraphBridge`, AnkiConnect REST API                                                                                                         |
 
 ---
 
@@ -73,6 +73,48 @@ If you add or edit Markdown files in `research/`, update the search index:
 python3 tools/research/parse_chunks.py
 ```
 
+##### 6. Hybrid BM25 + Vector Search
+
+Fuse BM25 lexical scores with a deterministic dense-vector index via reciprocal
+rank fusion:
+
+```bash
+PYTHONPATH=. python3 tools/research/search_chunks.py "B4 WAN traffic engineering" --rrf --limit 5
+```
+
+##### 7. Query Prerequisite Graph
+
+Ask what you need to know before a topic:
+
+```bash
+python3 tools/research/curriculum_service.py --before "paxos_consensus" --transitive
+```
+
+##### 8. Cross-Course Synthesis Scene
+
+Assemble a token-bounded comparative scene from two queries:
+
+```bash
+python3 tools/research/synthesis_service.py "Paxos consensus" "SDN controller consistency" --max-tokens 8192
+```
+
+##### 9. Record a Performance Event
+
+Instead of supplying a mastery score directly, record a raw performance event
+and let `memory_host` compute mastery from the session history:
+
+```bash
+python3 tools/research/memory_host.py --student "default_user" --record-performance --module "cs234-advanced-networks" --topic "b4_traffic_engineering" --raw-score 0.85
+```
+
+##### 10. Run a Batch Job Manifest
+
+Queue multiple CLI jobs from a JSON spec:
+
+```bash
+python3 tools/research/batch_runner.py --spec batch_spec.json --output batch_status.json
+```
+
 ### 2.2 Citation Formatting Rules
 
 All responses generated using `research-agent` MUST adhere to line-anchored Markdown citations:
@@ -134,14 +176,6 @@ Displays current memorization percentages without generating new cards:
 
 ```bash
 python3 tools/research/anki_generator.py --status
-```
-
-##### Export TSV Package Only (Offline Mode)
-
-Generates formatted tab-separated package file (`research/anki_import.txt`) for manual GUI import:
-
-```bash
-python3 tools/research/anki_generator.py --count 5 --deck "金融" --export-tsv
 ```
 
 ---
@@ -222,7 +256,7 @@ To combine both skills into a powerful study routine:
 ### Q1: AnkiConnect error `urllib.error.URLError: <urlopen error [Errno 61] Connection refused>`
 
 - **Cause:** Anki GUI is closed or AnkiConnect add-on is disabled.
-- **Solution:** Pass `--auto-launch` to automatically start `/Applications/Anki.app`, or ensure Anki is open with AnkiConnect configured on port `8765`. Alternatively, use `--export-tsv` to generate `research/anki_import.txt`.
+- **Solution:** Pass `--auto-launch` to automatically start `/Applications/Anki.app`, or ensure Anki is open with AnkiConnect configured on port `8765`. For one-off custom cards, the `--front/--back` path writes a legacy TSV package when AnkiConnect is unreachable.
 
 ### Q2: Why are language decks in `~/dev/anki` ignored?
 
