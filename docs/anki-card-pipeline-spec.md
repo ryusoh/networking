@@ -272,3 +272,18 @@ make precommit
 
 This runs prettier, ESLint, dependency-cruiser, Python xenon, Jest, pytest,
 thinking-check, C smoke tests, and `make sync-check`.
+
+## 12. Known limitations and open questions
+
+These items were carried over from the implementation-status audit that
+preceded this spec. They remain true but are not blockers:
+
+- **AnkiConnect behaviors are verified statically only.** `addNotes`,
+  `findNotes`, model-name resolution, and the verifier's SQLite reads were
+  traced in code but not exercised against a live Anki instance.
+- **`~/dev/anki/graph/graph_data.json` presence and schema were not checked.**
+  The `AnkiGraphBridge` path was verified in source only; the sibling repo and
+  its graph file were not inspected.
+- **`research/anki_import.chunks.json` staleness is inferred.** Its writer was
+  removed during the pipeline rework and nothing regenerates it, but the exact
+  commit that removed the writer was not bisected.
