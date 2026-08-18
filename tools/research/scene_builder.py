@@ -19,6 +19,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from tools.research.memory_host import MemoryHost
 from tools.research.parse_chunks import estimate_tokens
+from tools.research.resource_governor import ResourceGovernor
 from tools.research.search_chunks import BM25Indexer, format_file_link, load_manifest
 
 DEFAULT_RESEARCH_DIR = Path(__file__).resolve().parent.parent.parent / "research"
@@ -44,8 +45,6 @@ class SceneBuilder:
         selected_chunks: list[dict[str, Any]] = []
 
         system_instruction_tokens = 200
-        current_tokens = system_instruction_tokens
-
         memory_context = ""
         memory_tokens = 0
         if self.memory_host is not None:
@@ -54,31 +53,31 @@ class SceneBuilder:
                 memory_context = self.memory_host.render_memory_context()
                 memory_section = self._render_memory_section(memory_context)
                 memory_tokens = estimate_tokens(memory_section)
-                current_tokens += memory_tokens
+
+        governor = ResourceGovernor(
+            max_tokens=max_tokens, base_tokens=system_instruction_tokens + memory_tokens
+        )
 
         def try_add(chunk: dict[str, Any], score: float, slot: str) -> bool:
             """Append a chunk to the scene if it fits the token budget."""
-            nonlocal current_tokens
             chunk_tokens = chunk.get("token_count", estimate_tokens(chunk.get("content", "")))
-            if current_tokens + chunk_tokens > max_tokens:
+            if not governor.try_allocate(chunk_tokens):
                 if not selected_chunks:
                     # Truncate content to fit if the first chunk exceeds max_tokens.
-                    allowed_tokens = max(100, max_tokens - system_instruction_tokens - memory_tokens)
-                    allowed_chars = allowed_tokens * 4
+                    truncated, allowed_tokens = governor.truncate_content_to_fit(chunk["content"])
                     truncated_chunk = dict(chunk)
-                    truncated_chunk["content"] = chunk["content"][:allowed_chars] + "\n... [Truncated for token budget]"
+                    truncated_chunk["content"] = truncated
                     truncated_chunk["token_count"] = allowed_tokens
                     truncated_chunk["score"] = score
                     truncated_chunk["slot"] = slot
                     selected_chunks.append(truncated_chunk)
-                    current_tokens += allowed_tokens
+                    governor.used_tokens += allowed_tokens
                 return False
 
             chunk_copy = dict(chunk)
             chunk_copy["score"] = score
             chunk_copy["slot"] = slot
             selected_chunks.append(chunk_copy)
-            current_tokens += chunk_tokens
             return True
 
         if ranked:
@@ -105,6 +104,7 @@ class SceneBuilder:
                     break
                 try_add(chunk, score, "code")
 
+        current_tokens = governor.used_tokens
         formatted_payload = self._render_markdown_scene(
             query, selected_chunks, current_tokens, max_tokens, memory_context
         )
@@ -205,6 +205,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=str(DEFAULT_MEMORY_PATH),
         help="Path to durable-memory JSON (default: research/.durable_memory.json).",
     )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=0,
+        help="Abort scene assembly after this many seconds (0 = no timeout).",
+    )
     args = parser.parse_args(argv)
 
     if not args.query:
@@ -224,7 +230,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     memory_host = MemoryHost(memory_path)
     builder = SceneBuilder(chunks, repo_root, memory_host=memory_host)
-    scene = builder.build_scene(args.query, max_tokens=args.max_tokens, top_k=args.top_k)
+    governor = ResourceGovernor(max_tokens=args.max_tokens)
+    with governor.timeout(args.timeout):
+        scene = builder.build_scene(args.query, max_tokens=args.max_tokens, top_k=args.top_k)
 
     if args.json:
         print(json.dumps(scene, indent=2, ensure_ascii=False))
