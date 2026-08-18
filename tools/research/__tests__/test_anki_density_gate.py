@@ -159,6 +159,7 @@ def test_cli_execution_with_temp_files(tmp_path: Path):
         "--baseline", str(baseline_path),
         "--output", str(out_path),
         "--threshold-scale", "0.5",
+        "--report-only",
     ])
 
     assert ret == 0
@@ -168,3 +169,13 @@ def test_cli_execution_with_temp_files(tmp_path: Path):
     assert len(verdict_lines) == 1
     assert verdict_lines[0]["chunk_id"] == "c_cli_1"
     assert "decision" in verdict_lines[0]
+
+    # Test blocking mode returns 1 when cards fail threshold
+    ret_blocking = main([
+        "--cards", str(cards_path),
+        "--candidates", str(candidates_path),
+        "--baseline", str(baseline_path),
+        "--output", str(out_path),
+        "--threshold-scale", "2.0",
+    ])
+    assert ret_blocking == 1

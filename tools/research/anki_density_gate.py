@@ -208,8 +208,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--report-only",
         action="store_true",
-        default=True,
-        help="Run in report-only mode without blocking imports (default: True)",
+        default=False,
+        help="Run in report-only mode without returning non-zero exit code (default: False)",
     )
     parser.add_argument(
         "--threshold-scale",
@@ -278,6 +278,14 @@ def main(argv: list[str] | None = None) -> int:
         f"  Consolidated: {consolidated}\n"
         f"Verdicts written to {args.output}"
     )
+
+    if not args.report_only and total > 0 and accepted < total:
+        print(
+            f"❌ Density Gate Failed: {total - accepted}/{total} card(s) did not meet information density threshold.\n"
+            f"Enrich flagged cards with concrete mechanisms/equations or consolidate related chunks before import."
+        )
+        return 1
+
     return 0
 
 

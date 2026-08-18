@@ -79,12 +79,16 @@ date-stamp | outline | qa-mismatch | duplicate | other`.
     run `--count <remaining>` for replacements and author a second
     `anki_cards.jsonl` batch.
 
-#### Card format contract (enforce on every card)
+#### Card format & substance contract (enforce on every card)
 
-The validator enforces these rules; the import refuses cards that violate
+The validator and density gate enforce these rules; the import refuses cards that violate
 them. Author cards to this density target:
 
-- **Front:** `<strong>中文概念</strong>: 具体问题？` — a Chinese title plus a
+- **Technical Substance & Mechanism-First (Mandatory):**
+  - Every card must explain a **concrete engineering mechanism**: state machine transitions, message sequence flows, packet headers/bitfields, algorithm steps, mathematical formulas ($\LaTeX$), asymptotic complexity $O(...)$, hardware architectures, or quantitative trade-offs.
+  - **Ban on Definitional Fluff:** Never write cards that merely state general taxonomy classifications, dictionary definitions, marketing bullet points, or broad goals (e.g. _"减轻用户认知负荷"_, _"自动执行规则"_, _"根据环境配置系统"_). If a candidate chunk is a shallow slide bullet or survey outline without concrete mechanisms, **reject it immediately** (`--reject-chunk <id> --reason outline`) or enrich it with technical specifics from the textbook/paper via `search_web`.
+  - **Question Design:** The front question must ask about a concrete mechanism or quantitative property (e.g. _"<strong>TCP 拥塞控制</strong>: TCP Reno 在快速恢复阶段收到重复 ACK 时如何调整 \\(cwnd\\)？"_, _"<strong>Paxos 决议</strong>: Proposer 收到多数派 Promise 响应后如何选取提案值 \\(v\\)？"_), never an open-ended survey question (_"什么是上下文感知？"_, _"上下文应用有哪些目标？"_).
+- **Front:** `<strong>中文概念</strong>: 具体机制问题？` — a Chinese title plus a
   concrete question. English in the title is limited to **acronyms and
   single-token standard names** (`FFT`, `CSMA/CD`, `Dijkstra`) or acronym
   expansions (`WSN (Wireless Sensor Network)`). **Multi-word English glosses

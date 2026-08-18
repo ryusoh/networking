@@ -272,7 +272,7 @@ class AnkiCard:
 
 def _has_valid_file_path(chunk: dict[str, Any]) -> bool:
     fpath = chunk.get("file_path", "").lower()
-    # 4. Reject non-documentation code files and binaries (.py, .c, .sh, .gns3, .png, .jpg)
+    # Reject non-documentation code files and binaries (.py, .c, .sh, .gns3, .png, .jpg)
     # Also reject README files, sample code repositories, test runners, and tutorial apps
     if not fpath.endswith((".md", ".txt", ".rst")):
         return False
@@ -282,6 +282,19 @@ def _has_valid_file_path(chunk: dict[str, Any]) -> bool:
         or "/tests/" in fpath
         or "/test/" in fpath
         or "/gpac-temp/" in fpath
+        or any(
+            front in fpath
+            for front in [
+                "title-page",
+                "copyright",
+                "table-of-contents",
+                "references",
+                "-index.",
+                "preface",
+                "cover",
+                "-contents.",
+            ]
+        )
     ):
         return False
     return True
@@ -610,18 +623,33 @@ class CoverageTracker:
         """Calculate overall selection priority for a candidate chunk.
 
         Combines PageRank graph hub score with directory type weighting
-        (prioritizing 01-slides and 00-materials over 02-homework).
+        (prioritizing 00-textbooks, 00-readings, 00-materials, and lecture-notes over 01-slides and homework).
         """
         fpath = chunk.get("file_path", "").lower()
         dir_weight = 0.0
 
-        # Prioritize core slides, textbook review chapters, and primary materials
-        if "kurose-final-review" in fpath or "review-slide-lectures" in fpath or "01-slides" in fpath or "00-materials" in fpath:
-            dir_weight += 10.0
-        elif "01-readings" in fpath or "lecture-notes" in fpath:
-            dir_weight += 5.0
-        elif "02-homework" in fpath or "03-homework" in fpath or "/hw" in fpath or "/lab" in fpath or "related-work" in fpath:
-            dir_weight -= 10.0
+        # Prioritize core textbooks, seminal research readings, and detailed primary materials
+        if (
+            "00-textbooks" in fpath
+            or "00-readings" in fpath
+            or "kurose-final-review" in fpath
+            or "review-slide-lectures" in fpath
+        ):
+            dir_weight += 25.0
+        elif "00-materials" in fpath or "01-readings" in fpath or "lecture-notes" in fpath or "04-final-paper" in fpath:
+            dir_weight += 15.0
+        elif "01-slides" in fpath:
+            dir_weight += 0.0
+        elif (
+            "02-homework" in fpath
+            or "03-homework" in fpath
+            or "/hw" in fpath
+            or "/lab" in fpath
+            or "related-work" in fpath
+            or "03-exams" in fpath
+            or "04-finals" in fpath
+        ):
+            dir_weight -= 15.0
 
         pr_score = graph_bridge.score_chunk_pagerank(chunk) if graph_bridge else 0.0
         return dir_weight + pr_score
