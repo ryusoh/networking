@@ -2,8 +2,14 @@
 
 import json
 from pathlib import Path
+import zlib
+import jieba
 from tools.research.anki_density import DensityReport
-from tools.research.anki_density_baseline import BaselineReport
+from tools.research.anki_density_baseline import (
+    ANKI_REPO_ROOT,
+    BaselineReport,
+    compute_graph_hash,
+)
 from tools.research.anki_density_gate import (
     Verdict,
     evaluate_cards,
@@ -11,19 +17,31 @@ from tools.research.anki_density_gate import (
 )
 
 
-def _make_dummy_baseline(mean_density: float = 0.5, lexicon: set[str] | None = None) -> BaselineReport:
+def _make_dummy_baseline(
+    mean_density: float = 0.5,
+    lexicon: set[str] | None = None,
+    graph_hash: str | None = None,
+    zlib_version: str | None = None,
+    jieba_version: str | None = None,
+) -> BaselineReport:
     """Create a minimal baseline report for unit testing."""
     if lexicon is None:
         lexicon = {"tcp", "congestion", "variance", "risk"}
+    if graph_hash is None:
+        graph_hash = compute_graph_hash(ANKI_REPO_ROOT / "graph" / "graph_data.json")
+    if zlib_version is None:
+        zlib_version = zlib.ZLIB_VERSION
+    if jieba_version is None:
+        jieba_version = getattr(jieba, "__version__", "unknown")
     return BaselineReport(
         deck="金融",
         top_guids=["g1", "g2"],
         mean_density=mean_density,
         per_card=[],
         lexicon=lexicon,
-        zlib_version="1.2.12",
-        jieba_version="0.42.1",
-        graph_hash="dummy_hash",
+        zlib_version=zlib_version,
+        jieba_version=jieba_version,
+        graph_hash=graph_hash,
     )
 
 
