@@ -11,12 +11,18 @@ $ARGUMENTS — the query or topic to investigate.
 
 ## Quick Tool Workflows
 
-### 1. BM25 Lexical Search over Chunks
+### 1. Lexical / Hybrid Search over Chunks
 
 To find relevant slide sections, paper excerpts, or code blocks matching a query:
 
 ```bash
 python3 tools/research/search_chunks.py "$ARGUMENTS" --limit 5
+```
+
+To fuse BM25 with a deterministic dense-vector ranking via reciprocal rank fusion:
+
+```bash
+python3 tools/research/search_chunks.py "$ARGUMENTS" --rrf --limit 5
 ```
 
 #### Query tactics (BM25 is lexical, not semantic)
@@ -120,7 +126,23 @@ If Markdown sidecars, slides, or code files in `research/` have been updated:
 python3 tools/research/parse_chunks.py
 ```
 
-### 7. Post-Answer Interactive Anki Export Protocol
+### 7. Query Prerequisite Graph
+
+To discover what a student should know before a topic:
+
+```bash
+python3 tools/research/curriculum_service.py --before "paxos_consensus" --transitive
+```
+
+### 8. Cross-Course Synthesis Scene
+
+To compare two concepts across courses in one token-bounded scene:
+
+```bash
+python3 tools/research/synthesis_service.py "Paxos consensus" "SDN controller consistency" --max-tokens 8192
+```
+
+### 9. Post-Answer Interactive Anki Export Protocol
 
 After delivering a synthesized, citation-anchored answer to a user's research request, the agent MUST append an interactive export offer at the end of the response:
 

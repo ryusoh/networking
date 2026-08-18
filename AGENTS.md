@@ -205,12 +205,27 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   Tests in `stall_guard/tests/` — **not** `__tests__/`,
   because Chrome refuses to load extensions containing `_`-prefixed dirs. See
   the `add-extension` skill for the full new-extension checklist.
-- `docs/` — `ebpf-research.md`, `nas-strategy.md`. `bin/coverage_rank.py` — the
-  coverage ranking helper.
+- `docs/` — subsystem specs and research notes: `ebpf-research.md`,
+  `nas-strategy.md`, `anki-card-pipeline-spec.md`, `research-agent-spec.md`,
+  `skills-usage-guide.md`. `bin/coverage_rank.py` — the coverage ranking helper.
 - `tools/` — shared repository tooling (`gate_guard.py`, `check_thinking_comments.py`,
   `sync_commands.py`, `tools/research/`). Scripts referenced across agent docs and
   skills are verified by `tools/__tests__/test_doc_tool_references.py`.
-- `tools/research/` — courseware research agent pipeline (`anki_generator.py`, `scene_builder.py`, `citation_engine.py`, `memory_host.py`). **Safety Rule:** Never execute raw SQLite `INSERT`/`UPDATE` mutations directly on live Anki collections (`collection.anki2` / `collection.anki21b`); use AnkiConnect REST API or TSV/APKG package export (`open -a Anki`) to prevent database lock collisions and collation errors.
+- `tools/research/` — courseware research agent pipeline (`anki_generator.py`,
+  `anki_card_validator.py`, `anki_graph_bridge.py`, `anki_import_verifier.py`,
+  `scene_builder.py`, `search_chunks.py`, `dense_indexer.py`,
+  `citation_engine.py`, `memory_host.py`, `parse_chunks.py`,
+  `curriculum_service.py`, `synthesis_service.py`, `batch_runner.py`,
+  `resource_governor.py`). Scripts that import sibling modules under
+  `tools.research` add the repo root to `sys.path` so they can be invoked
+  directly as `python3 tools/research/<script>.py` from the repository root.
+  **Safety Rule:** Never execute raw SQLite `INSERT`/`UPDATE` mutations directly
+  on live Anki collections (`collection.anki2` / `collection.anki21b`); use
+  AnkiConnect REST API or TSV/APKG package export (`open -a Anki`) to prevent
+  database lock collisions and collation errors.
+- `research/` — courseware data, chunk manifests, Anki pipeline state files, and
+  durable memory. See `research/README.md` for a map of where data, code, specs,
+  and skills live.
 
 ### Shell scripts in `bin/` (macOS bash 3.2 gotchas)
 

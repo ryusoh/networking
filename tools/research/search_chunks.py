@@ -17,9 +17,13 @@ import sys
 from pathlib import Path
 from typing import Any, Sequence
 
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from tools.research.dense_indexer import DenseIndexer
 
-DEFAULT_RESEARCH_DIR = Path(__file__).resolve().parent.parent.parent / "research"
+DEFAULT_RESEARCH_DIR = REPO_ROOT / "research"
 DEFAULT_MANIFEST_PATH = DEFAULT_RESEARCH_DIR / ".chunks_manifest.json"
 
 WORD_PATTERN = re.compile(r"\b\w+\b")
