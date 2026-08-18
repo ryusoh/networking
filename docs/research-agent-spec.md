@@ -9,6 +9,7 @@ This specification defines the architectural design, subsystem boundaries, and d
 - **Implemented** — working code exists in `tools/research/` and behaves as described.
 - **Partially implemented** — code exists but covers only part of the described behavior; the gap is stated inline.
 - **Planned (not yet implemented)** — no code exists; the section is retained as a design target.
+- **Backburner** — like Planned, but explicitly deprioritized: not on the near-term roadmap; revisit only if the need resurfaces.
 
 Layer 4 (Bounded Reasoning) is currently **deliberately descoped**: the interactive coding agent, driven by `.agents/skills/research-agent/SKILL.md`, plays the role of prompt assembly, LLM execution, and output parsing. Whether Layer 4 is ever implemented as code or remains mapped to the host agent is an open design decision.
 
@@ -61,10 +62,10 @@ Component status summary (details inline per section):
 | Component                   | Status                             | Code location                               |
 | :-------------------------- | :--------------------------------- | :------------------------------------------ |
 | CLI Tooling                 | Implemented                        | `tools/research/*.py` argparse mains        |
-| Web Dashboard / IDE         | Planned                            | —                                           |
+| Web Dashboard / IDE         | Backburner                         | —                                           |
 | Automated Batch Runner      | Planned                            | —                                           |
 | CurriculumService           | Planned                            | —                                           |
-| QuizService                 | Planned                            | —                                           |
+| QuizService                 | Backburner                         | —                                           |
 | SynthesisService            | Planned                            | —                                           |
 | CitationEngine              | Partially implemented              | `tools/research/citation_engine.py`         |
 | SceneBuilder                | Partially implemented              | `tools/research/scene_builder.py`           |
@@ -80,7 +81,7 @@ Component status summary (details inline per section):
 The Interface Layer acts as the entry point for human interaction and automated task scheduling:
 
 - **CLI Tooling — Implemented.** Each Phase 1–5 module ships an argparse CLI: `parse_chunks.py`, `search_chunks.py` (query, `--limit`, `--rrf`, `--json`), `scene_builder.py` (query, `--max-tokens`, `--top-k`), `citation_engine.py`, and `memory_host.py` (`--record --module --topic --score`). The research-agent skill drives them as agent-invoked commands. Scope caveat: this is search/scene/citation/memory tooling only; the "self-assessment" and "diagnostic execution" verbs are not implemented.
-- **Web Dashboard / IDE — Planned (not yet implemented).** No graphical interface, Markdown renderer, concept-graph viewer, or document viewer exists anywhere in the repo.
+- **Web Dashboard / IDE — Backburner.** No graphical interface, Markdown renderer, concept-graph viewer, or document viewer exists anywhere in the repo. Deprioritized: the CLI plus the interactive agent cover current needs.
 - **Automated Batch Runner — Planned (not yet implemented).** No asynchronous job scheduler exists; all current entry points (including the Anki `--count` batch flow) are one-shot synchronous CLI invocations.
 
 ### 2.2 Layer 2: Domain Service Layer (Service)
@@ -88,7 +89,7 @@ The Interface Layer acts as the entry point for human interaction and automated 
 The Service Layer implements domain-specific logic tailored to academic curriculum analysis:
 
 - **`CurriculumService` — Planned (not yet implemented).** No prerequisite dependency graph across course modules (`cs231`, `cs232`, `cs233`, `cs234`) and no enforced learning progressions exist. (`memory_host.py` tracks per-module scores but models no cross-module dependencies.)
-- **`QuizService` — Planned (not yet implemented).** Nothing synthesizes practice problems, problem set solutions, or grading rubrics from historical homeworks, quizzes, and exams.
+- **`QuizService` — Backburner.** Nothing synthesizes practice problems, problem set solutions, or grading rubrics from historical homeworks, quizzes, and exams. Deprioritized: quiz generation is handled ad hoc by the interactive agent when needed.
 - **`SynthesisService` — Planned (not yet implemented).** No cross-course comparative analysis code exists (e.g., mapping Paxos consensus mechanisms in distributed systems to centralized Software-Defined Network controllers).
 - **`CitationEngine` — Partially implemented.** `tools/research/citation_engine.py` validates post-generation output for file existence and line-range bounds against actual repository content, but does **not** perform text content alignment (see §5.2).
 

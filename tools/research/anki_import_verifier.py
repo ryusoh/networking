@@ -5,6 +5,12 @@ a TSV file. That import is fire-and-forget: the agent cannot see whether the
 user clicked Import. This script closes the loop by reading the local SQLite
 collection and updating chunk status from `pending_import` to `imported`.
 
+Status: currently inert. No production code path sets `pending_import` (the
+AnkiConnect import writes `imported` directly from the `addNotes` note IDs,
+and the TSV export path does not mark chunks), so this script reports "No
+pending imports to verify." It activates only if the TSV export path starts
+marking chunks `pending_import` at export time.
+
 Usage:
     python3 tools/research/anki_import_verifier.py
     python3 tools/research/anki_import_verifier.py --coverage research/.anki_coverage.json --deck 金融

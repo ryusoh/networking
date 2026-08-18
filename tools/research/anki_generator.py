@@ -550,6 +550,8 @@ class CoverageTracker:
             chunks: Chunks that were converted to cards.
             deck_name: Target deck name.
             status: One of "generated", "candidate", "pending_import", or "imported".
+                "pending_import" is reserved for the TSV fire-and-forget flow and is
+                not set by any current production caller.
             front_htmls: Mapping from chunk_id to the rendered front HTML.
         """
         now_str = datetime.now(timezone.utc).isoformat()
@@ -578,7 +580,11 @@ class CoverageTracker:
         self.save()
 
     def pending_import_chunks(self) -> dict[str, dict[str, Any]]:
-        """Return chunks that have been exported to TSV but not yet verified as imported."""
+        """Return chunks exported to TSV but not yet verified as imported.
+
+        Always empty in practice: no production code path sets
+        `pending_import` (see anki_import_verifier.py module docstring).
+        """
         visited_chunks = self.data.get("visited_chunk_ids", {})
         return {cid: info for cid, info in visited_chunks.items() if info.get("status") == "pending_import"}
 
