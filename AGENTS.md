@@ -183,7 +183,8 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   `sync_commands.py`, `tools/research/`). Scripts referenced across agent docs and
   skills are verified by `tools/__tests__/test_doc_tool_references.py`.
 - `tools/research/` — courseware research agent pipeline (`anki_generator.py`,
-  `anki_card_validator.py`, `anki_graph_bridge.py`, `anki_import_verifier.py`,
+  `anki_card_validator.py`, `anki_density.py`, `anki_density_baseline.py`,
+  `anki_density_gate.py`, `anki_graph_bridge.py`, `anki_import_verifier.py`,
   `scene_builder.py`, `search_chunks.py`, `dense_indexer.py`,
   `citation_engine.py`, `memory_host.py`, `parse_chunks.py`,
   `curriculum_service.py`, `synthesis_service.py`, `batch_runner.py`,
@@ -194,11 +195,13 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   on live Anki collections (`collection.anki2` / `collection.anki21b`); use
   AnkiConnect REST API or TSV/APKG package export (`open -a Anki`) to prevent
   database lock collisions and collation errors.
-  **Testing hygiene:** commands like `anki_generator.py --count/--import` and
-  `memory_host.py --record*` mutate `research/.anki_coverage.json` and
+  **Testing hygiene:** commands like `anki_generator.py --count/--import`,
+  `anki_density_baseline.py`, and `memory_host.py --record*` mutate
+  `research/.anki_coverage.json`, `research/.anki_density_baseline.json`, and
   `research/.durable_memory.json`. Tests must use temp paths (monkeypatch
-  `DEFAULT_MEMORY_PATH` / `DEFAULT_COVERAGE_PATH` or pass explicit paths); when
-  testing manually, back up these files first and restore them afterward.
+  `DEFAULT_MEMORY_PATH` / `DEFAULT_COVERAGE_PATH` / `DEFAULT_BASELINE_CACHE_PATH`
+  or pass explicit paths); when testing manually, back up these files first and
+  restore them afterward.
 - `research/` — courseware data, chunk manifests, Anki pipeline state files, and
   durable memory. See `research/README.md` for a map of where data, code, specs,
   and skills live.
