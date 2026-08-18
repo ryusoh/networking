@@ -395,13 +395,11 @@ flowchart TD
   against the deck's actual distribution and human spot-checks before the gate
   is allowed to reject cards autonomously. Recommend shipping the gate in
   report-only mode first. See §6 test plan.
-- **`notesInfo` response schema not independently verified.** The AnkiConnect
-  Note Actions doc page returned HTTP 418 during this session; the live-fetch
-  path assumes `notesInfo` accepts note ids and returns field values (consistent
-  with the README's `cardsInfo` documentation and existing `findNotes` usage in
-  `anki_generator.py`). Whether `notesInfo` also returns the note `guid`
-  (which would eliminate the separate guid→nid map) is unverified. See §6 test
-  plan — this is directly testable with a running Anki.
+- **`notesInfo` response schema verified (T1).** Verified against live AnkiConnect
+  endpoint (test `tools/research/__tests__/test_anki_connect_schema.py`):
+  `notesInfo` returns field dictionaries with `Front` and `Back` keys (each
+  containing `value` and `order`), but does NOT return the note `guid`.
+  This confirms the requirement for a separate `guid -> nid` mapping in the live-fetch path.
 - **CJK tokenization.** Resolved at design level: jieba is permitted as a
   pinned dependency (design decision, this session). Implementation must use
   `jieba.cut(text, HMM=False)` for determinism and record the jieba version.
