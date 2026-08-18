@@ -37,6 +37,8 @@ LLM authors cards
     ↓  research/anki_cards.jsonl
 python3 tools/research/anki_card_validator.py research/anki_cards.jsonl
     ↓
+python3 tools/research/anki_density_gate.py --cards research/anki_cards.jsonl
+    ↓  research/anki_density_verdicts.jsonl
 python3 tools/research/anki_generator.py --import --deck "金融"
     ↓
 python3 tools/research/anki_import_verifier.py
@@ -76,13 +78,15 @@ in §4.
 
 ## 3. File artifacts
 
-| Path                             | Purpose                                                                                                  | Written by                      |
-| :------------------------------- | :------------------------------------------------------------------------------------------------------- | :------------------------------ |
-| `research/anki_candidates.jsonl` | Selected chunks with `chunk_id`, `file_path`, `heading`, `start_line`, `end_line`, `content`, `citation` | `--candidates`                  |
-| `research/anki_cards.jsonl`      | Agent-authored cards: `{chunk_id, front, back, tags, citation}`                                          | LLM agent                       |
-| `research/anki_review.jsonl`     | Append-only audit log: `{ts, chunk_id, verdict, reason?, note_id?}`                                      | `--reject-chunk`, `--import`    |
-| `research/.anki_coverage.json`   | Coverage state (see §4 for writers)                                                                      | CLI verbs + import verifier     |
-| `research/anki_import.txt`       | Legacy TSV package (fallback)                                                                            | `--front/--back` or legacy path |
+| Path                                   | Purpose                                                                                                   | Written by                      |
+| :------------------------------------- | :-------------------------------------------------------------------------------------------------------- | :------------------------------ |
+| `research/anki_candidates.jsonl`       | Selected chunks with `chunk_id`, `file_path`, `heading`, `start_line`, `end_line`, `content`, `citation`  | `--candidates`                  |
+| `research/anki_cards.jsonl`            | Agent-authored cards: `{chunk_id, front, back, tags, citation}`                                           | LLM agent                       |
+| `research/anki_density_verdicts.jsonl` | Density gate verdicts: `{chunk_id, density, threshold, decision, consolidation_group?, enrich_context?}` | `anki_density_gate.py`          |
+| `research/.anki_density_baseline.json` | Pinned deck baseline metrics and domain lexicon cache                                                     | `anki_density_baseline.py`      |
+| `research/anki_review.jsonl`           | Append-only audit log: `{ts, chunk_id, verdict, reason?, note_id?}`                                       | `--reject-chunk`, `--import`    |
+| `research/.anki_coverage.json`         | Coverage state (see §4 for writers)                                                                       | CLI verbs + import verifier     |
+| `research/anki_import.txt`             | Legacy TSV package (fallback)                                                                             | `--front/--back` or legacy path |
 
 All JSONL files above are ignored by `.gitignore`.
 

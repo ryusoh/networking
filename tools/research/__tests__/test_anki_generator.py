@@ -1144,3 +1144,130 @@ def test_quality_gate_accepts_sentence_bullets_chunk():
 
 def test_quality_gate_accepts_dense_bullets_chunk():
     assert is_high_quality_chunk(_chunk(IOT_CHARACTERISTICS))
+
+
+def test_import_with_density_verdicts_accepts_and_skips(monkeypatch, tmp_path: Path):
+    import json
+    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_cards
+
+    imported_cards: list[Any] = []
+
+    def _mock_add_notes(self, cards, deck_name):
+        imported_cards.extend(cards)
+        return [101]
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(AnkiConnectChecker, "add_notes", _mock_add_notes)
+
+    cards_file = tmp_path / "anki_cards.jsonl"
+    cards_data = [
+        {
+            "chunk_id": "c_dense",
+            "front": "拜占庭将军问题: 口头消息的可解条件是什么？",
+            "back": (
+                "<div><b>定义:</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
+                "<div><b>源码与文档引用 (Source Citation):</b> [research/cs234/b4.md#L1-L5](file:///tmp/x.md#L1-L5)</div>"
+            ),
+            "tags": ["research", "cs234"],
+        },
+        {
+            "chunk_id": "c_sparse",
+            "front": "拜占庭将军问题2: 签名消息的可解条件是什么？",
+            "back": (
+                "<div><b>定义:</b></div><div>使用 <b>signed messages</b> 时，可容忍任意数量叛徒。</div>"
+                "<div><b>源码与文档引用 (Source Citation):</b> [research/cs234/b4.md#L10-L15](file:///tmp/x.md#L10-L15)</div>"
+            ),
+            "tags": ["research", "cs234"],
+        },
+    ]
+    cards_file.write_text(
+        "\n".join(json.dumps(c, ensure_ascii=False) for c in cards_data) + "\n",
+        encoding="utf-8",
+    )
+
+    verdicts_file = tmp_path / "anki_density_verdicts.jsonl"
+    verdicts_data = [
+        {"chunk_id": "c_dense", "decision": "accept", "density": 0.5, "threshold": 0.3},
+        {"chunk_id": "c_sparse", "decision": "enrich", "density": 0.2, "threshold": 0.3},
+    ]
+    verdicts_file.write_text(
+        "\n".join(json.dumps(v) for v in verdicts_data) + "\n",
+        encoding="utf-8",
+    )
+
+    coverage_file = tmp_path / "cov.json"
+    coverage_file.write_text("{}", encoding="utf-8")
+    review_file = tmp_path / "review.jsonl"
+
+    ret = import_reviewed_cards(
+        "金融",
+        coverage_file,
+        cards_path=cards_file,
+        review_path=review_file,
+        verdicts_path=verdicts_file,
+    )
+    assert ret == 0
+    assert len(imported_cards) == 1
+    assert imported_cards[0].chunk_id == "c_dense"
+
+    # Verify review log contains skipped card
+    review_lines = [json.loads(line) for line in review_file.read_text(encoding="utf-8").splitlines() if line]
+    skipped_entries = [e for e in review_lines if e.get("verdict") == "density_skipped"]
+    assert len(skipped_entries) == 1
+    assert skipped_entries[0]["chunk_id"] == "c_sparse"
+
+
+def test_import_without_verdicts_file_imports_all(monkeypatch, tmp_path: Path):
+    import json
+    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_cards
+
+    imported_cards: list[Any] = []
+
+    def _mock_add_notes(self, cards, deck_name):
+        imported_cards.extend(cards)
+        return [101, 102]
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(AnkiConnectChecker, "add_notes", _mock_add_notes)
+
+    cards_file = tmp_path / "anki_cards.jsonl"
+    cards_data = [
+        {
+            "chunk_id": "c1",
+            "front": "拜占庭将军问题: 口头消息的可解条件是什么？",
+            "back": (
+                "<div><b>定义:</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
+                "<div><b>源码与文档引用 (Source Citation):</b> [research/cs234/b4.md#L1-L5](file:///tmp/x.md#L1-L5)</div>"
+            ),
+            "tags": ["research", "cs234"],
+        },
+        {
+            "chunk_id": "c2",
+            "front": "拜占庭将军问题2: 签名消息的可解条件是什么？",
+            "back": (
+                "<div><b>定义:</b></div><div>使用 <b>signed messages</b> 时，可容忍任意数量叛徒。</div>"
+                "<div><b>源码与文档引用 (Source Citation):</b> [research/cs234/b4.md#L10-L15](file:///tmp/x.md#L10-L15)</div>"
+            ),
+            "tags": ["research", "cs234"],
+        },
+    ]
+    cards_file.write_text(
+        "\n".join(json.dumps(c, ensure_ascii=False) for c in cards_data) + "\n",
+        encoding="utf-8",
+    )
+
+    coverage_file = tmp_path / "cov.json"
+    coverage_file.write_text("{}", encoding="utf-8")
+    review_file = tmp_path / "review.jsonl"
+    nonexistent_verdicts = tmp_path / "nonexistent_verdicts.jsonl"
+
+    ret = import_reviewed_cards(
+        "金融",
+        coverage_file,
+        cards_path=cards_file,
+        review_path=review_file,
+        verdicts_path=nonexistent_verdicts,
+    )
+    assert ret == 0
+    assert len(imported_cards) == 2
+

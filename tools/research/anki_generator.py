@@ -47,6 +47,7 @@ DEFAULT_TSV_PATH = DEFAULT_RESEARCH_DIR / "anki_import.txt"
 DEFAULT_CANDIDATES_PATH = DEFAULT_RESEARCH_DIR / "anki_candidates.jsonl"
 DEFAULT_CARDS_PATH = DEFAULT_RESEARCH_DIR / "anki_cards.jsonl"
 DEFAULT_REVIEW_PATH = DEFAULT_RESEARCH_DIR / "anki_review.jsonl"
+DEFAULT_VERDICTS_PATH = DEFAULT_RESEARCH_DIR / "anki_density_verdicts.jsonl"
 FIELD_SEP = "\x1f"
 JUNK_KEYWORDS = {
     "outline",
@@ -992,6 +993,7 @@ def import_reviewed_cards(
     cards_path: Path = DEFAULT_CARDS_PATH,
     tsv_path: Path = DEFAULT_TSV_PATH,
     review_path: Path = DEFAULT_REVIEW_PATH,
+    verdicts_path: Path = DEFAULT_VERDICTS_PATH,
     force: bool = False,
 ) -> int:
     """Import the human/LLM-reviewed cards JSONL via AnkiConnect.
@@ -1042,6 +1044,36 @@ def import_reviewed_cards(
                 print(f"  - {issue}")
         print("\nRewrite or fix the flagged cards and re-run. Override with --force (not recommended).")
         return 2
+
+    # Density gate filtering: if verdicts file exists, only import cards with decision == "accept".
+    if verdicts_path and verdicts_path.exists():
+        verdict_map: dict[str, str] = {}
+        try:
+            with open(verdicts_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line_str = line.strip()
+                    if line_str:
+                        v = json.loads(line_str)
+                        if "chunk_id" in v and "decision" in v:
+                            verdict_map[v["chunk_id"]] = v["decision"]
+        except Exception as e:
+            print(f"Warning: could not parse verdicts from {verdicts_path}: {e}")
+
+        if verdict_map:
+            accepted_cards: list[dict[str, Any]] = []
+            for card in cards:
+                cid = card.get("chunk_id", "")
+                decision = verdict_map.get(cid, "accept")
+                if decision == "accept":
+                    accepted_cards.append(card)
+                else:
+                    print(f"  skipping card {cid} due to density verdict: {decision}")
+                    _append_review_log(review_path, cid, "density_skipped")
+            cards = accepted_cards
+
+    if not cards:
+        print("No cards accepted by density gate for import.")
+        return 0
 
     checker = AnkiConnectChecker()
     if not checker.is_available():
@@ -1262,6 +1294,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Space-separated tags for custom card export.",
     )
     parser.add_argument(
+        "--verdicts",
+        default=str(DEFAULT_VERDICTS_PATH),
+        help="Path to density verdicts JSONL (default: research/anki_density_verdicts.jsonl).",
+    )
+    parser.add_argument(
         "--status",
         action="store_true",
         help="Print multi-level courseware memorization progress report and exit.",
@@ -1275,6 +1312,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             cards_path=Path(args.cards).resolve(),
             tsv_path=Path(args.tsv_path).resolve(),
             review_path=Path(args.review_path).resolve(),
+            verdicts_path=Path(args.verdicts).resolve(),
             force=args.force,
         )
 
