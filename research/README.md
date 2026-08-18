@@ -13,8 +13,8 @@ that processes it lives elsewhere.
 | Anki pipeline artifacts | `research/anki_candidates.jsonl`, `research/anki_cards.jsonl`, `research/anki_review.jsonl`, `research/.anki_coverage.json` | Candidate chunks, agent-authored cards, review log, and coverage state. |
 | Durable memory | `research/.durable_memory.json` | Student mastery records produced by `tools/research/memory_host.py`. |
 | Implementation | `tools/research/` | All Python scripts: parser, indexer, scene builder, citation engine, memory host, Anki generator/validator, etc. |
-| Specifications | `docs/anki-card-pipeline-spec.md`, `docs/research-agent-spec.md` | Canonical architecture and data-contract specs. |
-| User manual | `docs/research-anki-skills-usage-guide.md` | Step-by-step usage of the `research-agent` and `anki` slash-command skills. |
+| Specifications | `../docs/research/anki-card-pipeline-spec.md`, `../docs/research/research-agent-spec.md` | Canonical architecture and data-contract specs. |
+| User manual | `../docs/research/research-anki-skills-usage-guide.md` | Step-by-step usage of the `research-agent` and `anki` slash-command skills. |
 | Skills | `.agents/skills/research-agent/SKILL.md`, `.agents/skills/anki/SKILL.md` | Interactive agent skill definitions. |
 
 ## Entry points
@@ -27,5 +27,5 @@ that processes it lives elsewhere.
 - Curriculum graph and cross-course synthesis:
   `tools/research/curriculum_service.py`, `tools/research/synthesis_service.py`
 
-See `docs/research-agent-spec.md` and `docs/anki-card-pipeline-spec.md` for the
+See `../docs/research/research-agent-spec.md` and `../docs/research/anki-card-pipeline-spec.md` for the
 authoritative descriptions of each subsystem and how they interact.

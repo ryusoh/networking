@@ -175,8 +175,10 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   because Chrome refuses to load extensions containing `_`-prefixed dirs. See
   the `add-extension` skill for the full new-extension checklist.
 - `docs/` — subsystem specs and research notes: `ebpf-research.md`,
-  `nas-strategy.md`, `anki-card-pipeline-spec.md`, `research-agent-spec.md`,
-  `research-anki-skills-usage-guide.md`. `bin/coverage_rank.py` — the coverage ranking helper.
+  `nas-strategy.md`, `docs/research/anki-card-pipeline-spec.md`,
+  `docs/research/research-agent-spec.md`,
+  `docs/research/research-anki-skills-usage-guide.md`.
+  `bin/coverage_rank.py` — the coverage ranking helper.
 - `tools/` — shared repository tooling (`gate_guard.py`, `check_thinking_comments.py`,
   `sync_commands.py`, `tools/research/`). Scripts referenced across agent docs and
   skills are verified by `tools/__tests__/test_doc_tool_references.py`.

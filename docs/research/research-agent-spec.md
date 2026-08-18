@@ -244,7 +244,7 @@ The rejection path is incomplete relative to this design: `verify_text` returns 
 Research-agent answers can be exported as Anki cards. The export uses the
 inverted pipeline in `tools/research/anki_generator.py`: code selects chunks,
 the LLM authors the cards, and the validator/import path gates ingestion.
-See `docs/anki-card-pipeline-spec.md` for the authoritative description,
+See `anki-card-pipeline-spec.md` for the authoritative description,
 including current caveats (validator enforcement scope, verifier status).
 
 ### 6.1 Batch card workflow

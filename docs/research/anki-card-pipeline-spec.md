@@ -9,7 +9,7 @@ status is stated explicitly.
 
 This pipeline consumes the same `research/` chunk manifest and line-anchored
 citation format produced by the Research & Curriculum Agent. See
-`docs/research-agent-spec.md` for the parsing, indexing, scene assembly, and
+`research-agent-spec.md` for the parsing, indexing, scene assembly, and
 citation-verification machinery that sit upstream of card generation.
 
 ## 1. Core principle: LLM authors, code gates
