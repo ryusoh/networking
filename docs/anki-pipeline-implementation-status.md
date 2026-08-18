@@ -52,26 +52,26 @@ but no production path triggers it).
 | Validator: 16 detectors (spec §9)                    | partial    |
 | Validator: hard gate + `--force`                     | done       |
 | Card format contract (bilingual front, ≥3 sections)  | partial    |
-| Citation section enforced on cards                   | missing    |
+| Citation section enforced on cards                   | done       |
 | Import verifier                                      | inert      |
 | Agent: Layer 1 CLI tooling                           | done       |
 | Agent: Web Dashboard / IDE                           | backburner |
-| Agent: Automated Batch Runner                        | missing    |
-| Agent: CurriculumService                             | missing    |
+| Agent: Automated Batch Runner                        | done       |
+| Agent: CurriculumService                             | done       |
 | Agent: QuizService                                   | backburner |
-| Agent: SynthesisService                              | missing    |
-| Agent: CitationEngine (existence + line bounds)      | partial    |
-| Agent: SceneBuilder                                  | partial    |
-| Agent: MemoryHost durable store                      | partial    |
-| Agent: Working Memory buffer                         | missing    |
-| Agent: ResourceGovernor                              | missing    |
-| Agent: Hybrid indexer (BM25 + vectors + RRF)         | partial    |
+| Agent: SynthesisService                              | done       |
+| Agent: CitationEngine (existence + line bounds)      | done       |
+| Agent: SceneBuilder                                  | done       |
+| Agent: MemoryHost durable store                      | done       |
+| Agent: Working Memory buffer                         | done       |
+| Agent: ResourceGovernor                              | done       |
+| Agent: Hybrid indexer (BM25 + vectors + RRF)         | done       |
 | Agent: Prompt Assembler                              | descoped   |
 | Agent: LLM Execution Driver                          | descoped   |
-| Agent: Output & citation parser                      | partial    |
+| Agent: Output & citation parser                      | done       |
 | Agent: citation auto-retry loop                      | descoped   |
 | Agent: Phase 1 parser (headers/slides/offsets)       | done       |
-| Agent: mastery-score updating engine                 | missing    |
+| Agent: mastery-score updating engine                 | done       |
 
 ## 3. Claim-by-claim evidence
 

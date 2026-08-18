@@ -1,5 +1,10 @@
 # Research / Anki Pipeline: Action Items
 
+> **Status: COMPLETE — all 13 items implemented on 2026-08-18.** This file is
+> retained as a record; it is no longer an active backlog. The implementation
+> status table in `docs/anki-pipeline-implementation-status.md` is the living
+> source of truth.
+
 Implementation backlog derived from the gap analysis in
 `docs/anki-pipeline-implementation-status.md` (§2 table, statuses `missing` and
 `partial`). Items marked `done`, `backburner`, `descoped`, or `inert` there are
@@ -20,7 +25,7 @@ verified code locations, **Boundaries** state what not to touch.
 
 ## P1 — small, high-value, code already half-there
 
-### 1. Wire durable memory into SceneBuilder
+### [Done] 1. Wire durable memory into SceneBuilder
 
 **Objective:** `MemoryHost.render_memory_context`
 (`tools/research/memory_host.py:118`) was built for scene injection but
@@ -38,7 +43,7 @@ still respects `--max-tokens`; the test fails on the unmodified code; full
 **Boundaries:** no new CLI dependencies; injection must be a no-op when no
 memory store exists; do not redesign the scene format beyond the memory slot.
 
-### 2. Implement CitationEngine text-alignment check
+### [Done] 2. Implement CitationEngine text-alignment check
 
 **Objective:** `tools/research/citation_engine.py` validates file existence
 (`:86`) and line-range bounds (`:93-115`) but never compares the citation's
@@ -54,7 +59,7 @@ tolerable-whitespace cases and fail before the change; `make test-py` green.
 fuzzy-whitespace match) and document the tolerance in the docstring; do not
 change the accepted link format in `LINK_PATTERN`.
 
-### 3. Enforce the citation section on cards in the validator
+### [Done] 3. Enforce the citation section on cards in the validator
 
 **Objective:** the card contract requires a final
 `源码与文档引用 (Source Citation):` section with `[path#Ls-Le](file://...)`
@@ -72,7 +77,7 @@ import path in the same PR. Check existing imported cards' format first — if
 the current corpus violates the new rule, gate it as warning-first and note
 that in the PR body.
 
-### 4. Generalize the question/answer mismatch detector
+### [Done] 4. Generalize the question/answer mismatch detector
 
 **Objective:** `_question_matches_answer`
 (`tools/research/anki_card_validator.py:255-263`) is a single hardcoded
@@ -91,7 +96,7 @@ must not reject any card in the current valid test fixtures.
 
 ## P2 — larger features, need a design pass first
 
-### 5. Dense vector index + true RRF for the hybrid indexer
+### [Done] 5. Dense vector index + true RRF for the hybrid indexer
 
 **Objective:** `tools/research/search_chunks.py` is BM25-only;
 `reciprocal_rank_fusion` (`:126-141`) currently fuses multiple per-token BM25
@@ -109,7 +114,7 @@ addition (AGENTS.md non-negotiable #6 binds unattended routines; an interactive
 agent may add one but must call it out in the PR body). Keep pure-BM25 the
 default mode.
 
-### 6. Scene slots: primary/prerequisite distinction + lab-code slot
+### [Done] 6. Scene slots: primary/prerequisite distinction + lab-code slot
 
 **Objective:** the scene formula (spec §3.1) distinguishes R_primary, C_prereq,
 and A_code; `SceneBuilder` emits one flat BM25 ranking. Extend scene assembly
@@ -124,7 +129,7 @@ when a code chunk is relevant, and tests cover presence/absence of each slot;
 **Boundaries:** stay within the existing token-budget mechanism; coordinate
 with item 1 (memory slot) if both are in flight — do not merge them into one PR.
 
-### 7. Working Memory buffer in MemoryHost
+### [Done] 7. Working Memory buffer in MemoryHost
 
 **Objective:** `tools/research/memory_host.py` implements only the durable
 store; spec §4 has a short-term Working Memory layer (active-turn buffer with
@@ -137,7 +142,7 @@ record → flush → persisted; `make test-py` green.
 **Boundaries:** the buffer is in-process state plus explicit flush — do not add
 a daemon or background writer.
 
-### 8. Mastery-score computation engine
+### [Done] 8. Mastery-score computation engine
 
 **Objective:** `record_mastery` (`memory_host.py:52-81`) stores a
 caller-supplied score verbatim (clamped to [0,1]); nothing computes proficiency
@@ -151,7 +156,7 @@ across a scripted sequence; `make test-py` green.
 **Boundaries:** keep the existing caller-supplied-score API working (the CLI
 `--record --score` path depends on it); add the computed path alongside.
 
-### 9. CurriculumService (prerequisite graph)
+### [Done] 9. CurriculumService (prerequisite graph)
 
 **Objective:** no prerequisite dependency graph across `cs231`–`cs234` modules
 exists (spec §2.2). Design and implement a minimal `CurriculumService`: a
@@ -164,7 +169,7 @@ prerequisite chain for a sample topic; tests green.
 **Boundaries:** start with a hand-authored graph informed by the courseware —
 do not attempt automatic extraction in the first PR.
 
-### 10. SynthesisService (cross-course analysis scaffolding)
+### [Done] 10. SynthesisService (cross-course analysis scaffolding)
 
 **Objective:** no cross-course comparative-analysis code exists (spec §2.2).
 Implement the deterministic half only: given two topics, assemble a comparative
@@ -177,7 +182,7 @@ both matching courses, token-bounded; tests green.
 **Boundaries:** the synthesis prose itself stays with the host agent (Layer 4
 is descoped); this item is retrieval + assembly only.
 
-### 11. Automated Batch Runner
+### [Done] 11. Automated Batch Runner
 
 **Objective:** all entry points are one-shot synchronous CLIs; spec §2.1 wants
 an asynchronous job scheduler for large-scale processing (e.g. course-wide
@@ -190,7 +195,7 @@ with per-job status capture; tests use stubbed commands; `make test-py` green.
 **Boundaries:** keep it stdlib-only and single-machine; no external queue or
 scheduler daemon.
 
-### 12. ResourceGovernor
+### [Done] 12. ResourceGovernor
 
 **Objective:** token budgeting lives inline in `scene_builder.py:34-62`;
 execution timeouts and read-only-FS enforcement exist nowhere (spec §2.3).
@@ -206,7 +211,7 @@ filesystem sandboxing in the first PR.
 
 ## P3 — hygiene (single small PR each)
 
-### 13. Fix incidental code issues from the investigation
+### [Done] 13. Fix incidental code issues from the investigation
 
 - `tools/research/scene_builder.py` uses `Any`/`Sequence` without importing
   them (masked by `from __future__ import annotations`) — add the `typing`
