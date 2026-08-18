@@ -232,9 +232,10 @@ it reports issues and exits non-zero but blocks nothing by itself. Detectors:
 - Date stamps.
 - Generator fallback template front
   (`【X】的核心技术机制、计算公式与工程应用是什么？`).
-- Question/answer mismatch — **limited**: a small set of hardcoded heuristics
-  for specific known-bad cards, not a general mismatch checker; most fronts
-  pass unconditionally.
+- Question/answer mismatch — **removed**. The validator previously ran a single
+  hardcoded heuristic for one known-bad card; that detector has been deleted.
+  Catch mismatches during the required human review step, not via an automated
+  gate.
 - Duplicate titles within the batch.
 - Multi-word English glosses in the front (banned, per §8).
 - Fewer than 2 structured section headers in the back.

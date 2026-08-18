@@ -178,8 +178,10 @@ generator fallback template front (`:63`, `:412-413`); batch duplicate titles
 
 Partial / missing:
 
-- Question/answer mismatch — **partial**: `_question_matches_answer` (`:255-263`) is
-  a single hardcoded heuristic for one specific card; all other fronts return True.
+- Question/answer mismatch — **removed**. The validator previously contained a
+  single hardcoded heuristic for one known-bad card (`_question_matches_answer`);
+  it has been deleted because it did not generalize. Manual review remains the
+  only way to catch a mismatch between front and back.
 - Missing bilingual front annotation — **contradicted** (see above; code bans
   glosses instead).
 - Missing inline English annotations in back — **missing**: there is a _maximum_

@@ -254,17 +254,6 @@ def _has_ocr_errors(back: str) -> bool:
     return any(pat.search(plain) for pat in OCR_ERROR_PATTERNS)
 
 
-def _question_matches_answer(front: str, back: str) -> bool:
-    """Basic sanity check: if the front asks for a numbered list, the back should mention it."""
-    plain_front = re.sub(r"<[^>]+>", "", front)
-    plain_back = re.sub(r"<[^>]+>", "", back)
-    # If front mentions "4 级选路优先级" (4-level route selection), back should mention selection levels
-    if "4 级" in plain_front or "四级" in plain_front or "4级" in plain_front:
-        if "优先级" in plain_front and "选路" in plain_front:
-            return "优先级" in plain_back or "决策" in plain_back or "local-pref" in plain_back.lower()
-    return True
-
-
 def _has_paper_metadata(back: str) -> bool:
     plain = re.sub(r"<[^>]+>", "", back)
     return any(pat.search(plain) for pat in PAPER_METADATA_PATTERNS)
@@ -413,9 +402,6 @@ def _validate_card(front: str, back: str) -> list[str]:
 
     if _is_template_front(front):
         card_issues.append("Front is the generator's fallback template, not a concrete question")
-
-    if not _question_matches_answer(front, back):
-        card_issues.append("Front asks for details not covered in the back")
 
     invented = _front_gloss_violations(front)
     if invented:
