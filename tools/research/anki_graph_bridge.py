@@ -1,19 +1,29 @@
 """Anki Knowledge Graph Bridge (tools/research/anki_graph_bridge.py).
 
-Interfaces with ~/dev/anki/graph to provide PageRank lookup, Aho-Corasick subphrase matching,
-and automated graph re-export triggers scoped strictly to the target deck (金融).
+Interfaces with the Anki repo's graph/ directory to provide PageRank lookup
+scoped strictly to the target deck (金融). The repo root defaults to
+~/dev/anki and can be overridden with the ANKI_REPO_ROOT environment variable.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-ANKI_REPO_ROOT = Path("/Users/lz/dev/anki")
+
+def _default_anki_repo_root() -> Path:
+    env_root = os.environ.get("ANKI_REPO_ROOT")
+    if env_root:
+        return Path(env_root)
+    return Path.home() / "dev" / "anki"
+
+
+ANKI_REPO_ROOT = _default_anki_repo_root()
 if str(ANKI_REPO_ROOT) not in sys.path and ANKI_REPO_ROOT.exists():
     sys.path.insert(0, str(ANKI_REPO_ROOT))
 
@@ -87,7 +97,7 @@ STOPWORDS = {
 
 
 class AnkiGraphBridge:
-    """Bridge for querying ~/dev/anki graph data scoped strictly to target deck (金融)."""
+    """Bridge for querying an Anki knowledge-graph repo scoped to a target deck."""
 
     def __init__(self, target_deck: str = "金融", repo_root: Path = ANKI_REPO_ROOT):
         self.target_deck = target_deck

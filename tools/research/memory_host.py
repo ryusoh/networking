@@ -34,7 +34,8 @@ class MemoryHost:
             try:
                 content = self.memory_path.read_text(encoding="utf-8", errors="replace")
                 return json.loads(content)
-            except Exception:
+            except (json.JSONDecodeError, OSError):
+                # Corrupted or unreadable memory file: start with a fresh schema.
                 pass
         return {
             "metadata": {

@@ -3,8 +3,23 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from tools.research.anki_graph_bridge import AnkiGraphBridge
+
+
+def test_default_anki_repo_root_respects_env_var(tmp_path: Path) -> None:
+    from tools.research.anki_graph_bridge import _default_anki_repo_root
+
+    old_env = os.environ.get("ANKI_REPO_ROOT")
+    try:
+        os.environ["ANKI_REPO_ROOT"] = str(tmp_path)
+        assert _default_anki_repo_root() == tmp_path
+    finally:
+        if old_env is None:
+            os.environ.pop("ANKI_REPO_ROOT", None)
+        else:
+            os.environ["ANKI_REPO_ROOT"] = old_env
 
 
 def test_anki_graph_bridge_missing_file(tmp_path: Path) -> None:
