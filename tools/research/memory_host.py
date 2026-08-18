@@ -49,6 +49,70 @@ class MemoryHost:
         self.memory_path.parent.mkdir(parents=True, exist_ok=True)
         self.memory_path.write_text(json.dumps(self.data, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    def record_turn(
+        self,
+        student_id: str,
+        course_module: str,
+        topic: str,
+        query: str,
+        response: str,
+    ) -> dict[str, Any]:
+        """Record a short-term working-memory turn for the active session."""
+        students = self.data.setdefault("students", {})
+        student = students.setdefault(
+            student_id, {"modules": {}, "session_history": [], "working_memory": []}
+        )
+        working_memory = student.setdefault("working_memory", [])
+
+        now_str = datetime.now(timezone.utc).isoformat()
+        turn = {
+            "timestamp": now_str,
+            "module": course_module,
+            "topic": topic,
+            "query": query,
+            "response": response,
+        }
+        working_memory.append(turn)
+        self.save()
+        return turn
+
+    def flush_working_memory(
+        self, student_id: str, summary: str | None = None
+    ) -> dict[str, Any]:
+        """Fold buffered working-memory turns into durable session_history."""
+        students = self.data.setdefault("students", {})
+        student = students.setdefault(
+            student_id, {"modules": {}, "session_history": [], "working_memory": []}
+        )
+        working_memory = student.setdefault("working_memory", [])
+
+        flushed = 0
+        now_str = datetime.now(timezone.utc).isoformat()
+        for turn in working_memory:
+            student["session_history"].append(
+                {
+                    "timestamp": turn["timestamp"],
+                    "module": turn["module"],
+                    "topic": turn["topic"],
+                    "query": turn["query"],
+                    "response": turn["response"],
+                }
+            )
+            flushed += 1
+
+        if summary:
+            student["session_history"].append(
+                {
+                    "timestamp": now_str,
+                    "type": "session_summary",
+                    "summary": summary,
+                }
+            )
+
+        student["working_memory"] = []
+        self.save()
+        return {"flushed": flushed, "summarized": summary is not None}
+
     def record_mastery(
         self, student_id: str, course_module: str, topic: str, score: float
     ) -> dict[str, Any]:
@@ -143,10 +207,33 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--module", help="Course module name (e.g. cs234-advanced-networks).")
     parser.add_argument("--topic", help="Topic name (e.g. b4_traffic_engineering).")
     parser.add_argument("--score", type=float, help="Mastery score (0.0 to 1.0).")
+    parser.add_argument(
+        "--record-turn", action="store_true", help="Record a working-memory turn."
+    )
+    parser.add_argument("--query", help="Query text for a working-memory turn.")
+    parser.add_argument("--response", help="Response text for a working-memory turn.")
+    parser.add_argument(
+        "--flush", action="store_true", help="Flush working memory to durable session history."
+    )
+    parser.add_argument("--summary", help="Optional session summary when flushing.")
     parser.add_argument("--json", action="store_true", help="Emit JSON output.")
     args = parser.parse_args(argv)
 
     memory_host = MemoryHost()
+
+    if args.record_turn:
+        if not args.module or not args.topic or args.query is None or args.response is None:
+            parser.error("--record-turn requires --module, --topic, --query, and --response.")
+        turn = memory_host.record_turn(
+            args.student, args.module, args.topic, args.query, args.response
+        )
+        print(f"Recorded working-memory turn for {args.student}: {args.module} / {args.topic}")
+        return 0
+
+    if args.flush:
+        result = memory_host.flush_working_memory(args.student, summary=args.summary)
+        print(f"Flushed {result['flushed']} turn(s) for {args.student}.")
+        return 0
 
     if args.record:
         if not args.module or not args.topic or args.score is None:

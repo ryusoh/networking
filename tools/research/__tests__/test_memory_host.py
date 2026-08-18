@@ -1,5 +1,6 @@
 """Unit tests for Phase 5 MemoryHost and Mastery Matrix (tools/research/memory_host.py)."""
 
+import json
 from pathlib import Path
 from tools.research.memory_host import MemoryHost
 
@@ -23,13 +24,34 @@ def test_memory_host_records_and_reports_mastery(tmp_path: Path):
     assert report["strong_topics"][0]["topic"] == "b4_traffic_engineering"
 
 
-def test_memory_host_renders_memory_context(tmp_path: Path):
+def test_memory_host_records_and_flushes_working_memory(tmp_path: Path):
     memory_path = tmp_path / ".durable_memory.json"
     host = MemoryHost(memory_path=memory_path)
 
-    context_empty = host.render_memory_context("student1")
-    assert "No previous study history" in context_empty
+    host.record_turn("student1", "cs234-advanced-networks", "b4_te", "What is B4?", "B4 is Google's SD-WAN.")
+    host.record_turn("student1", "cs234-advanced-networks", "b4_te", "How does B4 route?", "Via centralized TE.")
 
-    host.record_mastery("student1", "cs231", "raft", 0.60)
-    context_filled = host.render_memory_context("student1")
-    assert "Focus Needed (Weak Areas): raft (cs231)" in context_filled
+    data = json.loads(memory_path.read_text(encoding="utf-8"))
+    assert len(data["students"]["student1"]["working_memory"]) == 2
+    assert len(data["students"]["student1"]["session_history"]) == 0
+
+    result = host.flush_working_memory("student1", summary="Reviewed B4 TE.")
+    assert result["flushed"] == 2
+    assert result["summarized"] is True
+
+    data = json.loads(memory_path.read_text(encoding="utf-8"))
+    assert len(data["students"]["student1"]["working_memory"]) == 0
+    assert len(data["students"]["student1"]["session_history"]) == 3
+    assert data["students"]["student1"]["session_history"][-1]["type"] == "session_summary"
+
+
+def test_memory_host_empty_flush_is_a_no_op(tmp_path: Path):
+    memory_path = tmp_path / ".durable_memory.json"
+    host = MemoryHost(memory_path=memory_path)
+
+    result = host.flush_working_memory("student1")
+    assert result["flushed"] == 0
+    assert result["summarized"] is False
+
+    data = json.loads(memory_path.read_text(encoding="utf-8"))
+    assert "student1" not in data["students"] or not data["students"]["student1"].get("working_memory")
