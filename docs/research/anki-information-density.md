@@ -22,11 +22,11 @@ normalization pipeline, then combine three deterministic components:
 
 $$
 \begin{aligned}
-x &= \operatorname{normalize}(\text{front\_html} + \text{" "} + \text{back\_html}) \\[0.6em]
-D_{\text{comp}} &= 1 - \frac{|\operatorname{zlib}_9(\operatorname{utf8}(x))| - |\operatorname{zlib}_9(\text{""})|}{|\operatorname{utf8}(x)|} \quad &&\text{(compression density)} \\
-D_{\text{lex}} &= \operatorname{MTLD}(\operatorname{tokens}(x), \text{threshold}=0.72, \text{bidirectional}) \quad &&\text{(lexical diversity)} \\
-D_{\text{concept}} &= \frac{|\text{distinct technical tokens}|}{|\operatorname{tokens}(x)|} \times 100 \quad &&\text{(technical-form proxy)} \\
-D_{\text{domain}} &= \frac{|\operatorname{tokens}(x) \cap L_{\text{deck}}|}{|\operatorname{tokens}(x)|} \times 100 \quad &&\text{(domain-lexicon coverage)} \\[0.6em]
+x &= \text{normalize}(\text{front\_html} + \text{" "} + \text{back\_html}) \\[0.6em]
+D_{\text{comp}} &= 1 - \frac{|\text{zlib}_9(\text{utf8}(x))| - |\text{zlib}_9(\text{""})|}{|\text{utf8}(x)|} \quad &&\text{(compression density)} \\
+D_{\text{lex}} &= \text{MTLD}(\text{tokens}(x), \text{threshold}=0.72, \text{bidirectional}) \quad &&\text{(lexical diversity)} \\
+D_{\text{concept}} &= \frac{|\text{distinct technical tokens}|}{|\text{tokens}(x)|} \times 100 \quad &&\text{(technical-form proxy)} \\
+D_{\text{domain}} &= \frac{|\text{tokens}(x) \cap L_{\text{deck}}|}{|\text{tokens}(x)|} \times 100 \quad &&\text{(domain-lexicon coverage)} \\[0.6em]
 D(\text{card}) &= 0.4 \cdot D_{\text{comp}} + 0.2 \cdot \frac{D_{\text{lex}}}{100} + 0.2 \cdot \frac{D_{\text{concept}}}{100} + 0.2 \cdot \frac{D_{\text{domain}}}{100}
 \end{aligned}
 $$
