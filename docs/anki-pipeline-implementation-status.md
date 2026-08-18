@@ -5,6 +5,11 @@ against the code in `tools/research/`, the artifacts in `research/`, and the ski
 `.agents/skills/{anki,research-agent}/`. Read-only investigation; all claims traced to
 code, not to comments or docstrings. Date: 2026-08-18.
 
+> **Snapshot notice:** this report describes the state as of 2026-08-18. The two
+> specs were subsequently updated to match the code, and the open questions in §4
+> were resolved — see §5 for the decisions. The specs, not this report, are the
+> living source of truth.
+
 ## 1. The question
 
 Both specs describe a courseware-research / Anki-card pipeline over `research/`
@@ -301,24 +306,41 @@ uses `Any`/`Sequence` without importing them (survives via
 `except Exception: pass`; `citation_engine.py:7` docstring advertises snippet
 alignment the code never performs.
 
-## 4. Open questions / what I couldn't verify
+## 4. Open questions from the investigation
 
-- **Whether the spec or the code is authoritative on validator drift.** The skill
-  doc matches the code (gloss ban, annotation cap), suggesting the pipeline spec §8/§9
-  is stale rather than the code being wrong — but that intent was not confirmed with
-  the user.
-- **`pending_import` intent.** The verifier depends on it, production import never
-  sets it; whether the intended flow is import → `pending_import` → verifier →
-  `imported` (and `--import` is simply missing that write) is ambiguous from code.
+Resolved on 2026-08-18 — see §5. The genuinely still-open items:
+
 - **AnkiConnect behaviors not exercised.** `addNotes`, `findNotes`, model-name
   resolution, and the verifier's SQLite reads were verified statically only; no live
   Anki instance was queried.
 - **`~/dev/anki/graph/graph_data.json` presence and schema** were not checked (path
   is outside this repo); the PageRank ranking path was verified in code but not run.
-- **Layer 4 omission: deliberate or backlog?** The skill effectively makes the
-  interactive agent the LLM driver, but the spec never says the four-layer design was
-  descoped; whether Prompt Assembler / LLM Driver / retry loop are planned or
-  abandoned is undetermined.
 - **`research/anki_import.chunks.json` staleness**: inferred from git history and the
   absence of a writer in current code; the exact commit that removed the writer was
   not bisected.
+
+## 5. Decisions taken (2026-08-18)
+
+- **Validator drift — spec was stale, spec updated.** The code is authoritative:
+  `docs/anki-card-pipeline-spec.md` §8/§9 now describe the validator as implemented
+  (front gloss ban, ≤2 back annotations, ≥2 dense sections, unenforced citation
+  section). The spec now states it describes the pipeline as implemented.
+- **`pending_import` — deliberately left inert.** No production path sets it and the
+  AnkiConnect import already gets confirmation from `addNotes` note IDs. Marked as
+  inert in `tools/research/anki_import_verifier.py` (module docstring) and
+  `tools/research/anki_generator.py` (`mark_chunks_visited`,
+  `pending_import_chunks`). Unblock condition: only implement if the TSV export
+  path starts marking chunks `pending_import` at export time.
+- **Layer 4 — stays descoped to the host agent.** Not implemented as code; the
+  interactive agent is the prompt assembler, LLM driver, and output parser.
+  `docs/research-agent-spec.md` §1 records the unblock condition: revisit only when
+  an unattended/scheduled workflow needs LLM invocation without an interactive
+  session.
+- **Web Dashboard / IDE and QuizService — Backburner.** A fourth status level
+  (Planned but explicitly deprioritized) was added to `docs/research-agent-spec.md`
+  and applied to both components.
+- **Both specs updated to match code.** Status labels (Implemented / Partially
+  implemented / Planned / Backburner) applied throughout
+  `docs/research-agent-spec.md`; `docs/anki-card-pipeline-spec.md` rewritten where
+  it contradicted the implementation (state machine, verifier status, stale
+  artifacts, graph-bridge caveats, validator contract).

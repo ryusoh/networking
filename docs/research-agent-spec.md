@@ -11,7 +11,7 @@ This specification defines the architectural design, subsystem boundaries, and d
 - **Planned (not yet implemented)** — no code exists; the section is retained as a design target.
 - **Backburner** — like Planned, but explicitly deprioritized: not on the near-term roadmap; revisit only if the need resurfaces.
 
-Layer 4 (Bounded Reasoning) is currently **deliberately descoped**: the interactive coding agent, driven by `.agents/skills/research-agent/SKILL.md`, plays the role of prompt assembly, LLM execution, and output parsing. Whether Layer 4 is ever implemented as code or remains mapped to the host agent is an open design decision.
+Layer 4 (Bounded Reasoning) is currently **deliberately descoped**: the interactive coding agent, driven by `.agents/skills/research-agent/SKILL.md`, plays the role of prompt assembly, LLM execution, and output parsing. **Unblock condition:** Layer 4 stays mapped to the host agent until an unattended or scheduled workflow requires LLM invocation without an interactive session (e.g. nightly batch card drafting, or bulk generation routed to a cheaper model).
 
 ### 1.1 Core Engineering Principles
 
