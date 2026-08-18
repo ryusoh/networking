@@ -191,9 +191,10 @@
   // Watch for dynamically loaded content
   const observer = new MutationObserver((mutations) => {
     let shouldCheck = false;
-    for (const mutation of mutations) {
-      if (mutation.addedNodes.length > 0) {
+    for (let i = 0; i < mutations.length; i++) {
+      if (mutations[i].addedNodes.length > 0) {
         shouldCheck = true;
+        break;
       }
     }
     if (shouldCheck) {
