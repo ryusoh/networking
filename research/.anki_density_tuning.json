@@ -1,0 +1,19 @@
+{
+  "weights": {
+    "d_comp": 0.4,
+    "d_lex": 0.2,
+    "d_concept": 0.2,
+    "d_domain": 0.2
+  },
+  "threshold_scale": 0.6,
+  "effective_threshold": 0.2102796613629426,
+  "metrics": {
+    "f1": 0.9523809523809523,
+    "precision": 0.9090909090909091,
+    "recall": 1.0,
+    "tp": 10,
+    "fp": 1,
+    "fn": 0,
+    "tn": 5
+  }
+}

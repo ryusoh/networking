@@ -1,6 +1,6 @@
 # Anki Card Information Density: Deterministic Metric and Density-Gated Generation Pipeline
 
-Status: research findings + architecture proposal. No implementation exists yet.
+Status: Implemented (Phase 0–5 complete). Deterministic metric, baseline builder, density gate, pipeline integration, and validation experiments operational.
 
 ## 1. The question
 

@@ -285,8 +285,8 @@ Rules for the implementer:
 
 ## Definition of done
 
-- [ ] All Phase 0–4 items implemented with tests.
-- [ ] `make precommit` green.
-- [ ] Baseline computed for 金融 deck and committed as `research/.anki_density_baseline.json`.
-- [ ] Gate runs in report-only mode on a real batch of 5 cards.
-- [ ] Spec `docs/research/anki-information-density.md` updated with implementation status.
+- [x] All Phase 0–4 items implemented with tests.
+- [x] `make precommit` green.
+- [x] Baseline computed for 金融 deck and committed as `research/.anki_density_baseline.json`.
+- [x] Gate runs in report-only mode on a real batch of 5 cards.
+- [x] Spec `docs/research/anki-information-density.md` updated with implementation status.
