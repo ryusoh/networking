@@ -198,16 +198,20 @@ At the conclusion of an `/anki` generation run, the terminal outputs a 3-level p
 To combine both skills into a powerful study routine:
 
 1. **Step 1 — Deep Topic Research (`research-agent`):**
+
    ```text
    /research-agent What are the core tradeoffs between Paxos and Multi-Paxos in WAN topologies?
    ```
+
 2. **Step 2 — Review & Understand Context:**
    Read the citation-anchored analysis generated from `research/cs231-distributed-systems/`.
 
 3. **Step 3 — Convert to Durable Memory (`anki`):**
+
    ```bash
    python3 tools/research/anki_generator.py --count 5 --deck "金融" --auto-launch
    ```
+
 4. **Step 4 — Review Progress:**
    Check the multi-level progress report to monitor your courseware coverage.
 

@@ -87,10 +87,12 @@ lane's defined scope, so it sits untouched indefinitely.
 ### 3. `make type` is explicitly non-blocking via `|| echo`
 
 - `Makefile:33-34`:
-  ```
+
+  ```makefile
   type:
       @npx tsc -p jsconfig.json --noEmit || echo "make type: non-blocking JS type errors remain (Typist lane)"
   ```
+
 - Mechanism: `tsc --noEmit` exits non-zero when type errors exist; the shell `||`
   operator only runs the right-hand side when the left-hand side fails, and — key
   point — the **overall exit status of the compound command becomes the exit
