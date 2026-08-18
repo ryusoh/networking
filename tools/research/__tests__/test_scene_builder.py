@@ -93,6 +93,76 @@ def test_scene_builder_omits_empty_memory_context(tmp_path: Path):
     assert scene["chunk_count"] == 1
 
 
+def test_scene_builder_assigns_code_and_prereq_slots(tmp_path: Path):
+    chunks = [
+        {
+            "chunk_id": "c1",
+            "file_path": "research/cs231/paxos.md",
+            "heading": "Paxos Consensus Implementation",
+            "start_line": 1,
+            "end_line": 30,
+            "token_count": 500,
+            "content": "The Paxos consensus implementation uses proposers, acceptors, and learners to reach agreement.",
+        },
+        {
+            "chunk_id": "c2",
+            "file_path": "research/cs231/consensus_overview.md",
+            "heading": "Consensus Overview",
+            "start_line": 1,
+            "end_line": 20,
+            "token_count": 500,
+            "content": "Consensus algorithms like Paxos ensure agreement among distributed processes.",
+        },
+        {
+            "chunk_id": "c3",
+            "file_path": "research/cs231/paxos.py",
+            "heading": "Paxos Python Code",
+            "start_line": 1,
+            "end_line": 30,
+            "token_count": 500,
+            "content": "class Paxos:",
+        },
+    ]
+
+    builder = SceneBuilder(chunks, tmp_path)
+    scene = builder.build_scene("Paxos consensus implementation", max_tokens=2000, top_k=3)
+
+    slots = {c["chunk_id"]: c["slot"] for c in scene["chunks"]}
+    assert slots["c1"] == "primary"
+    assert "code" in slots.values()
+    assert "prereq" in slots.values()
+    assert "[CODE]" in scene["markdown_payload"]
+    assert "[PREREQ]" in scene["markdown_payload"]
+
+
+def test_scene_builder_empty_code_slot_when_no_code_chunks(tmp_path: Path):
+    chunks = [
+        {
+            "chunk_id": "c1",
+            "file_path": "research/cs234/b4.md",
+            "heading": "B4 Traffic Engineering",
+            "start_line": 10,
+            "end_line": 50,
+            "token_count": 500,
+            "content": "B4 uses a centralized controller.",
+        },
+        {
+            "chunk_id": "c2",
+            "file_path": "research/cs231/paxos.md",
+            "heading": "Paxos Consensus",
+            "start_line": 1,
+            "end_line": 30,
+            "token_count": 500,
+            "content": "Paxos agreement protocol.",
+        },
+    ]
+
+    builder = SceneBuilder(chunks, tmp_path)
+    scene = builder.build_scene("Paxos consensus", max_tokens=2000, top_k=2)
+
+    slots = {c["chunk_id"]: c["slot"] for c in scene["chunks"]}
+    assert "code" not in slots.values()
+    assert "[CODE]" not in scene["markdown_payload"]
 def test_scene_builder_memory_reduces_available_chunk_budget(tmp_path: Path):
     memory_path = tmp_path / "durable_memory.json"
     memory_host = MemoryHost(memory_path)

@@ -25,6 +25,9 @@ DEFAULT_RESEARCH_DIR = Path(__file__).resolve().parent.parent.parent / "research
 DEFAULT_MANIFEST_PATH = DEFAULT_RESEARCH_DIR / ".chunks_manifest.json"
 DEFAULT_MEMORY_PATH = DEFAULT_RESEARCH_DIR / ".durable_memory.json"
 
+# File extensions treated as lab code / topology sources for the explicit code slot.
+CODE_EXTS = {".p4", ".py", ".gns3"}
+
 
 class SceneBuilder:
     """Host SceneBuilder for assembling token-bounded Study Scenes."""
@@ -53,27 +56,54 @@ class SceneBuilder:
                 memory_tokens = estimate_tokens(memory_section)
                 current_tokens += memory_tokens
 
-        for chunk, score in ranked:
+        def try_add(chunk: dict[str, Any], score: float, slot: str) -> bool:
+            """Append a chunk to the scene if it fits the token budget."""
+            nonlocal current_tokens
             chunk_tokens = chunk.get("token_count", estimate_tokens(chunk.get("content", "")))
             if current_tokens + chunk_tokens > max_tokens:
                 if not selected_chunks:
-                    # Truncate content to fit if first chunk exceeds max_tokens
+                    # Truncate content to fit if the first chunk exceeds max_tokens.
                     allowed_tokens = max(100, max_tokens - system_instruction_tokens - memory_tokens)
                     allowed_chars = allowed_tokens * 4
                     truncated_chunk = dict(chunk)
                     truncated_chunk["content"] = chunk["content"][:allowed_chars] + "\n... [Truncated for token budget]"
                     truncated_chunk["token_count"] = allowed_tokens
+                    truncated_chunk["score"] = score
+                    truncated_chunk["slot"] = slot
                     selected_chunks.append(truncated_chunk)
                     current_tokens += allowed_tokens
-                break
+                return False
 
             chunk_copy = dict(chunk)
             chunk_copy["score"] = score
+            chunk_copy["slot"] = slot
             selected_chunks.append(chunk_copy)
             current_tokens += chunk_tokens
+            return True
 
-            if len(selected_chunks) >= top_k:
-                break
+        if ranked:
+            primary_chunk, primary_score = ranked[0]
+            code_pool = [
+                (c, s)
+                for c, s in ranked[1:]
+                if Path(c["file_path"]).suffix.lower() in CODE_EXTS
+            ]
+            code_ids = {c["chunk_id"] for c, _ in code_pool}
+            prereq_pool = [
+                (c, s)
+                for c, s in ranked[1:]
+                if c["chunk_id"] not in code_ids
+            ]
+
+            try_add(primary_chunk, primary_score, "primary")
+            for chunk, score in prereq_pool:
+                if len(selected_chunks) >= top_k:
+                    break
+                try_add(chunk, score, "prereq")
+            for chunk, score in code_pool[:1]:
+                if len(selected_chunks) >= top_k:
+                    break
+                try_add(chunk, score, "code")
 
         formatted_payload = self._render_markdown_scene(
             query, selected_chunks, current_tokens, max_tokens, memory_context
@@ -132,9 +162,10 @@ class SceneBuilder:
             end_line = chunk["end_line"]
             heading = chunk.get("heading", "Untitled Section")
             content = chunk.get("content", "")
+            slot = chunk.get("slot", "primary")
             link = format_file_link(self.repo_root, file_path, start_line, end_line, label=heading)
 
-            lines.append(f"### Block {idx}: {heading}")
+            lines.append(f"### Block {idx}: [{slot.upper()}] {heading}")
             lines.append(f"**Source Link:** {link}")
             lines.append("```")
             lines.append(content)
