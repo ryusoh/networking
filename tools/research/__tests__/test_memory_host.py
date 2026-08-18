@@ -45,6 +45,24 @@ def test_memory_host_records_and_flushes_working_memory(tmp_path: Path):
     assert data["students"]["student1"]["session_history"][-1]["type"] == "session_summary"
 
 
+def test_memory_host_computes_mastery_from_performance_events(tmp_path: Path):
+    memory_path = tmp_path / ".durable_memory.json"
+    host = MemoryHost(memory_path=memory_path)
+
+    host.record_performance("student1", "cs231", "paxos", 0.5)
+    host.record_performance("student1", "cs231", "paxos", 0.75)
+    host.record_performance("student1", "cs231", "paxos", 1.0)
+
+    report = host.get_student_report("student1")
+    assert report["total_topics_tracked"] == 1
+    assert report["average_mastery"] == 0.75
+
+    # Older direct mastery records are unaffected.
+    host.record_mastery("student1", "cs231", "paxos", 0.9)
+    report = host.get_student_report("student1")
+    assert report["average_mastery"] == 0.9
+
+
 def test_memory_host_empty_flush_is_a_no_op(tmp_path: Path):
     memory_path = tmp_path / ".durable_memory.json"
     host = MemoryHost(memory_path=memory_path)

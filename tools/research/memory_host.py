@@ -113,6 +113,62 @@ class MemoryHost:
         self.save()
         return {"flushed": flushed, "summarized": summary is not None}
 
+    def record_performance(
+        self,
+        student_id: str,
+        course_module: str,
+        topic: str,
+        raw_score: float,
+        window_size: int = 5,
+    ) -> dict[str, Any]:
+        """Record a raw performance event and compute a derived mastery score.
+
+        The computed mastery score is the average of the last `window_size`
+        performance events for this topic, falling back to fewer events when the
+        history is short. This keeps the existing caller-supplied `record_mastery`
+        API unchanged.
+        """
+        raw_score = max(0.0, min(1.0, float(raw_score)))
+
+        students = self.data.setdefault("students", {})
+        student = students.setdefault(student_id, {"modules": {}, "session_history": []})
+        modules = student.setdefault("modules", {})
+        module_topics = modules.setdefault(course_module, {})
+
+        now_str = datetime.now(timezone.utc).isoformat()
+
+        # Append the raw performance event to session history.
+        student["session_history"].append(
+            {
+                "timestamp": now_str,
+                "module": course_module,
+                "topic": topic,
+                "score": raw_score,
+                "type": "performance",
+            }
+        )
+
+        # Compute mastery from the last `window_size` performance events.
+        relevant = [
+            entry["score"]
+            for entry in student["session_history"]
+            if (
+                entry.get("module") == course_module
+                and entry.get("topic") == topic
+                and entry.get("type") == "performance"
+            )
+        ]
+        window = relevant[-window_size:]
+        computed = sum(window) / len(window) if window else raw_score
+
+        module_topics[topic] = {
+            "mastery_score": computed,
+            "last_reviewed": now_str,
+            "computed_from": len(window),
+        }
+        self.save()
+        return module_topics[topic]
+
     def record_mastery(
         self, student_id: str, course_module: str, topic: str, score: float
     ) -> dict[str, Any]:
@@ -208,15 +264,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--topic", help="Topic name (e.g. b4_traffic_engineering).")
     parser.add_argument("--score", type=float, help="Mastery score (0.0 to 1.0).")
     parser.add_argument(
-        "--record-turn", action="store_true", help="Record a working-memory turn."
+        "--record-performance", action="store_true", help="Record a raw performance event and compute mastery."
     )
-    parser.add_argument("--query", help="Query text for a working-memory turn.")
-    parser.add_argument("--response", help="Response text for a working-memory turn.")
-    parser.add_argument(
-        "--flush", action="store_true", help="Flush working memory to durable session history."
-    )
-    parser.add_argument("--summary", help="Optional session summary when flushing.")
-    parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+    parser.add_argument("--raw-score", type=float, help="Raw performance score (0.0 to 1.0).")
     args = parser.parse_args(argv)
 
     memory_host = MemoryHost()
@@ -233,6 +283,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.flush:
         result = memory_host.flush_working_memory(args.student, summary=args.summary)
         print(f"Flushed {result['flushed']} turn(s) for {args.student}.")
+        return 0
+
+    if args.record_performance:
+        if not args.module or not args.topic or args.raw_score is None:
+            parser.error("--record-performance requires --module, --topic, and --raw-score.")
+        entry = memory_host.record_performance(args.student, args.module, args.topic, args.raw_score)
+        print(f"Computed mastery for {args.student}: {args.module} / {args.topic} = {entry['mastery_score']:.4f} (from {entry['computed_from']} event(s))")
         return 0
 
     if args.record:
