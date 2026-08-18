@@ -103,6 +103,11 @@ expected noise:
 - **jsdom prints async `unhandled exception` stack traces** for errors thrown
   inside content-script code even when the test passes. These are real bugs to fix
   (Sentinel's lane), but they do not fail the suite by themselves.
+- **SIGALRM-based timeout tests can be flaky on macOS.** Tests that use
+  `signal.SIGALRM` to enforce a timeout (e.g. `resource_governor.py`) may
+  escape `pytest.raises` when the suite runs under heavy load. Prefer
+  `time.sleep` over tight busy-loops so the signal interrupts a blocking
+  syscall, and avoid relying on sub-second alarm precision.
 
 System dependency: the C tests link `-lcurl`, so a runner needs
 `libcurl4-openssl-dev` (CI installs it; macOS has it via the SDK).
@@ -223,6 +228,11 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   on live Anki collections (`collection.anki2` / `collection.anki21b`); use
   AnkiConnect REST API or TSV/APKG package export (`open -a Anki`) to prevent
   database lock collisions and collation errors.
+  **Testing hygiene:** commands like `anki_generator.py --count/--import` and
+  `memory_host.py --record*` mutate `research/.anki_coverage.json` and
+  `research/.durable_memory.json`. Tests must use temp paths (monkeypatch
+  `DEFAULT_MEMORY_PATH` / `DEFAULT_COVERAGE_PATH` or pass explicit paths); when
+  testing manually, back up these files first and restore them afterward.
 - `research/` — courseware data, chunk manifests, Anki pipeline state files, and
   durable memory. See `research/README.md` for a map of where data, code, specs,
   and skills live.
