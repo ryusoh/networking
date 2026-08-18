@@ -31,24 +31,33 @@ class CitationEngine:
 
     def __init__(self, repo_root: Path = REPO_ROOT):
         self.repo_root = repo_root
-        self._file_line_cache: dict[Path, int] = {}
+        self._file_cache: dict[Path, tuple[int, list[str]] | None] = {}
 
-    def get_file_line_count(self, file_path: Path) -> int | None:
-        """Cache and return the line count of a given file."""
-        if file_path in self._file_line_cache:
-            return self._file_line_cache[file_path]
+    def _read_file(self, file_path: Path) -> tuple[int, list[str]] | None:
+        """Cache and return (line_count, lines) for a file, or None if unreadable."""
+        if file_path in self._file_cache:
+            return self._file_cache[file_path]
 
         if not file_path.exists() or not file_path.is_file():
+            self._file_cache[file_path] = None
             return None
 
         try:
             content = file_path.read_text(encoding="utf-8", errors="replace")
             lines = content.splitlines()
-            line_count = len(lines)
-            self._file_line_cache[file_path] = line_count
-            return line_count
+            result = (len(lines), lines)
+            self._file_cache[file_path] = result
+            return result
         except Exception:
+            self._file_cache[file_path] = None
             return None
+
+    def get_file_line_count(self, file_path: Path) -> int | None:
+        """Cache and return the line count of a given file."""
+        cached = self._read_file(file_path)
+        if cached is None:
+            return None
+        return cached[0]
 
     def extract_citations(self, text: str) -> list[dict[str, Any]]:
         """Extract all line-anchored citations from text."""
@@ -120,6 +129,24 @@ class CitationEngine:
             }
 
         capped_end_line = min(end_line, total_lines)
+
+        # Verify text alignment: the citation label should appear (modulo whitespace)
+        # within the referenced source lines.
+        file_info = self._read_file(path_obj)
+        assert file_info is not None  # total_lines was non-None, so lines exist
+        _, lines = file_info
+        source_text = self._normalize_text("\n".join(lines[start_line - 1 : capped_end_line]))
+        label_text = self._normalize_text(citation["label"])
+        if label_text and label_text not in source_text:
+            return {
+                "citation": citation,
+                "is_valid": False,
+                "error": (
+                    f"Text mismatch: cited text not found in {raw_path} "
+                    f"lines {start_line}-{capped_end_line}"
+                ),
+            }
+
         return {
             "citation": citation,
             "is_valid": True,
@@ -128,6 +155,11 @@ class CitationEngine:
             "capped_end_line": capped_end_line,
             "error": None,
         }
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        """Collapse whitespace for fuzzy text-alignment comparison."""
+        return re.sub(r"\s+", " ", text.strip())
 
     def verify_text(self, text: str) -> dict[str, Any]:
         """Verify all citations within a given text string."""

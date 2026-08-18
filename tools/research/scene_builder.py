@@ -129,9 +129,9 @@ class SceneBuilder:
             file_path = chunk["file_path"]
             start_line = chunk["start_line"]
             end_line = chunk["end_line"]
-            link = format_file_link(self.repo_root, file_path, start_line, end_line)
             heading = chunk.get("heading", "Untitled Section")
             content = chunk.get("content", "")
+            link = format_file_link(self.repo_root, file_path, start_line, end_line, label=heading)
 
             lines.append(f"### Block {idx}: {heading}")
             lines.append(f"**Source Link:** {link}")

@@ -148,10 +148,22 @@ def load_manifest(manifest_path: Path) -> dict[str, Any]:
     return data
 
 
-def format_file_link(repo_root: Path, file_path: str, start_line: int, end_line: int) -> str:
-    """Format absolute file URI for terminal/markdown link rendering."""
+def format_file_link(
+    repo_root: Path, file_path: str, start_line: int, end_line: int, label: str | None = None
+) -> str:
+    """Format absolute file URI for terminal/markdown link rendering.
+
+    Args:
+        repo_root: Repository root used to resolve absolute paths.
+        file_path: Relative or absolute file path.
+        start_line: First referenced line (1-indexed).
+        end_line: Last referenced line (1-indexed).
+        label: Optional link label. Defaults to "file_path#Lstart-Lend".
+    """
     abs_path = (repo_root / file_path).resolve()
-    return f"[{file_path}#L{start_line}-L{end_line}](file://{abs_path}#L{start_line}-L{end_line})"
+    location = f"{file_path}#L{start_line}-L{end_line}"
+    display_label = label if label is not None else location
+    return f"[{display_label}](file://{abs_path}#L{start_line}-L{end_line})"
 
 
 def main(argv: Sequence[str] | None = None) -> int:

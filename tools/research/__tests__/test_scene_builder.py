@@ -37,7 +37,7 @@ def test_scene_builder_assembles_payload_within_token_budget(tmp_path: Path):
     assert scene["chunk_count"] == 1
     assert scene["chunks"][0]["chunk_id"] == "c1"
     assert "MANDATORY CITATION CONTRACT" in scene["markdown_payload"]
-    assert "[research/cs234/b4.md#L10-L50](file://" in scene["markdown_payload"]
+    assert "[B4 Traffic Engineering](file://" in scene["markdown_payload"]
     assert scene["memory_injected"] is False
 
 
