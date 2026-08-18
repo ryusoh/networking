@@ -20,6 +20,31 @@ if str(REPO_ROOT) not in sys.path:
 
 DEFAULT_SPEC_PATH = REPO_ROOT / "research" / "batch_spec.json"
 
+
+def _normalize_args(args: list[str] | dict[str, Any] | None) -> list[str]:
+    """Convert job args to a flat CLI argument list.
+
+    Supports both list form (``["--limit", "3"]``) and dict form
+    (``{"limit": 3, "rrf": true}``). Dict values that are ``True`` become
+    flags; ``False`` or ``None`` values are omitted.
+    """
+    if args is None:
+        return []
+    if isinstance(args, list):
+        return [str(a) for a in args]
+
+    flattened: list[str] = []
+    for key, value in args.items():
+        if value is False or value is None:
+            continue
+        flag = f"--{key.replace('_', '-')}"
+        if value is True:
+            flattened.append(flag)
+        else:
+            flattened.extend([flag, str(value)])
+    return flattened
+
+
 # Map logical command names to the existing research-agent CLIs.
 BATCH_COMMANDS: dict[str, list[str]] = {
     "parse": ["python3", "tools/research/parse_chunks.py"],
@@ -60,7 +85,7 @@ def run_batch(
             )
             continue
 
-        cmd = BATCH_COMMANDS[command_key] + job.get("args", [])
+        cmd = BATCH_COMMANDS[command_key] + _normalize_args(job.get("args"))
         record: dict[str, Any] = {
             "job_index": idx,
             "command": command_key,

@@ -89,9 +89,10 @@ them. Author cards to this density target:
   phrases like `(Analytic Deployment Problem)` or `(IoT Analytics Knowledge
 Hierarchy)` are translated titles, not terminology, even when the words
   come from the source slides. When in doubt, the title is Chinese-only.
-- **Back:** at least 3 dense sections, each introduced by a `<b>section
-name:</b>` header. Write the body in Chinese prose; use `<b>` to emphasize
-  key **Chinese** terms. Do not append English glosses.
+- **Back:** at least 2 dense sections (the validator gate), ideally 3 or
+  more, each introduced by a `<b>section name:</b>` header. Write the body in
+  Chinese prose; use `<b>` to emphasize key **Chinese** terms. Do not append
+  English glosses.
 - **English annotations (machine-gated, cap = 2 per back):** annotate a term
   in English ONLY if a domain reader would not already know it — i.e.
   acronym expansions on first use (exempt from the cap) and rare specialized
@@ -196,9 +197,9 @@ Example (bad — low density, no sections, English summary paragraph):
     (`--import`, `--reject-chunk`, verifier). This is the same discipline as
     never writing raw SQLite to `collection.anki2`.
   - Verify imports with `python3 tools/research/anki_import_verifier.py`.
-  - If AnkiConnect is unavailable, `--import` falls back to launching Anki
-    with the legacy TSV file (`research/anki_import.txt`). Do not ask the user
-    to run the launch command manually.
+  - `--import` requires AnkiConnect. If Anki is not running, pass `--auto-launch`
+    to start it. The one-off `--front/--back` path falls back to the legacy TSV
+    file when AnkiConnect is unreachable.
 
 ### 5. Database safety non-negotiable
 

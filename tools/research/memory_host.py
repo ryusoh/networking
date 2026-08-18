@@ -25,8 +25,8 @@ DEFAULT_MEMORY_PATH = DEFAULT_RESEARCH_DIR / ".durable_memory.json"
 class MemoryHost:
     """Persistent state manager for student mastery matrix and session summaries."""
 
-    def __init__(self, memory_path: Path = DEFAULT_MEMORY_PATH):
-        self.memory_path = memory_path
+    def __init__(self, memory_path: Path | None = None):
+        self.memory_path = memory_path if memory_path is not None else DEFAULT_MEMORY_PATH
         self.data: dict[str, Any] = self._load_memory()
 
     def _load_memory(self) -> dict[str, Any]:
@@ -268,6 +268,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--record-performance", action="store_true", help="Record a raw performance event and compute mastery."
     )
     parser.add_argument("--raw-score", type=float, help="Raw performance score (0.0 to 1.0).")
+    parser.add_argument("--record-turn", action="store_true", help="Record a working-memory turn.")
+    parser.add_argument("--query", help="Query text for --record-turn.")
+    parser.add_argument("--response", help="Response text for --record-turn.")
+    parser.add_argument("--flush", action="store_true", help="Flush working memory into durable session history.")
+    parser.add_argument("--summary", help="Optional summary for --flush.")
+    parser.add_argument("--json", action="store_true", help="Emit report as JSON.")
     args = parser.parse_args(argv)
 
     memory_host = MemoryHost()

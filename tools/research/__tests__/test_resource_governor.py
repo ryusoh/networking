@@ -42,9 +42,7 @@ def test_resource_governor_timeout_raises_on_slow_operation():
     gov = ResourceGovernor(max_tokens=1000)
     with pytest.raises(TimeoutError):
         with gov.timeout(0.5):
-            deadline = time.time() + 2.0
-            while time.time() < deadline:
-                pass
+            time.sleep(2.0)
 
 
 def test_resource_governor_timeout_disabled_with_zero():

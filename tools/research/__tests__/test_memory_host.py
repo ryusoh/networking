@@ -2,6 +2,8 @@
 
 import json
 from pathlib import Path
+
+from tools.research import memory_host as memory_host_module
 from tools.research.memory_host import MemoryHost
 
 
@@ -73,3 +75,53 @@ def test_memory_host_empty_flush_is_a_no_op(tmp_path: Path):
 
     data = json.loads(memory_path.read_text(encoding="utf-8"))
     assert "student1" not in data["students"] or not data["students"]["student1"].get("working_memory")
+
+
+def test_cli_report_path_uses_default_memory(tmp_path: Path, monkeypatch):
+    memory_path = tmp_path / ".durable_memory.json"
+    monkeypatch.setattr(memory_host_module, "DEFAULT_MEMORY_PATH", memory_path)
+
+    host = MemoryHost(memory_path=memory_path)
+    host.record_mastery("cli_student", "cs234", "b4", 0.95)
+
+    assert memory_host_module.main(["--student", "cli_student"]) == 0
+
+
+def test_cli_record_turn_and_flush_round_trip(tmp_path: Path, monkeypatch):
+    memory_path = tmp_path / ".durable_memory.json"
+    monkeypatch.setattr(memory_host_module, "DEFAULT_MEMORY_PATH", memory_path)
+
+    assert (
+        memory_host_module.main(
+            [
+                "--student",
+                "cli_turn_student",
+                "--record-turn",
+                "--module",
+                "cs231",
+                "--topic",
+                "paxos",
+                "--query",
+                "What is Paxos?",
+                "--response",
+                "A consensus protocol.",
+            ]
+        )
+        == 0
+    )
+
+    assert (
+        memory_host_module.main(
+            [
+                "--student",
+                "cli_turn_student",
+                "--flush",
+                "--summary",
+                "Reviewed Paxos.",
+            ]
+        )
+        == 0
+    )
+
+    data = json.loads(memory_path.read_text(encoding="utf-8"))
+    assert len(data["students"]["cli_turn_student"]["session_history"]) == 2

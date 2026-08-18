@@ -55,6 +55,31 @@ def test_run_batch_reports_unknown_command():
     assert results[0]["status"] == "unknown_command"
 
 
+def test_run_batch_accepts_dict_args(tmp_path: Path):
+    spec = {
+        "jobs": [
+            {
+                "command": "search",
+                "args": {"query": "Paxos", "limit": 3, "rrf": True, "json": False},
+            }
+        ]
+    }
+    stub = _StubRunner()
+    results = run_batch(spec, repo_root=tmp_path, runner=stub)
+
+    assert len(results) == 1
+    assert results[0]["status"] == "success"
+    assert stub.calls[0][0] == [
+        "python3",
+        "tools/research/search_chunks.py",
+        "--query",
+        "Paxos",
+        "--limit",
+        "3",
+        "--rrf",
+    ]
+
+
 def test_run_batch_reports_failure():
     class _FailingRunner:
         def run(self, cmd: list[str], **kwargs: object) -> _FakeCompletedProcess:
