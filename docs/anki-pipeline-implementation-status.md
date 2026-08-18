@@ -30,43 +30,48 @@ vector half of the hybrid indexer, and Layer 4 is almost entirely missing (no pr
 assembler, no LLM driver, no retry loop) — by design, the interactive agent plays
 that role via the skill.
 
-| Feature (spec ref)                                   | Status  |
-| ---------------------------------------------------- | ------- |
-| Pipeline: candidate CLI (`--count` / `--candidates`) | done    |
-| Pipeline: `--import` via AnkiConnect                 | done    |
-| Pipeline: TSV fallback on import                     | partial |
-| Pipeline: `--reject-chunk` + 10 reason categories    | done    |
-| Pipeline: `--front`/`--back` one-off cards           | done    |
-| Pipeline: coverage state machine                     | partial |
-| Pipeline: selection lockout (candidate/pending)      | done    |
-| Pipeline: quality filter + reject-rate ranking       | done    |
-| Pipeline: directory weighting                        | done    |
-| Pipeline: selection-time title dedup                 | done    |
-| Pipeline: import-time front-hash dedup               | done    |
-| Pipeline: AnkiGraphBridge PageRank                   | done    |
-| Validator: 16 detectors (spec §9)                    | partial |
-| Validator: hard gate + `--force`                     | done    |
-| Card format contract (bilingual front, ≥3 sections)  | partial |
-| Citation section enforced on cards                   | missing |
-| Import verifier                                      | done    |
-| Agent: Layer 1 CLI tooling                           | done    |
-| Agent: Web Dashboard / IDE                           | missing |
-| Agent: Automated Batch Runner                        | missing |
-| Agent: CurriculumService                             | missing |
-| Agent: QuizService                                   | missing |
-| Agent: SynthesisService                              | missing |
-| Agent: CitationEngine (existence + line bounds)      | partial |
-| Agent: SceneBuilder                                  | partial |
-| Agent: MemoryHost durable store                      | partial |
-| Agent: Working Memory buffer                         | missing |
-| Agent: ResourceGovernor                              | missing |
-| Agent: Hybrid indexer (BM25 + vectors + RRF)         | partial |
-| Agent: Prompt Assembler                              | missing |
-| Agent: LLM Execution Driver                          | missing |
-| Agent: Output & citation parser                      | partial |
-| Agent: citation auto-retry loop                      | missing |
-| Agent: Phase 1 parser (headers/slides/offsets)       | done    |
-| Agent: mastery-score updating engine                 | missing |
+Status values: `done`, `partial`, `missing` (genuinely absent, still planned),
+`backburner` (planned but deprioritized per §5), `descoped` (deliberately not
+code — the interactive host agent fills the role per §5), `inert` (code exists
+but no production path triggers it).
+
+| Feature (spec ref)                                   | Status     |
+| ---------------------------------------------------- | ---------- |
+| Pipeline: candidate CLI (`--count` / `--candidates`) | done       |
+| Pipeline: `--import` via AnkiConnect                 | done       |
+| Pipeline: TSV fallback on import                     | partial    |
+| Pipeline: `--reject-chunk` + 10 reason categories    | done       |
+| Pipeline: `--front`/`--back` one-off cards           | done       |
+| Pipeline: coverage state machine                     | partial    |
+| Pipeline: selection lockout (candidate/pending)      | done       |
+| Pipeline: quality filter + reject-rate ranking       | done       |
+| Pipeline: directory weighting                        | done       |
+| Pipeline: selection-time title dedup                 | done       |
+| Pipeline: import-time front-hash dedup               | done       |
+| Pipeline: AnkiGraphBridge PageRank                   | done       |
+| Validator: 16 detectors (spec §9)                    | partial    |
+| Validator: hard gate + `--force`                     | done       |
+| Card format contract (bilingual front, ≥3 sections)  | partial    |
+| Citation section enforced on cards                   | missing    |
+| Import verifier                                      | inert      |
+| Agent: Layer 1 CLI tooling                           | done       |
+| Agent: Web Dashboard / IDE                           | backburner |
+| Agent: Automated Batch Runner                        | missing    |
+| Agent: CurriculumService                             | missing    |
+| Agent: QuizService                                   | backburner |
+| Agent: SynthesisService                              | missing    |
+| Agent: CitationEngine (existence + line bounds)      | partial    |
+| Agent: SceneBuilder                                  | partial    |
+| Agent: MemoryHost durable store                      | partial    |
+| Agent: Working Memory buffer                         | missing    |
+| Agent: ResourceGovernor                              | missing    |
+| Agent: Hybrid indexer (BM25 + vectors + RRF)         | partial    |
+| Agent: Prompt Assembler                              | descoped   |
+| Agent: LLM Execution Driver                          | descoped   |
+| Agent: Output & citation parser                      | partial    |
+| Agent: citation auto-retry loop                      | descoped   |
+| Agent: Phase 1 parser (headers/slides/offsets)       | done       |
+| Agent: mastery-score updating engine                 | missing    |
 
 ## 3. Claim-by-claim evidence
 
