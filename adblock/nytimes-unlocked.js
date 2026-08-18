@@ -65,25 +65,37 @@
     { passive: true, once: true }
   );
 
+  /**
+   * Helper to extract horizontal scroll position.
+   * @param {unknown} a0
+   * @returns {number}
+   */
+  function getScrollX(a0) {
+    if (typeof a0 === 'object' && a0 !== null) {
+      return /** @type {ScrollToOptions} */ (a0).left || 0;
+    }
+    return typeof a0 === 'number' ? a0 : 0;
+  }
+
+  /**
+   * Helper to extract vertical scroll position.
+   * @param {unknown} a0
+   * @param {unknown} a1
+   * @returns {number}
+   */
+  function getScrollY(a0, a1) {
+    if (typeof a0 === 'object' && a0 !== null) {
+      return /** @type {ScrollToOptions} */ (a0).top || 0;
+    }
+    return typeof a1 === 'number' ? a1 : 0;
+  }
+
   window.scrollTo = /** @type {typeof window.scrollTo} */ (
     function () {
       // Allow scrollTo(0, 0) only before user interacts; block regiwall scroll resets
       if (userHasScrolled) {
-        const args = arguments;
-        const a0 = args[0];
-        const a1 = args[1];
-        const x =
-          typeof a0 === 'object' && a0 !== null
-            ? /** @type {ScrollToOptions} */ (a0).left || 0
-            : typeof a0 === 'number'
-              ? a0
-              : 0;
-        const y =
-          typeof a0 === 'object' && a0 !== null
-            ? /** @type {ScrollToOptions} */ (a0).top || 0
-            : typeof a1 === 'number'
-              ? a1
-              : 0;
+        const x = getScrollX(arguments[0]);
+        const y = getScrollY(arguments[0], arguments[1]);
         if (x === 0 && y === 0) {
           return;
         } // Block scroll-to-top resets
