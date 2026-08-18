@@ -345,7 +345,7 @@ def compute_baseline(
 
     lexicon = build_domain_lexicon(
         deck=deck,
-        k=k,
+        k=max(k, 50),
         max_terms=500,
         mode=mode,
         repo_root=repo_root,

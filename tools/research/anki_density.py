@@ -143,17 +143,17 @@ def _is_technical_token(token: str) -> bool:
     """Check if token matches technical-form criteria."""
     if not token:
         return False
-    # Digit presence
+    # Digit presence (e.g. '3g', '2004', '802.11', '100ms')
     if any(c.isdigit() for c in token):
         return True
-    # All-caps acronym (length >= 2)
+    # All-caps acronym (length >= 2, e.g. 'GPS', 'BBR', 'TLB')
     if len(token) >= 2 and token.isupper():
         return True
-    # Mixed-case identifier
+    # Mixed-case identifier (e.g. 'PageRank', 'zkSNARK')
     if len(token) >= 2 and any(c.isupper() for c in token[1:]):
         return True
-    # CJK compound (length >= 2)
-    if len(token) >= 2 and any("\u4e00" <= c <= "\u9fff" or "\u3040" <= c <= "\u30ff" for c in token):
+    # Mathematical / technical syntax symbols
+    if any(sym in token for sym in ("\\", "_", "^", "=", "<", ">", "+", "-", "*", "/")):
         return True
     return False
 
@@ -198,6 +198,8 @@ def card_density(front_html: str, back_html: str, lexicon: set[str]) -> DensityR
     d_concept = concept_density(tokens)
     d_domain = domain_density(tokens, lexicon)
 
+    norm_lex = min(1.0, d_lex / 100.0)
+
     if token_count < 50:
         lex_fallback = True
         composite = 0.4 * d_comp + 0.3 * (d_concept / 100.0) + 0.3 * (d_domain / 100.0)
@@ -205,7 +207,7 @@ def card_density(front_html: str, back_html: str, lexicon: set[str]) -> DensityR
         lex_fallback = False
         composite = (
             0.4 * d_comp
-            + 0.2 * (d_lex / 100.0)
+            + 0.2 * norm_lex
             + 0.2 * (d_concept / 100.0)
             + 0.2 * (d_domain / 100.0)
         )

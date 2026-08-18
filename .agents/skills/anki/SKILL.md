@@ -25,13 +25,16 @@ python3 tools/research/anki_generator.py --count 5 --deck "金融"
 # 2. Read research/anki_candidates.jsonl and author cards to research/anki_cards.jsonl
 #    One JSON object per line: {chunk_id, front, back, tags, citation}
 
-# 3. Validate the authored cards (hard gate — --import refuses while issues exist)
+# 3. Validate structural formatting (hard gate — --import refuses while issues exist)
 python3 tools/research/anki_card_validator.py research/anki_cards.jsonl
 
-# 4. Reject junk chunks by id (requires --reason CATEGORY)
+# 4. Evaluate information density against deck baseline (emits research/anki_density_verdicts.jsonl)
+python3 tools/research/anki_density_gate.py --cards research/anki_cards.jsonl
+
+# 5. Reject junk chunks by id (requires --reason CATEGORY)
 python3 tools/research/anki_generator.py --reject-chunk <chunk_id> --reason <CATEGORY>
 
-# 5. Import reviewed cards via AnkiConnect (marks chunks "imported")
+# 6. Import reviewed & density-accepted cards via AnkiConnect (marks chunks "imported")
 python3 tools/research/anki_generator.py --import --deck "金融"
 ```
 
@@ -150,15 +153,21 @@ Example (bad — low density, no sections, English summary paragraph):
 }
 ```
 
-### 3. Agent quality review (mandatory before import)
+### 3. Agent quality & density review (mandatory before import)
 
 - Immediately inspect the authored `research/anki_cards.jsonl`. **Read every
   card's front AND back in full — never approve from a truncated print.**
-  - Run the automated validator:
+  - Run the automated structural validator:
     `python3 tools/research/anki_card_validator.py research/anki_cards.jsonl`.
     Any reported issue is a hard reject unless you rewrite the card.
-  - `--import` re-runs the validator, so "validator green" is necessary, not
-    sufficient — your full-text judgment is the second gate.
+  - Run the information density gate:
+    `python3 tools/research/anki_density_gate.py --cards research/anki_cards.jsonl`.
+    Cards flagged with `enrich` or `consolidate` must be re-authored with concrete
+    mechanisms/equations/algorithms from the source chunks (or consolidated)
+    before import.
+  - Reject cards with **low technical density / superficial prose**: cards that merely
+    translate high-level survey bullets without concrete formulas, mechanisms,
+    algorithms, or protocol specifications must be enriched or rejected.
   - Reject a card for a **bad artifact, not a bad topic**: a famous concept
     does not redeem a card whose front is a raw title or whose back is an
     abstract/metadata dump. Judge the last card of the batch as strictly as
