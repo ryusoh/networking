@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Phase 2 Hybrid Lexical Search Engine (BM25 + Rank Fusion) for research courseware.
+"""Phase 2 Hybrid Lexical Search Engine (BM25 + dense vector + RRF) for research courseware.
 
 Searches over the structural chunks manifest generated in Phase 1 (research/.chunks_manifest.json),
 ranking chunks by BM25 Okapi term frequency, document length normalization, and heading relevance.
-Emits clickable Markdown file links with exact line ranges.
+With --rrf, BM25 and a lightweight deterministic dense-vector index are fused with Reciprocal Rank
+Fusion. Emits clickable Markdown file links with exact line ranges.
 """
 
 from __future__ import annotations
@@ -15,6 +16,8 @@ import re
 import sys
 from pathlib import Path
 from typing import Any, Sequence
+
+from tools.research.dense_indexer import DenseIndexer
 
 DEFAULT_RESEARCH_DIR = Path(__file__).resolve().parent.parent.parent / "research"
 DEFAULT_MANIFEST_PATH = DEFAULT_RESEARCH_DIR / ".chunks_manifest.json"
@@ -183,7 +186,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--rrf",
         action="store_true",
-        help="Enable Reciprocal Rank Fusion (RRF) ranker.",
+        help="Fuse BM25 and dense-vector rankings with Reciprocal Rank Fusion.",
     )
     parser.add_argument(
         "--json",
@@ -208,10 +211,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     indexer = BM25Indexer(chunks)
     if args.rrf:
-        # Perform multi-pass BM25 token ranking and fuse using RRF
-        tokens = tokenize(args.query)
-        passes = [indexer.score(t) for t in tokens] if len(tokens) > 1 else [indexer.score(args.query)]
-        ranked_results = reciprocal_rank_fusion(passes)[: args.limit]
+        dense_indexer = DenseIndexer(chunks, repo_root)
+        dense_indexer.build_index()
+        bm25_results = indexer.score(args.query)
+        dense_results = dense_indexer.score(args.query)
+        ranked_results = reciprocal_rank_fusion([bm25_results, dense_results])[: args.limit]
     else:
         ranked_results = indexer.score(args.query)[: args.limit]
 

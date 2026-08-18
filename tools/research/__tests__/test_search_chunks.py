@@ -1,5 +1,6 @@
 """Unit tests for Phase 2 BM25 Search Engine (tools/search_research_chunks.py)."""
 
+import json
 from pathlib import Path
 from tools.research import search_chunks
 
@@ -66,3 +67,34 @@ def test_reciprocal_rank_fusion():
     assert len(fused) == 2
     # c2 is rank 2 in first and rank 1 in second, c1 is rank 1 in first and rank 2 in second -> equal sum
     assert fused[0][1] > 0
+
+
+def test_cli_rrf_fuses_bm25_and_dense_rankings(tmp_path: Path):
+    manifest_dir = tmp_path / "research"
+    manifest_dir.mkdir(parents=True)
+    manifest = {
+        "chunks": [
+            {
+                "chunk_id": "c1",
+                "file_path": "research/cs234/b4.md",
+                "heading": "B4 Traffic Engineering",
+                "start_line": 10,
+                "end_line": 50,
+                "content": "B4 uses a centralized controller to manage WAN traffic engineering.",
+            },
+            {
+                "chunk_id": "c2",
+                "file_path": "research/cs231/paxos.md",
+                "heading": "Paxos Consensus",
+                "start_line": 1,
+                "end_line": 30,
+                "content": "Paxos agreement protocol uses phase 1a phase 1b phase 2a phase 2b.",
+            },
+        ]
+    }
+    (manifest_dir / ".chunks_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    ret = search_chunks.main(["B4 traffic", "--manifest", str(manifest_dir / ".chunks_manifest.json"), "--rrf", "--json"])
+    assert ret == 0
+    # Dense index cache should have been written.
+    assert (manifest_dir / ".dense_vectors.json").exists()
