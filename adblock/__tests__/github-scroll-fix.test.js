@@ -261,6 +261,8 @@ describe('github-scroll-fix.js final coverage', () => {
 
     const wrapper = new Function('window', 'document', 'Element', 'HTMLElement', code);
     wrapper(undefined, undefined, undefined, undefined);
+
+    global.window = origWindow;
   });
 
   test('covers missing HTMLElement prototype branch', () => {
@@ -270,7 +272,6 @@ describe('github-scroll-fix.js final coverage', () => {
 
     // Remove HTMLElement entirely for this test
     const origHTMLElement = global.HTMLElement;
-    const origElement = global.Element;
 
     global.HTMLElement = undefined;
 
@@ -367,9 +368,6 @@ describe('github-scroll-fix.js super extra final coverage', () => {
     const { instrumentFile } = require('./helpers/instrument');
     const srcPath = require('path').resolve(__dirname, '../github-scroll-fix.js');
     const code = instrumentFile(srcPath);
-
-    const origHTMLElement = global.HTMLElement;
-    const origElement = global.Element;
 
     // First, verify behavior when Element does not have scrollTop descriptor
     // JSDOM Element doesn't have it natively sometimes, it's on HTMLElement usually or Element.
