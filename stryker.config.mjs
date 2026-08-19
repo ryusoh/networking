@@ -5,10 +5,21 @@
 // Incremental mode caches results in .stryker-tmp/ (gitignored).
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
-  mutate: ['clean_adblock/picker.js'],
+  mutate: ['adblock/picker.js'],
   testRunner: 'jest',
   reporters: ['clear-text', 'progress'],
   incremental: true,
+  disableTypeChecks: false,
+  ignorePatterns: [
+    '.claude/**',
+    '.agents/**',
+    'research/**',
+    'nas_proxy/**',
+    'nas_tools/**',
+    'vps_kernel_proxy/**',
+    'bin/**',
+    'docs/**'
+  ],
   // Smoke-scaffold thresholds: informational only, never wired into a gate.
   thresholds: { high: 80, low: 60, break: null },
   timeoutMS: 30000
