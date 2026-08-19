@@ -344,19 +344,31 @@
   };
 
   /**
+   * Checks if the Chrome runtime object and core methods are present.
+   * @returns {boolean}
+   */
+  function hasValidRuntime() {
+    return !!(chrome?.runtime?.id && chrome?.runtime?.onMessage);
+  }
+
+  /**
+   * Checks if the Chrome storage object and core methods are present.
+   * @returns {boolean}
+   */
+  function hasValidStorage() {
+    return !!(chrome?.storage?.sync && chrome?.storage?.local);
+  }
+
+  /**
    * Checks if the extension context is still valid.
    * @returns {boolean}
    */
   function isContextValid() {
     try {
-      // Use optional chaining and check for runtime.id which is cleared on invalidation
-      return !!(
-        typeof chrome !== 'undefined' &&
-        chrome?.runtime?.id &&
-        chrome?.runtime?.onMessage &&
-        chrome?.storage?.sync &&
-        chrome?.storage?.local
-      );
+      if (typeof chrome === 'undefined' || !chrome) {
+        return false;
+      }
+      return hasValidRuntime() && hasValidStorage();
     } catch {
       return false;
     }
