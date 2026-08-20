@@ -362,7 +362,20 @@
       requestAnimationFrame(startObserver);
       return;
     }
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver((mutations) => {
+      if (typeof document === 'undefined' || !document) {
+        return;
+      }
+      let hasAdded = false;
+      for (let i = 0; i < mutations.length; i++) {
+        if (mutations[i].addedNodes.length > 0) {
+          hasAdded = true;
+          break;
+        }
+      }
+      if (!hasAdded) {
+        return;
+      }
       removeInert();
       hideOverlays();
       if (!restored) {
