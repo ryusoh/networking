@@ -7,22 +7,32 @@
   'use strict';
 
   // Skip search engines — broad keyword/element scanning causes false positives on results pages
+  const EXEMPT_SEARCH_ENGINES = [
+    'google.com',
+    'google.co.uk',
+    'google.ca',
+    'google.com.au',
+    'google.de',
+    'google.fr',
+    'google.co.jp',
+    'google.co.in',
+    'bing.com',
+    'duckduckgo.com',
+    'baidu.com',
+    'wsj.com',
+    'nvidia.com'
+  ];
+
+  /**
+   * @param {string} host
+   * @returns {boolean}
+   */
+  function isExemptHost(host) {
+    return EXEMPT_SEARCH_ENGINES.some((d) => host === d || host.endsWith('.' + d));
+  }
+
   const _host = window.location.hostname;
-  if (
-    _host.endsWith('google.com') ||
-    _host.endsWith('google.co.uk') ||
-    _host.endsWith('google.ca') ||
-    _host.endsWith('google.com.au') ||
-    _host.endsWith('google.de') ||
-    _host.endsWith('google.fr') ||
-    _host.endsWith('google.co.jp') ||
-    _host.endsWith('google.co.in') ||
-    _host.endsWith('bing.com') ||
-    _host.endsWith('duckduckgo.com') ||
-    _host.endsWith('baidu.com') ||
-    _host.endsWith('wsj.com') ||
-    _host.endsWith('nvidia.com')
-  ) {
+  if (isExemptHost(_host)) {
     return;
   }
 
