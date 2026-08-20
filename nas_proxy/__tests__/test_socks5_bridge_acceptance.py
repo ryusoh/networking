@@ -58,7 +58,7 @@ class FakeSocks5Proxy:
         self.thread.start()
         return self
 
-    def __exit__(self, *exc):
+    def __exit__(self, *_exc):
         self.thread.join(timeout=5)
         self.listener.close()
         return False
