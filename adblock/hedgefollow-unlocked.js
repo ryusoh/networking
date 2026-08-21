@@ -97,6 +97,22 @@
     }
   }, 500);
 
+  /**
+   * @param {HTMLElement} node
+   * @returns {boolean}
+   */
+  const isModalNode = (node) => {
+    const id = node.id || '';
+    const cls = node.className || '';
+    return (
+      id === 'loginModal' ||
+      id === 'simplemodal-overlay' ||
+      id === 'simplemodal-container' ||
+      (typeof cls === 'string' && cls.includes('simplemodal-container')) ||
+      (typeof cls === 'string' && cls.includes('simplemodal-overlay'))
+    );
+  };
+
   // MutationObserver for dynamically injected modals
   const startObserver = () => {
     if (!document.body) {
@@ -109,15 +125,7 @@
           if (!(node instanceof HTMLElement)) {
             continue;
           }
-          const id = node.id || '';
-          const cls = node.className || '';
-          if (
-            id === 'loginModal' ||
-            id === 'simplemodal-overlay' ||
-            id === 'simplemodal-container' ||
-            cls.includes('simplemodal-container') ||
-            cls.includes('simplemodal-overlay')
-          ) {
+          if (isModalNode(node)) {
             node.style.setProperty('display', 'none', 'important');
             if (document.body) {
               document.body.style.overflow = '';
