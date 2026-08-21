@@ -10,13 +10,6 @@
     "types": ["chrome"],
     "skipLibCheck": true
   },
-  "include": [
-    "adblock/*.js",
-    "gov_bypass/tianditu-defaults.js",
-    "gov_bypass/offscreen.js",
-    "gov_bypass/background.js",
-    "gov_bypass/tile-cache-page.js",
-    "stall_guard/*.js"
-  ],
-  "exclude": ["node_modules", "adblock/__tests__", "stall_guard/dist"]
+  "include": ["adblock/*.js", "gov_bypass/*.js", "stall_guard/*.js"],
+  "exclude": ["node_modules", "adblock/__tests__", "stall_guard/dist", "gov_bypass/__tests__"]
 }
