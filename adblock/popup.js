@@ -114,6 +114,23 @@ document.addEventListener('DOMContentLoaded', () => {
   );
   const addJsBlockBtn = /** @type {HTMLButtonElement} */ (document.getElementById('addJsBlock'));
 
+  /**
+   * @param {any} result
+   * @param {string} host
+   * @param {HTMLButtonElement} wlBtn
+   * @param {HTMLButtonElement} blBtn
+   * @param {HTMLButtonElement} jsBtn
+   */
+  function applyButtonStates(result, host, wlBtn, blBtn, jsBtn) {
+    const isWhitelisted = (result.whitelist || []).includes(host);
+    const isBlacklisted = (result.blacklist || []).includes(host);
+    const isJsBlocked = (result.jsBlocked || []).includes(host);
+
+    wlBtn.textContent = isWhitelisted ? 'Un-Whitelist' : 'Whitelist';
+    blBtn.textContent = isBlacklisted ? 'Un-Blacklist' : 'Blacklist';
+    jsBtn.textContent = isJsBlocked ? 'Un-Block JS' : 'Block JS';
+  }
+
   function updateButtonStates() {
     try {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -143,13 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ) {
               return;
             }
-            const isWhitelisted = (result.whitelist || []).includes(host);
-            const isBlacklisted = (result.blacklist || []).includes(host);
-            const isJsBlocked = (result.jsBlocked || []).includes(host);
-
-            addWhitelistBtn.textContent = isWhitelisted ? 'Un-Whitelist' : 'Whitelist';
-            addBlacklistBtn.textContent = isBlacklisted ? 'Un-Blacklist' : 'Blacklist';
-            addJsBlockBtn.textContent = isJsBlocked ? 'Un-Block JS' : 'Block JS';
+            applyButtonStates(result, host, addWhitelistBtn, addBlacklistBtn, addJsBlockBtn);
           }
         );
       });
