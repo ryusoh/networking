@@ -178,8 +178,7 @@
      */
     XMLHttpRequest.prototype.open = function (method, url, ...rest) {
       this['_url'] = url.toString();
-      // @ts-ignore
-      return originalOpen.apply(this, [method, url, ...rest]);
+      return /** @type {Function} */ (originalOpen).apply(this, [method, url, ...rest]);
     };
 
     /**
@@ -192,8 +191,7 @@
         this.abort();
         return;
       }
-      // @ts-ignore
-      return originalSend.apply(this, args);
+      return /** @type {Function} */ (originalSend).apply(this, args);
     };
   }
 
