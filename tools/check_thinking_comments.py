@@ -176,6 +176,24 @@ def scan_abandoned_tests(src):
             yield node.lineno, node.name
 
 
+
+
+def _process_in_block(stripped):
+    """Process a line when already inside a block comment."""
+    text = stripped.lstrip("*").strip()
+    return text, ("*/" not in stripped)
+
+def _process_start_comment(stripped):
+    """Process a line starting with a comment marker."""
+    text = stripped[2:].lstrip("*").strip()
+    new_in_block = stripped.startswith("/*") and "*/" not in stripped
+    return text, new_in_block
+
+def _process_inline_match(line, match):
+    """Process an inline comment match."""
+    text = line[match.end() :].lstrip("*").strip()
+    new_in_block = match.group(1) == "/*" and "*/" not in line[match.end() :]
+    return text, new_in_block
 def scan_c_style_comments(src):
     """Yield (lineno, comment_text) for // and /* */ comments matching the pattern.
 
@@ -186,27 +204,18 @@ def scan_c_style_comments(src):
     in_block = False
     for lineno, line in enumerate(src.splitlines(), 1):
         stripped = line.lstrip()
+        text = None
         if in_block:
-            text = stripped.lstrip("*").strip()
-            if thinking_in_comment(text):
-                yield lineno, text
-            if "*/" in stripped:
-                in_block = False
-            continue
-        if stripped.startswith(("//", "/*")):
-            text = stripped[2:].lstrip("*").strip()
-            if thinking_in_comment(text):
-                yield lineno, text
-            if stripped.startswith("/*") and "*/" not in stripped:
-                in_block = True
-            continue
-        match = JS_INLINE_MARKER_RE.search(line)
-        if match:
-            text = line[match.end() :].lstrip("*").strip()
-            if thinking_in_comment(text):
-                yield lineno, text
-            if match.group(1) == "/*" and "*/" not in line[match.end() :]:
-                in_block = True
+            text, in_block = _process_in_block(stripped)
+        elif stripped.startswith(("//", "/*")):
+            text, in_block = _process_start_comment(stripped)
+        else:
+            match = JS_INLINE_MARKER_RE.search(line)
+            if match:
+                text, in_block = _process_inline_match(line, match)
+
+        if text and thinking_in_comment(text):
+            yield lineno, text
 
 
 def iter_tracked_sources():
