@@ -1015,41 +1015,32 @@ def _load_tsv_cards(tsv_path: Path) -> list[dict[str, Any]]:
     return cards
 
 
-def import_reviewed_cards(
-    deck_name: str,
-    coverage_path: Path,
-    cards_path: Path = DEFAULT_CARDS_PATH,
-    tsv_path: Path = DEFAULT_TSV_PATH,
-    review_path: Path = DEFAULT_REVIEW_PATH,
-    verdicts_path: Path = DEFAULT_VERDICTS_PATH,
-    force: bool = False,
-) -> int:
-    """Import the human/LLM-reviewed cards JSONL via AnkiConnect.
 
-    Falls back to the legacy TSV + sidecar if no cards JSONL exists.
-    This is the ONLY path from generated candidates to the deck: generation
-    emits candidates, not cards, and this function refuses to import anything
-    the validator flags (unless --force).
-    """
+def _load_cards_from_path(
+    cards_path: Path, tsv_path: Path
+) -> tuple[list[dict[str, Any]], Path, int]:
+    """Load cards from JSONL or legacy TSV, returning (cards, source_path, err_code)."""
     if cards_path.exists():
-        cards = _load_cards_jsonl(cards_path)
-        source_path = cards_path
+        return _load_cards_jsonl(cards_path), cards_path, 0
     elif tsv_path.exists():
         try:
-            cards = _load_tsv_cards(tsv_path)
+            return _load_tsv_cards(tsv_path), tsv_path, 0
         except FileNotFoundError as err:
             print(f"Legacy fallback failed: {err}")
-            return 1
+            return [], tsv_path, 1
         except ValueError as err:
             print(f"Legacy TSV mismatch: {err}")
-            return 2
-        source_path = tsv_path
+            return [], tsv_path, 2
     else:
         print(f"No reviewed cards at {cards_path} (or legacy {tsv_path}). "
               "Run candidate generation, author cards to anki_cards.jsonl, then import.")
-        return 1
+        return [], cards_path, 1
 
-    # Drop cards whose front already exists in coverage (same content = same hash).
+
+def _filter_duplicate_cards(
+    cards: list[dict[str, Any]], coverage_path: Path
+) -> list[dict[str, Any]]:
+    """Drop cards whose front already exists in coverage (same content = same hash)."""
     seen_hashes = _existing_front_hashes(coverage_path)
     unique_cards: list[dict[str, Any]] = []
     for card in cards:
@@ -1061,8 +1052,13 @@ def import_reviewed_cards(
         unique_cards.append(card)
     if len(unique_cards) < len(cards):
         print(f"Removed {len(cards) - len(unique_cards)} duplicate card(s) before import.")
-    cards = unique_cards
+    return unique_cards
 
+
+def _validate_cards_for_import(
+    cards: list[dict[str, Any]], source_path: Path, force: bool
+) -> int:
+    """Validate cards and return 0 if OK or 2 if validation fails (and not forced)."""
     issues = validate_tsv(source_path) if str(source_path).endswith(".txt") else validate_cards(cards)
     if issues and not force:
         print(f"Validator rejects {source_path}; refusing to import:")
@@ -1072,41 +1068,58 @@ def import_reviewed_cards(
                 print(f"  - {issue}")
         print("\nRewrite or fix the flagged cards and re-run. Override with --force (not recommended).")
         return 2
+    return 0
 
-    # Density gate filtering: if verdicts file exists, only import cards with decision == "accept".
-    if verdicts_path and verdicts_path.exists():
-        verdict_map: dict[str, str] = {}
-        try:
-            with open(verdicts_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line_str = line.strip()
-                    if line_str:
-                        v = json.loads(line_str)
-                        if "chunk_id" in v and "decision" in v:
-                            verdict_map[v["chunk_id"]] = v["decision"]
-        except Exception as e:
-            print(f"Warning: could not parse verdicts from {verdicts_path}: {e}")
 
-        if verdict_map:
-            accepted_cards: list[dict[str, Any]] = []
-            for card in cards:
-                cid = card.get("chunk_id", "")
-                decision = verdict_map.get(cid, "accept")
-                if decision == "accept":
-                    accepted_cards.append(card)
-                else:
-                    print(f"  skipping card {cid} due to density verdict: {decision}")
-                    _append_review_log(review_path, cid, "density_skipped")
-            cards = accepted_cards
 
-    if not cards:
-        print("No cards accepted by density gate for import.")
-        return 0
+def _load_density_verdicts(verdicts_path: Path) -> dict[str, str]:
+    """Parse the verdicts file and return a chunk_id -> decision map."""
+    verdict_map: dict[str, str] = {}
+    try:
+        with open(verdicts_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line_str = line.strip()
+                if line_str:
+                    import json
+                    v = json.loads(line_str)
+                    if "chunk_id" in v and "decision" in v:
+                        verdict_map[v["chunk_id"]] = v["decision"]
+    except Exception as e:
+        print(f"Warning: could not parse verdicts from {verdicts_path}: {e}")
+    return verdict_map
 
+def _apply_density_gate_verdicts(
+    cards: list[dict[str, Any]], verdicts_path: Path, review_path: Path
+) -> list[dict[str, Any]]:
+    """Filter cards based on density verdicts."""
+    if not verdicts_path or not verdicts_path.exists():
+        return cards
+
+    verdict_map = _load_density_verdicts(verdicts_path)
+    if not verdict_map:
+        return cards
+
+    accepted_cards: list[dict[str, Any]] = []
+    for card in cards:
+        cid = card.get("chunk_id", "")
+        decision = verdict_map.get(cid, "accept")
+        if decision == "accept":
+            accepted_cards.append(card)
+        else:
+            print(f"  skipping card {cid} due to density verdict: {decision}")
+            _append_review_log(review_path, cid, "density_skipped")
+    return accepted_cards
+
+
+
+def _import_cards_to_anki(
+    cards: list[dict[str, Any]], deck_name: str
+) -> tuple[list[AnkiCard], list[int | None], int]:
+    """Convert cards to AnkiCard objects and add them to AnkiConnect."""
     checker = AnkiConnectChecker()
     if not checker.is_available():
         print("AnkiConnect is not reachable. Open Anki (with AnkiConnect installed) and retry.")
-        return 1
+        return [], [], 1
 
     anki_cards = [
         AnkiCard(
@@ -1120,7 +1133,6 @@ def import_reviewed_cards(
         for card in cards
     ]
 
-    # One bad row (e.g. a duplicate) must not sink the whole batch.
     note_ids: list[int | None] = []
     for card in anki_cards:
         try:
@@ -1130,6 +1142,14 @@ def import_reviewed_cards(
             print(f"  skipped {card.chunk_id}: {err}")
             note_ids.append(None)
 
+    return anki_cards, note_ids, 0
+
+
+def _record_import_coverage(
+    anki_cards: list[AnkiCard], note_ids: list[int | None],
+    deck_name: str, coverage_path: Path, review_path: Path
+) -> int:
+    """Update the coverage tracker and review log for successfully imported cards."""
     now_str = datetime.now(timezone.utc).isoformat()
     tracker = CoverageTracker(coverage_path=coverage_path)
     visited = tracker.data.setdefault("visited_chunk_ids", {})
@@ -1151,6 +1171,45 @@ def import_reviewed_cards(
         _append_review_log(review_path, card.chunk_id, "accept", note_id=nid)
         imported += 1
     tracker.save()
+    return imported
+
+
+def import_reviewed_cards(
+    deck_name: str,
+    coverage_path: Path,
+    cards_path: Path = DEFAULT_CARDS_PATH,
+    tsv_path: Path = DEFAULT_TSV_PATH,
+    review_path: Path = DEFAULT_REVIEW_PATH,
+    verdicts_path: Path = DEFAULT_VERDICTS_PATH,
+    force: bool = False,
+) -> int:
+    """Import the human/LLM-reviewed cards JSONL via AnkiConnect.
+
+    Falls back to the legacy TSV + sidecar if no cards JSONL exists.
+    This is the ONLY path from generated candidates to the deck: generation
+    emits candidates, not cards, and this function refuses to import anything
+    the validator flags (unless --force).
+    """
+    cards, source_path, err_code = _load_cards_from_path(cards_path, tsv_path)
+    if err_code != 0:
+        return err_code
+
+    cards = _filter_duplicate_cards(cards, coverage_path)
+
+    err_code = _validate_cards_for_import(cards, source_path, force)
+    if err_code != 0:
+        return err_code
+
+    cards = _apply_density_gate_verdicts(cards, verdicts_path, review_path)
+    if not cards:
+        print("No cards accepted by density gate for import.")
+        return 0
+
+    anki_cards, note_ids, err_code = _import_cards_to_anki(cards, deck_name)
+    if err_code != 0:
+        return err_code
+
+    imported = _record_import_coverage(anki_cards, note_ids, deck_name, coverage_path, review_path)
 
     print(f"Imported {imported}/{len(cards)} reviewed cards into deck '{deck_name}'.")
     print(f"Anki Note IDs: {note_ids}")
