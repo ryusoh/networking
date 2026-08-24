@@ -192,10 +192,10 @@
     }
     if (shouldCheck && !observerThrottled) {
       observerThrottled = true;
-      setTimeout(() => {
+      Promise.resolve().then(() => {
         observerThrottled = false;
         blockYouTubeAds();
-      }, 50);
+      });
     }
   });
 

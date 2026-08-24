@@ -434,10 +434,10 @@
         }
         if (shouldCheck && !observerThrottled) {
           observerThrottled = true;
-          setTimeout(() => {
+          Promise.resolve().then(() => {
             observerThrottled = false;
             blockCookieBanner();
-          }, 50);
+          });
         }
       });
       observer.observe(target, { childList: true, subtree: true });
