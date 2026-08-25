@@ -112,6 +112,118 @@ def top_k_hub_guids(
     return guids
 
 
+def _load_guid_to_nid_map(repo_root: Path) -> dict[str, int]:
+    map_path = repo_root / "data" / "anki" / "notes.json.gz"
+    if not map_path.exists():
+        raise RuntimeError(
+            f"Notes GUID-to-NID mapping file not found at {map_path}"
+        )
+
+    try:
+        with gzip.open(map_path, "rt", encoding="utf-8") as f:
+            notes_data = json.load(f)
+    except Exception as e:
+        raise RuntimeError(f"Failed to read {map_path}: {e}") from e
+
+    guid_to_nid: dict[str, int] = {}
+    for item in notes_data:
+        guid = item.get("guid")
+        nid = item.get("id")
+        if guid and nid:
+            guid_to_nid[guid] = nid
+
+    return guid_to_nid
+
+def _fetch_notes_info_from_anki(needed_nids: list[int], anki_connect_url: str) -> list[dict]:
+    payload = json.dumps(
+        {"action": "notesInfo", "version": 6, "params": {"notes": needed_nids}}
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        anki_connect_url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            resp_data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        raise RuntimeError(
+            f"AnkiConnect request failed at {anki_connect_url}: {e}"
+        ) from e
+
+    if resp_data.get("error"):
+        raise RuntimeError(f"AnkiConnect error: {resp_data['error']}")
+
+    return resp_data.get("result", [])
+
+def _parse_notes_info(notes_info_list: list[dict]) -> dict[int, dict[str, str]]:
+    nid_to_fields = {}
+    for note_info in notes_info_list:
+        if not note_info:
+            continue
+        nid = note_info.get("noteId")
+        fields = note_info.get("fields", {})
+        front_val = fields.get("Front", {}).get("value", "")
+        back_val = fields.get("Back", {}).get("value", "")
+        # Fallback if field names differ
+        if not front_val and not back_val and fields:
+            keys = list(fields.keys())
+            front_val = fields.get(keys[0], {}).get("value", "") if len(keys) > 0 else ""
+            back_val = fields.get(keys[1], {}).get("value", "") if len(keys) > 1 else ""
+        nid_to_fields[nid] = {"front": front_val, "back": back_val}
+    return nid_to_fields
+
+def _fetch_live_notes(guids: list[str], repo_root: Path, anki_connect_url: str) -> dict[str, dict[str, str]]:
+    guid_to_nid = _load_guid_to_nid_map(repo_root)
+
+    needed_nids = [guid_to_nid[g] for g in guids if g in guid_to_nid]
+    if not needed_nids:
+        raise RuntimeError(f"None of requested GUIDs found in mapping file")
+
+    notes_info_list = _fetch_notes_info_from_anki(needed_nids, anki_connect_url)
+    nid_to_fields = _parse_notes_info(notes_info_list)
+
+    result = {}
+    for guid in guids:
+        if guid in guid_to_nid and guid_to_nid[guid] in nid_to_fields:
+            result[guid] = nid_to_fields[guid_to_nid[guid]]
+        else:
+            raise RuntimeError(f"Note GUID {guid} could not be retrieved via live AnkiConnect")
+    return result
+
+
+def _fetch_staged_notes(guids: list[str], repo_root: Path) -> dict[str, dict[str, str]]:
+    staged_path = repo_root / "data" / "cloudflare" / "collection" / "notes.json.gz"
+    if not staged_path.exists():
+        raise RuntimeError(
+            f"Staged collection export not found at {staged_path}"
+        )
+
+    try:
+        with gzip.open(staged_path, "rt", encoding="utf-8") as f:
+            staged_data = json.load(f)
+    except Exception as e:
+        raise RuntimeError(f"Failed to read {staged_path}: {e}") from e
+
+    staged_guid_map: dict[str, dict[str, str]] = {}
+    for item in staged_data:
+        guid = item.get("guid")
+        flds = item.get("flds", "")
+        if guid:
+            parts = flds.split("\x1f")
+            front = parts[0] if len(parts) > 0 else ""
+            back = parts[1] if len(parts) > 1 else ""
+            staged_guid_map[guid] = {"front": front, "back": back}
+
+    result = {}
+    for guid in guids:
+        if guid in staged_guid_map:
+            result[guid] = staged_guid_map[guid]
+        else:
+            raise RuntimeError(f"Note GUID {guid} not found in staged export {staged_path}")
+    return result
+
+
 def fetch_note_texts(
     guids: list[str],
     mode: str = "live",
@@ -126,105 +238,12 @@ def fetch_note_texts(
     if not guids:
         return {}
 
-    result: dict[str, dict[str, str]] = {}
-
     if mode == "live":
-        map_path = repo_root / "data" / "anki" / "notes.json.gz"
-        if not map_path.exists():
-            raise RuntimeError(
-                f"Notes GUID-to-NID mapping file not found at {map_path}"
-            )
-
-        try:
-            with gzip.open(map_path, "rt", encoding="utf-8") as f:
-                notes_data = json.load(f)
-        except Exception as e:
-            raise RuntimeError(f"Failed to read {map_path}: {e}") from e
-
-        guid_to_nid: dict[str, int] = {}
-        for item in notes_data:
-            guid = item.get("guid")
-            nid = item.get("id")
-            if guid and nid:
-                guid_to_nid[guid] = nid
-
-        needed_nids = [guid_to_nid[g] for g in guids if g in guid_to_nid]
-        if not needed_nids:
-            raise RuntimeError(f"None of requested GUIDs found in {map_path}")
-
-        payload = json.dumps(
-            {"action": "notesInfo", "version": 6, "params": {"notes": needed_nids}}
-        ).encode("utf-8")
-        req = urllib.request.Request(
-            anki_connect_url,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
-                resp_data = json.loads(resp.read().decode("utf-8"))
-        except Exception as e:
-            raise RuntimeError(
-                f"AnkiConnect request failed at {anki_connect_url}: {e}"
-            ) from e
-
-        if resp_data.get("error"):
-            raise RuntimeError(f"AnkiConnect error: {resp_data['error']}")
-
-        notes_info_list = resp_data.get("result", [])
-        nid_to_fields = {}
-        for note_info in notes_info_list:
-            if not note_info:
-                continue
-            nid = note_info.get("noteId")
-            fields = note_info.get("fields", {})
-            front_val = fields.get("Front", {}).get("value", "")
-            back_val = fields.get("Back", {}).get("value", "")
-            # Fallback if field names differ
-            if not front_val and not back_val and fields:
-                keys = list(fields.keys())
-                front_val = fields.get(keys[0], {}).get("value", "") if len(keys) > 0 else ""
-                back_val = fields.get(keys[1], {}).get("value", "") if len(keys) > 1 else ""
-            nid_to_fields[nid] = {"front": front_val, "back": back_val}
-
-        for guid in guids:
-            if guid in guid_to_nid and guid_to_nid[guid] in nid_to_fields:
-                result[guid] = nid_to_fields[guid_to_nid[guid]]
-            else:
-                raise RuntimeError(f"Note GUID {guid} could not be retrieved via live AnkiConnect")
-
+        return _fetch_live_notes(guids, repo_root, anki_connect_url)
     elif mode == "staged":
-        staged_path = repo_root / "data" / "cloudflare" / "collection" / "notes.json.gz"
-        if not staged_path.exists():
-            raise RuntimeError(
-                f"Staged collection export not found at {staged_path}"
-            )
-
-        try:
-            with gzip.open(staged_path, "rt", encoding="utf-8") as f:
-                staged_data = json.load(f)
-        except Exception as e:
-            raise RuntimeError(f"Failed to read {staged_path}: {e}") from e
-
-        staged_guid_map: dict[str, dict[str, str]] = {}
-        for item in staged_data:
-            guid = item.get("guid")
-            flds = item.get("flds", "")
-            if guid:
-                parts = flds.split("\x1f")
-                front = parts[0] if len(parts) > 0 else ""
-                back = parts[1] if len(parts) > 1 else ""
-                staged_guid_map[guid] = {"front": front, "back": back}
-
-        for guid in guids:
-            if guid in staged_guid_map:
-                result[guid] = staged_guid_map[guid]
-            else:
-                raise RuntimeError(f"Note GUID {guid} not found in staged export {staged_path}")
+        return _fetch_staged_notes(guids, repo_root)
     else:
         raise ValueError(f"Invalid mode '{mode}', expected 'live' or 'staged'")
-
-    return result
 
 
 def _is_single_cjk_char(token: str) -> bool:
