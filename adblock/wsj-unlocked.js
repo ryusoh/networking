@@ -96,19 +96,24 @@
       '.tp-backdrop'
     ];
     for (const sel of paywallSelectors) {
-      document.querySelectorAll(sel).forEach((el) => el.remove());
+      const els = document.querySelectorAll(sel);
+      for (let i = 0; i < els.length; i++) {
+        els[i].remove();
+      }
     }
 
     // The doorslam container wraps everything — find it by its child structure
-    document.querySelectorAll('div:has(> #cx-snippet-overlay-container)').forEach((el) => {
-      el.remove();
-    });
+    const containers = document.querySelectorAll('div:has(> #cx-snippet-overlay-container)');
+    for (let i = 0; i < containers.length; i++) {
+      containers[i].remove();
+    }
 
     // Remove inert attribute from article body (paywall hides content via inert)
-    document.querySelectorAll('article[inert], [data-type="article-body"][inert]').forEach((el) => {
-      el.removeAttribute('inert');
-      el.removeAttribute('aria-hidden');
-    });
+    const inerts = document.querySelectorAll('article[inert], [data-type="article-body"][inert]');
+    for (let i = 0; i < inerts.length; i++) {
+      inerts[i].removeAttribute('inert');
+      inerts[i].removeAttribute('aria-hidden');
+    }
 
     // Restore scrolling
     document.body?.classList.remove('is-paywall-active', 'is-snippet');
