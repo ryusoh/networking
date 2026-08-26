@@ -1286,6 +1286,112 @@ def emit_candidates(
     return 0
 
 
+
+def _handle_reject_chunk(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    if not args.reason:
+        parser.error("--reject-chunk requires --reason CATEGORY")
+    tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
+    visited = tracker.data.setdefault("visited_chunk_ids", {})
+    now_str = datetime.now(timezone.utc).isoformat()
+    rejected = 0
+    review_path = Path(args.review_path).resolve()
+    for cid in args.reject_chunk:
+        if cid in visited:
+            visited[cid]["status"] = "skipped_low_quality"
+            visited[cid]["audited_at"] = now_str
+            visited[cid]["reason"] = args.reason
+            visited[cid].pop("front_html", None)
+            _append_review_log(review_path, cid, "reject", reason=args.reason)
+            rejected += 1
+        else:
+            print(f"  unknown chunk id: {cid}")
+    tracker.save()
+    print(f"Marked {rejected} chunk(s) as skipped_low_quality.")
+    return 0
+
+
+def _handle_status(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    manifest_path = Path(args.manifest).resolve()
+    if not manifest_path.exists():
+        parser.error(
+            f"Manifest file not found at {manifest_path}. Run 'python3 tools/research/parse_chunks.py' first."
+        )
+    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    chunks = manifest_data.get("chunks", [])
+    tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
+    visited_dict = tracker.data.get("visited_chunk_ids", {})
+    CoverageProgressReporter.print_report(chunks, visited_dict)
+    accepts, decided, rate = _approve_rate(Path(args.review_path).resolve())
+    if decided:
+        print(f"\nApprove rate (last {decided} decisions): {rate:.1f}% ({accepts} accepted, {decided - accepts} rejected)")
+    return 0
+
+
+def _handle_custom_card(args: argparse.Namespace) -> int:
+    raw_tags = [t for t in args.tags.split() if t]
+    tag_list = canonicalize_tags(raw_tags)
+    dropped = [t for t in raw_tags if canonical_tag(t) is None]
+    if dropped:
+        print(
+            f"Warning: dropping non-canonical tag(s) {dropped}; "
+            "use the canonical vocabulary in anki_card_validator.CANONICAL_TAGS."
+        )
+    custom_card = AnkiCard(
+        chunk_id="custom-qa",
+        file_path="custom-qa",
+        heading=args.front[:60],
+        front_html=args.front,
+        back_html=args.back,
+        tags=tag_list if tag_list else ["research", "qa_export"],
+    )
+    cards = [custom_card]
+    connect_checker = AnkiConnectChecker()
+
+    if args.auto_launch and not connect_checker.is_available():
+        print("Anki GUI is closed. Launching /Applications/Anki.app in background...")
+        os.system("open -a Anki")
+        import time
+
+        for _ in range(10):
+            time.sleep(0.5)
+            if connect_checker.is_available():
+                break
+
+    imported_via_api = False
+    if not args.tsv and connect_checker.is_available():
+        try:
+            note_ids = connect_checker.add_notes(cards, deck_name=args.deck)
+            print("🎉 CUSTOM Q&A CARD INGESTION SUCCESSFUL!")
+            print(
+                f"Directly imported 1 custom Q&A card into Anki deck '{args.deck}' via AnkiConnect API."
+            )
+            print(f"Anki Note ID: {note_ids}")
+            imported_via_api = True
+        except Exception as err:
+            print(
+                f"AnkiConnect import warning: {err}. Falling back to TSV package export..."
+            )
+
+    if not imported_via_api:
+        exporter = TSVExporter()
+        tsv_path = exporter.export(cards)
+        print("Exported 1 custom Q&A card to TSV package file:")
+        print(f"  Path: {tsv_path}")
+        print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
+
+    manifest_path = Path(args.manifest).resolve()
+    if manifest_path.exists():
+        try:
+            manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+            chunks = manifest_data.get("chunks", [])
+            tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
+            visited_dict = tracker.data.get("visited_chunk_ids", {})
+            CoverageProgressReporter.print_report(chunks, visited_dict)
+        except Exception:
+            pass
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Autonomous Anki Flashcard Generation Pipeline (Phase 1-4 Complete Pipeline)."
@@ -1404,26 +1510,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     if args.reject_chunk:
-        if not args.reason:
-            parser.error("--reject-chunk requires --reason CATEGORY")
-        tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
-        visited = tracker.data.setdefault("visited_chunk_ids", {})
-        now_str = datetime.now(timezone.utc).isoformat()
-        rejected = 0
-        review_path = Path(args.review_path).resolve()
-        for cid in args.reject_chunk:
-            if cid in visited:
-                visited[cid]["status"] = "skipped_low_quality"
-                visited[cid]["audited_at"] = now_str
-                visited[cid]["reason"] = args.reason
-                visited[cid].pop("front_html", None)
-                _append_review_log(review_path, cid, "reject", reason=args.reason)
-                rejected += 1
-            else:
-                print(f"  unknown chunk id: {cid}")
-        tracker.save()
-        print(f"Marked {rejected} chunk(s) as skipped_low_quality.")
-        return 0
+        return _handle_reject_chunk(args, parser)
 
     if args.candidates:
         return emit_candidates(
@@ -1435,85 +1522,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     if args.status:
-        manifest_path = Path(args.manifest).resolve()
-        if not manifest_path.exists():
-            parser.error(
-                f"Manifest file not found at {manifest_path}. Run 'python3 tools/research/parse_chunks.py' first."
-            )
-        manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
-        chunks = manifest_data.get("chunks", [])
-        tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
-        visited_dict = tracker.data.get("visited_chunk_ids", {})
-        CoverageProgressReporter.print_report(chunks, visited_dict)
-        accepts, decided, rate = _approve_rate(Path(args.review_path).resolve())
-        if decided:
-            print(f"\nApprove rate (last {decided} decisions): {rate:.1f}% ({accepts} accepted, {decided - accepts} rejected)")
-        return 0
+        return _handle_status(args, parser)
 
     # Custom Q&A card direct ingestion path
     if args.front and args.back:
-        raw_tags = [t for t in args.tags.split() if t]
-        tag_list = canonicalize_tags(raw_tags)
-        dropped = [t for t in raw_tags if canonical_tag(t) is None]
-        if dropped:
-            print(
-                f"Warning: dropping non-canonical tag(s) {dropped}; "
-                "use the canonical vocabulary in anki_card_validator.CANONICAL_TAGS."
-            )
-        custom_card = AnkiCard(
-            chunk_id="custom-qa",
-            file_path="custom-qa",
-            heading=args.front[:60],
-            front_html=args.front,
-            back_html=args.back,
-            tags=tag_list if tag_list else ["research", "qa_export"],
-        )
-        cards = [custom_card]
-        connect_checker = AnkiConnectChecker()
-
-        if args.auto_launch and not connect_checker.is_available():
-            print("Anki GUI is closed. Launching /Applications/Anki.app in background...")
-            os.system("open -a Anki")
-            import time
-
-            for _ in range(10):
-                time.sleep(0.5)
-                if connect_checker.is_available():
-                    break
-
-        imported_via_api = False
-        if not args.tsv and connect_checker.is_available():
-            try:
-                note_ids = connect_checker.add_notes(cards, deck_name=args.deck)
-                print("🎉 CUSTOM Q&A CARD INGESTION SUCCESSFUL!")
-                print(
-                    f"Directly imported 1 custom Q&A card into Anki deck '{args.deck}' via AnkiConnect API."
-                )
-                print(f"Anki Note ID: {note_ids}")
-                imported_via_api = True
-            except Exception as err:
-                print(
-                    f"AnkiConnect import warning: {err}. Falling back to TSV package export..."
-                )
-
-        if not imported_via_api:
-            exporter = TSVExporter()
-            tsv_path = exporter.export(cards)
-            print("Exported 1 custom Q&A card to TSV package file:")
-            print(f"  Path: {tsv_path}")
-            print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
-
-        manifest_path = Path(args.manifest).resolve()
-        if manifest_path.exists():
-            try:
-                manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
-                chunks = manifest_data.get("chunks", [])
-                tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
-                visited_dict = tracker.data.get("visited_chunk_ids", {})
-                CoverageProgressReporter.print_report(chunks, visited_dict)
-            except Exception:
-                pass
-        return 0
+        return _handle_custom_card(args)
 
     # Default generation behavior: emit candidate chunks for the LLM to author.
     return emit_candidates(
