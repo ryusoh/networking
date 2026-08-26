@@ -234,8 +234,12 @@
    */
   function findButtonByText(container, textPatterns) {
     const buttons = container.querySelectorAll('button, [role="button"], a.button, a.btn');
-    for (const pattern of textPatterns) {
-      for (const btn of buttons) {
+    const numButtons = buttons.length;
+    const numPatterns = textPatterns.length;
+    for (let i = 0; i < numPatterns; i++) {
+      const pattern = textPatterns[i];
+      for (let j = 0; j < numButtons; j++) {
+        const btn = buttons[j];
         if (
           btn instanceof HTMLElement &&
           /** @type {string} */ (btn.textContent).toLowerCase().trim().includes(pattern)
@@ -332,10 +336,14 @@
    * @returns {HTMLElement | null}
    */
   function findButton(container, buttonSelectors) {
-    for (const selector of buttonSelectors) {
+    const numSelectors = buttonSelectors.length;
+    for (let i = 0; i < numSelectors; i++) {
+      const selector = buttonSelectors[i];
       try {
         const buttons = container.querySelectorAll(selector);
-        for (const btn of buttons) {
+        const numButtons = buttons.length;
+        for (let j = 0; j < numButtons; j++) {
+          const btn = buttons[j];
           if (btn instanceof HTMLElement && isVisible(btn)) {
             return btn;
           }
