@@ -81,13 +81,10 @@ describe('gov_bypass background.js', () => {
   });
 
   test('onInstalled clears cookies and fetches proxy list', async () => {
-    global.chrome.runtime.sendMessage
-      .mockResolvedValueOnce({
-        html: '192.168.1.1:1080'
-      })
-      .mockResolvedValueOnce({
-        proxies: [{ ip: '192.168.1.1', port: '1080', scheme: 'SOCKS5', speed: 10 }]
-      });
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => '192.168.1.1:1080'
+    });
 
     await listeners.onInstalled();
 
@@ -105,16 +102,10 @@ describe('gov_bypass background.js', () => {
   });
 
   test('onProxyError rotates proxy when fatal', async () => {
-    global.chrome.runtime.sendMessage
-      .mockResolvedValueOnce({
-        html: '192.168.1.1:1080\n192.168.1.2:1080'
-      })
-      .mockResolvedValueOnce({
-        proxies: [
-          { ip: '192.168.1.1', port: '1080', scheme: 'SOCKS5', speed: 10 },
-          { ip: '192.168.1.2', port: '1080', scheme: 'SOCKS5', speed: 10 }
-        ]
-      });
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => '192.168.1.1:1080\n192.168.1.2:1080'
+    });
 
     await listeners.onStartup();
     for (let i = 0; i < 10; i++) {
@@ -175,13 +166,10 @@ describe('gov_bypass background.js', () => {
   });
 
   test('onProxyError exhausted proxies triggers refresh', async () => {
-    global.chrome.runtime.sendMessage
-      .mockResolvedValueOnce({
-        html: '192.168.1.1:1080'
-      })
-      .mockResolvedValueOnce({
-        proxies: [{ ip: '192.168.1.1', port: '1080', scheme: 'SOCKS5', speed: 10 }]
-      });
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => '192.168.1.1:1080'
+    });
 
     await listeners.onStartup();
     for (let i = 0; i < 10; i++) {
@@ -189,32 +177,26 @@ describe('gov_bypass background.js', () => {
     }
 
     global.chrome.proxy.settings.set.mockClear();
-    global.chrome.runtime.sendMessage.mockClear();
+    global.fetch.mockClear();
 
-    global.chrome.runtime.sendMessage
-      .mockResolvedValueOnce({
-        html: '192.168.1.1:1080'
-      })
-      .mockResolvedValueOnce({
-        proxies: [{ ip: '192.168.1.1', port: '1080', scheme: 'SOCKS5', speed: 10 }]
-      });
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => '192.168.1.1:1080'
+    });
 
     listeners.onProxyError({ error: 'fatal', fatal: true });
 
     for (let i = 0; i < 10; i++) {
       await Promise.resolve();
     }
-    expect(global.chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalled();
   });
 
   test('refreshProxy keeps previous list if no new proxies', async () => {
-    global.chrome.runtime.sendMessage
-      .mockResolvedValueOnce({
-        html: '192.168.1.1:1080'
-      })
-      .mockResolvedValueOnce({
-        proxies: [{ ip: '192.168.1.1', port: '1080', scheme: 'SOCKS5', speed: 10 }]
-      });
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => '192.168.1.1:1080'
+    });
 
     await listeners.onStartup();
     for (let i = 0; i < 10; i++) {
@@ -222,15 +204,12 @@ describe('gov_bypass background.js', () => {
     }
 
     global.chrome.proxy.settings.set.mockClear();
-    global.chrome.runtime.sendMessage.mockClear();
+    global.fetch.mockClear();
 
-    global.chrome.runtime.sendMessage
-      .mockResolvedValueOnce({
-        html: ''
-      })
-      .mockResolvedValueOnce({
-        proxies: []
-      });
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => ''
+    });
 
     listeners.onAlarm({ name: 'refreshProxy' });
 
@@ -241,42 +220,6 @@ describe('gov_bypass background.js', () => {
     expect(global.chrome.proxy.settings.set).toHaveBeenCalled();
     const config = global.chrome.proxy.settings.set.mock.calls[0][0];
     expect(config.value.pacScript.data).toContain('SOCKS5 192.168.1.1:1080');
-  });
-
-  test('ensureOffscreenDocument throws on unexpected error', async () => {
-    global.chrome.offscreen.hasDocument.mockResolvedValueOnce(false);
-    global.chrome.offscreen.createDocument.mockRejectedValueOnce(new Error('Random Error'));
-
-    global.chrome.runtime.sendMessage.mockClear();
-
-    listeners.onAlarm({ name: 'refreshProxy' });
-    for (let i = 0; i < 10; i++) {
-      await Promise.resolve();
-    }
-
-    expect(global.chrome.runtime.sendMessage).not.toHaveBeenCalled();
-  });
-
-  test('ensureOffscreenDocument ignores already-created error', async () => {
-    global.chrome.offscreen.hasDocument.mockResolvedValueOnce(false);
-    global.chrome.offscreen.createDocument.mockRejectedValueOnce(
-      new Error('Only a single offscreen document may be created.')
-    );
-
-    global.chrome.runtime.sendMessage
-      .mockResolvedValueOnce({
-        html: '192.168.1.1:1080'
-      })
-      .mockResolvedValueOnce({
-        proxies: [{ ip: '192.168.1.1', port: '1080', scheme: 'SOCKS5', speed: 10 }]
-      });
-
-    listeners.onAlarm({ name: 'refreshProxy' });
-    for (let i = 0; i < 10; i++) {
-      await Promise.resolve();
-    }
-
-    expect(global.chrome.runtime.sendMessage).toHaveBeenCalled();
   });
 
   test('TILE_CACHE_FETCH responds with hit:false on fetch error', async () => {
@@ -339,13 +282,10 @@ describe('gov_bypass background.js', () => {
   });
 
   test('applyProxyList triggers OFF state when no proxies available', async () => {
-    global.chrome.runtime.sendMessage
-      .mockResolvedValueOnce({
-        html: ''
-      })
-      .mockResolvedValueOnce({
-        proxies: []
-      });
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => ''
+    });
 
     await listeners.onStartup();
     for (let i = 0; i < 10; i++) {
@@ -356,33 +296,37 @@ describe('gov_bypass background.js', () => {
     expect(global.chrome.action.setBadgeBackgroundColor).toHaveBeenCalledWith({ color: '#F44336' });
   });
 
-  test('sendMessageToOffscreen retries on failure', async () => {
-    global.chrome.runtime.sendMessage
-      .mockRejectedValueOnce(new Error('fail1'))
-      .mockRejectedValueOnce(new Error('fail2'))
-      .mockResolvedValueOnce({
-        html: '192.168.1.1:1080'
-      })
-      .mockResolvedValueOnce({
-        proxies: [{ ip: '192.168.1.1', port: '1080', scheme: 'SOCKS5', speed: 10 }]
-      });
+  test('fetchFromSource handles fetch error gracefully', async () => {
+    global.fetch.mockRejectedValueOnce(new Error('fail1'));
 
     listeners.onAlarm({ name: 'refreshProxy' });
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 10; i++) {
       jest.runAllTimers();
       await Promise.resolve();
     }
+  });
 
-    expect(global.chrome.runtime.sendMessage).toHaveBeenCalledTimes(4); // 3 retries for fetch, 1 for parse
+  test('fetchFromSource handles non ok response gracefully', async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found'
+    });
+
+    listeners.onAlarm({ name: 'refreshProxy' });
+    for (let i = 0; i < 10; i++) {
+      jest.runAllTimers();
+      await Promise.resolve();
+    }
   });
 
   test('onAlarm ignores unknown alarms', async () => {
-    global.chrome.runtime.sendMessage.mockClear();
+    global.fetch.mockClear();
     listeners.onAlarm({ name: 'unknownAlarm' });
     for (let i = 0; i < 10; i++) {
       await Promise.resolve();
     }
-    expect(global.chrome.runtime.sendMessage).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   test('onProxyError ignores non-fatal errors', async () => {
@@ -395,20 +339,5 @@ describe('gov_bypass background.js', () => {
     const sendResponse = jest.fn();
     const res = listeners.onMessage({ type: 'OTHER_MSG' }, {}, sendResponse);
     expect(res).toBeUndefined();
-  });
-
-  test('sendMessageToOffscreen exhausts max retries', async () => {
-    global.chrome.runtime.sendMessage
-      .mockRejectedValueOnce(new Error('fail1'))
-      .mockRejectedValueOnce(new Error('fail2'))
-      .mockRejectedValueOnce(new Error('fail3'));
-
-    listeners.onAlarm({ name: 'refreshProxy' });
-    for (let i = 0; i < 20; i++) {
-      jest.runAllTimers();
-      await Promise.resolve();
-    }
-
-    expect(global.chrome.runtime.sendMessage).toHaveBeenCalledTimes(3);
   });
 });

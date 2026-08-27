@@ -7,7 +7,6 @@
     "proxy",
     "storage",
     "alarms",
-    "offscreen",
     "declarativeNetRequest",
     "declarativeNetRequestFeedback",
     "declarativeNetRequestWithHostAccess",

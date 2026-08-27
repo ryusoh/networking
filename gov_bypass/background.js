@@ -108,7 +108,6 @@ async function refreshProxy() {
   currentProxyIndex = 0;
 
   try {
-    await ensureOffscreenDocument();
     const results = await Promise.all(SOURCES.map((s) => fetchFromSource(s)));
     const fetchedProxies = results.flat();
 
@@ -125,65 +124,69 @@ async function refreshProxy() {
   }
 }
 
-async function ensureOffscreenDocument() {
-  if (await chrome.offscreen.hasDocument()) {
-    return;
-  }
-  try {
-    await chrome.offscreen.createDocument({
-      url: 'offscreen.html',
-      reasons: ['DOM_PARSER'],
-      justification: 'Fetch and parse proxies'
-    });
-  } catch (/** @type {any} */ e) {
-    if (!e.message.includes('Only a single offscreen document')) {
-      throw e;
-    }
-  }
-}
-
-/**
- * @param {any} message
- * @param {number} [maxRetries=3]
- */
-async function sendMessageToOffscreen(message, maxRetries = 3) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      const response = await chrome.runtime.sendMessage(message);
-      if (response) {
-        return response;
-      }
-    } catch (/** @type {any} */ e) {
-      if (i === maxRetries - 1) {
-        throw e;
-      }
-      await new Promise((r) => setTimeout(r, 200));
-    }
-  }
-}
-
 /**
  * @param {ProxySource} source
  * @returns {Promise<VerifiedProxy[]>}
  */
 async function fetchFromSource(source) {
   try {
-    await ensureOffscreenDocument();
-    const fetchResult = await sendMessageToOffscreen({ type: 'FETCH_HTML', url: source.url });
-    if (!fetchResult || fetchResult.error) {
-      return [];
-    }
+    const uas = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    ];
+    const ua = uas[Math.floor(Math.random() * uas.length)];
 
-    const result = await sendMessageToOffscreen({
-      type: 'PARSE_PROXIES_MULTI',
-      html: fetchResult.html,
-      sourceType: source.type
+    const r = await fetch(source.url, {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-cache',
+      headers: {
+        'User-Agent': ua,
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Upgrade-Insecure-Requests': '1'
+      }
     });
-    return result.proxies || [];
+    if (!r.ok) {
+      throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+    }
+    const html = await r.text();
+
+    if (source.type === 'raw_text') {
+      return parseRawText(html);
+    }
+    return [];
   } catch (/** @type {any} */ e) {
     console.error(`[Tianditu] ${source.name} failed: ${e.message}`);
     return [];
   }
+}
+
+/**
+ * @param {string} text
+ * @returns {VerifiedProxy[]}
+ */
+function parseRawText(text) {
+  // Parses "IP:Port" format - these are NAS-verified SOCKS5 Chinese-exit proxies
+  return text
+    .split('\n')
+    .map((/** @type {string} */ line) => {
+      const parts = line.trim().split(':');
+      if (parts.length === 2 && parts[0].includes('.')) {
+        return {
+          ip: parts[0],
+          port: parseInt(parts[1], 10)
+        };
+      }
+      return null;
+    })
+    .filter(
+      /** @type {(p: any) => p is VerifiedProxy} */ (
+        (p) => p !== null && p.ip && p.port && !isNaN(p.port)
+      )
+    );
 }
 
 chrome.alarms.create('refreshProxy', { periodInMinutes: ROTATION_INTERVAL_MINS });
