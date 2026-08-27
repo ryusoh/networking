@@ -53,6 +53,135 @@ def _get_card_filepath(card: dict[str, Any], candidates_map: dict[str, dict[str,
     return ""
 
 
+
+def _score_cards(cards: list[dict[str, Any]], baseline: BaselineReport) -> list[tuple[dict[str, Any], float]]:
+    """Score cards against the baseline density."""
+    card_scores = []
+    for card in cards:
+        front = card.get("front", "")
+        back = card.get("back", "")
+        report = card_density(front, back, baseline.lexicon)
+        card_scores.append((card, report.composite))
+    return card_scores
+
+
+def _cards_connect(card_a: dict[str, Any], card_b: dict[str, Any], candidates_map: dict[str, dict[str, Any]]) -> bool:
+    """Check if two cards should be grouped based on chunk_id or file_path and tags."""
+    chunk_a = card_a.get("chunk_id", "")
+    chunk_b = card_b.get("chunk_id", "")
+
+    if chunk_a and chunk_a == chunk_b:
+        return True
+
+    file_a = _get_card_filepath(card_a, candidates_map)
+    file_b = _get_card_filepath(card_b, candidates_map)
+    tags_a = set(card_a.get("tags", []))
+    tags_b = set(card_b.get("tags", []))
+
+    if file_a and file_a == file_b and (tags_a & tags_b):
+        return True
+
+    return False
+
+
+def _group_below_threshold_cards(
+    below_threshold_indices: list[int],
+    card_scores: list[tuple[dict[str, Any], float]],
+    candidates_map: dict[str, dict[str, Any]]
+) -> list[list[int]]:
+    """Group below-threshold cards using BFS."""
+    groups: list[list[int]] = []
+    visited: set[int] = set()
+
+    for idx_a in below_threshold_indices:
+        if idx_a in visited:
+            continue
+        group = [idx_a]
+        visited.add(idx_a)
+        queue = [idx_a]
+
+        while queue:
+            curr = queue.pop(0)
+            card_curr = card_scores[curr][0]
+
+            for idx_b in below_threshold_indices:
+                if idx_b in visited:
+                    continue
+                card_b = card_scores[idx_b][0]
+
+                if _cards_connect(card_curr, card_b, candidates_map):
+                    visited.add(idx_b)
+                    group.append(idx_b)
+                    queue.append(idx_b)
+
+        groups.append(group)
+    return groups
+
+
+def _apply_consolidate(
+    group: list[int],
+    card_scores: list[tuple[dict[str, Any], float]],
+    threshold: float,
+    verdicts_dict: dict[int, Verdict]
+) -> None:
+    group_chunk_ids = [card_scores[i][0].get("chunk_id", f"unknown-{i}") for i in group]
+    for i in group:
+        card, score = card_scores[i]
+        verdicts_dict[i] = Verdict(
+            chunk_id=card.get("chunk_id", f"unknown-{i}"),
+            density=score,
+            threshold=threshold,
+            decision="consolidate",
+            consolidation_group=group_chunk_ids,
+            enrich_context=None,
+        )
+
+def _apply_enrich(
+    group: list[int],
+    card_scores: list[tuple[dict[str, Any], float]],
+    candidates_map: dict[str, dict[str, Any]],
+    threshold: float,
+    verdicts_dict: dict[int, Verdict]
+) -> None:
+    for i in group:
+        card, score = card_scores[i]
+        chunk_id = card.get("chunk_id", f"unknown-{i}")
+        candidate_info = candidates_map.get(chunk_id, {})
+        enrich_citation = (
+            candidate_info.get("citation")
+            or card.get("citation")
+            or candidate_info.get("heading")
+            or ""
+        )
+        verdicts_dict[i] = Verdict(
+            chunk_id=chunk_id,
+            density=score,
+            threshold=threshold,
+            decision="enrich",
+            consolidation_group=None,
+            enrich_context=enrich_citation if enrich_citation else None,
+        )
+
+def _evaluate_groups(
+    groups: list[list[int]],
+    card_scores: list[tuple[dict[str, Any], float]],
+    candidates_map: dict[str, dict[str, Any]],
+    threshold: float,
+    max_merge_chars: int,
+    verdicts_dict: dict[int, Verdict]
+) -> None:
+    """Evaluate decisions for grouped below-threshold cards."""
+    for group in groups:
+        total_chars = sum(
+            len(card_scores[i][0].get("front", "")) + len(card_scores[i][0].get("back", ""))
+            for i in group
+        )
+
+        if len(group) >= 2 and total_chars <= max_merge_chars:
+            _apply_consolidate(group, card_scores, threshold, verdicts_dict)
+        else:
+            _apply_enrich(group, card_scores, candidates_map, threshold, verdicts_dict)
+
 def evaluate_cards(
     cards: list[dict[str, Any]],
     baseline: BaselineReport,
@@ -69,12 +198,7 @@ def evaluate_cards(
     max_merge_chars = int(config.get("max_merge_chars", 2000))
     threshold = baseline.mean_density * threshold_scale
 
-    card_scores: list[tuple[dict[str, Any], float]] = []
-    for card in cards:
-        front = card.get("front", "")
-        back = card.get("back", "")
-        report = card_density(front, back, baseline.lexicon)
-        card_scores.append((card, report.composite))
+    card_scores = _score_cards(cards, baseline)
 
     below_threshold_indices: list[int] = []
     verdicts_dict: dict[int, Verdict] = {}
@@ -93,84 +217,8 @@ def evaluate_cards(
         else:
             below_threshold_indices.append(idx)
 
-    # Group below-threshold cards
-    # Two cards connect if same chunk_id OR (same file_path AND share >= 1 tag)
-    groups: list[list[int]] = []
-    visited: set[int] = set()
-
-    for idx_a in below_threshold_indices:
-        if idx_a in visited:
-            continue
-        group = [idx_a]
-        visited.add(idx_a)
-        queue = [idx_a]
-
-        while queue:
-            curr = queue.pop(0)
-            card_curr = card_scores[curr][0]
-            chunk_curr = card_curr.get("chunk_id", "")
-            file_curr = _get_card_filepath(card_curr, candidates_map)
-            tags_curr = set(card_curr.get("tags", []))
-
-            for idx_b in below_threshold_indices:
-                if idx_b in visited:
-                    continue
-                card_b = card_scores[idx_b][0]
-                chunk_b = card_b.get("chunk_id", "")
-                file_b = _get_card_filepath(card_b, candidates_map)
-                tags_b = set(card_b.get("tags", []))
-
-                connected = False
-                if chunk_curr and chunk_curr == chunk_b:
-                    connected = True
-                elif file_curr and file_curr == file_b and (tags_curr & tags_b):
-                    connected = True
-
-                if connected:
-                    visited.add(idx_b)
-                    group.append(idx_b)
-                    queue.append(idx_b)
-
-        groups.append(group)
-
-    # Evaluate decisions for grouped below-threshold cards
-    for group in groups:
-        total_chars = sum(
-            len(card_scores[i][0].get("front", "")) + len(card_scores[i][0].get("back", ""))
-            for i in group
-        )
-        group_chunk_ids = [card_scores[i][0].get("chunk_id", f"unknown-{i}") for i in group]
-
-        if len(group) >= 2 and total_chars <= max_merge_chars:
-            for i in group:
-                card, score = card_scores[i]
-                verdicts_dict[i] = Verdict(
-                    chunk_id=card.get("chunk_id", f"unknown-{i}"),
-                    density=score,
-                    threshold=threshold,
-                    decision="consolidate",
-                    consolidation_group=group_chunk_ids,
-                    enrich_context=None,
-                )
-        else:
-            for i in group:
-                card, score = card_scores[i]
-                chunk_id = card.get("chunk_id", f"unknown-{i}")
-                candidate_info = candidates_map.get(chunk_id, {})
-                enrich_citation = (
-                    candidate_info.get("citation")
-                    or card.get("citation")
-                    or candidate_info.get("heading")
-                    or ""
-                )
-                verdicts_dict[i] = Verdict(
-                    chunk_id=chunk_id,
-                    density=score,
-                    threshold=threshold,
-                    decision="enrich",
-                    consolidation_group=None,
-                    enrich_context=enrich_citation if enrich_citation else None,
-                )
+    groups = _group_below_threshold_cards(below_threshold_indices, card_scores, candidates_map)
+    _evaluate_groups(groups, card_scores, candidates_map, threshold, max_merge_chars, verdicts_dict)
 
     # Return verdicts in original card order
     return [verdicts_dict[i] for i in range(len(cards))]
