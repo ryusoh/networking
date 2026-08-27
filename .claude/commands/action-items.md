@@ -54,7 +54,7 @@ where ambiguity is dangerous:
 - **Bake in verified traps** you discovered while reading (jsdom teardown
   hazards, tests that shell out to C binaries, privileged self-skipping tests)
   as single sentences, not paragraphs.
-- **Scoped verification per item** (`npx jest clean_adblock/__tests__/<file>`,
+- **Scoped verification per item** (`npx jest adblock/__tests__/<file>`,
   `python3 -m pytest <package>/__tests__/<file> -q`, `make -C nas_proxy test`),
   not a full-repo gate per item. Jest is pinned to v29 — never suggest config
   or dependency changes as part of a work order.

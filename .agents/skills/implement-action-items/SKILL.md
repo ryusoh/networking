@@ -33,7 +33,7 @@ them literally.
      `git add .` (other agents' work may share the tree).
    - Commit with a Conventional Commits subject
      (`type(scope): summary`, lower-case imperative, ≤ 72 chars; scope is the
-     subproject, e.g. `clean_adblock`, `nas_proxy`, `retriever`), referencing
+     subproject, e.g. `adblock`, `nas_proxy`, `retriever`), referencing
      the work-order number in the body.
    - **Never push, never amend, never rebase.** Pushing is the human's call.
 
