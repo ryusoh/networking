@@ -39,7 +39,7 @@ The repo has an automated complexity gate (the "Complexity ratchet" bullet in
 
 ## Before starting
 
-Run `gh pr list --state all --limit 30` and read the recent ones. Do not
+Run `python3 tools/prior_prs.py` and read the recent ones. Do not
 refactor anything already proposed or previously rejected — pick a different
 target.
 

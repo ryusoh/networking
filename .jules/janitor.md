@@ -20,7 +20,7 @@ dependency. One concern per PR.
 
 ## Before starting
 
-Run `gh pr list --state all --limit 30` and read the recent ones. Do not repeat
+Run `python3 tools/prior_prs.py` and read the recent ones. Do not repeat
 pending or previously-rejected cleanups — pick a different target.
 
 ## Lane

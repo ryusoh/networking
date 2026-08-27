@@ -25,6 +25,11 @@ dev-dependency (referenced in `jsconfig.json` `types`). First-party JS lives in
 Each run, do exactly one of the following, checked in order. **No runtime
 behavior change, ever.**
 
+0. **Early exit** — if your run's driving goal is already satisfied by the
+   current repo state (e.g. the task says "make JS type-checking blocking" and
+   the gate already is), that is a no-op: **end the run with no PR** (AGENTS.md
+   non-negotiable #10). A no-op summary belongs in the run log, not in a PR.
+
 1. **Fix** — if `npx tsc -p jsconfig.json --noEmit` reports errors, TARGET = the
    included file with the fewest errors (ties → smallest line count). Bring
    TARGET to zero errors via JSDoc.

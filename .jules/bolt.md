@@ -18,7 +18,7 @@ then open a PR. Measure first; optimize second.
 
 ## Before starting
 
-Run `gh pr list --state all --limit 30` and read the recent ones. Do not repeat
+Run `python3 tools/prior_prs.py` and read the recent ones. Do not repeat
 or closely resemble pending or previously-rejected work — pick a different
 target.
 

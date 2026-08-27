@@ -58,7 +58,8 @@ eBPF (`vps_kernel_proxy/`, Docker-only).
 7. **Don't write a command/example you haven't actually run this session.** Verify
    behaviour; don't infer it from a name or a target label.
 8. **Check open and recently-closed PRs before you start, and don't repeat them.**
-   Run `gh pr list --state all --limit 30` and read the recent ones. A closed PR
+   Run `python3 tools/prior_prs.py` (lists number, state, labels, title;
+   `--stats` prints per-lane accept rates). A closed PR
    was closed for a reason; an open one already claims that work. Pick something new.
 9. **No stream-of-consciousness in the diff.** Your reasoning stays out of
    committed code: no thinking-out-loud comments ("Wait, ...", "Ah, ..."), no
@@ -67,6 +68,13 @@ eBPF (`vps_kernel_proxy/`, Docker-only).
    behaviour. Enforced deterministically by `make thinking-check`
    (`tools/check_thinking_comments.py`) over all tracked py/js/css/c/h/sh
    sources.
+10. **Never open an empty PR.** If the run produces no diff (zero changed
+    files), end the run with no PR — an empty PR can't be merged and costs the
+    reviewer a manual close. This includes when your task's goal turns out to be
+    already satisfied by the current repo state (e.g. a stale task description):
+    a satisfied goal is a no-op, not a PR. (Typist opened empty PRs like #75 and
+    #78 this way; CI now hard-fails empty PRs — see the "Reject empty pull
+    request" step in `ci.yml` — but don't rely on the backstop.)
 
 ## Reading the gate output (this repo is noisy on purpose)
 
@@ -141,6 +149,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 | Mutation smoke, JS / Python (non-gated)  | `make mutate-js` / `make mutate-py`      |
 | Rank least-covered files (Testpilot)     | `python3 bin/coverage_rank.py --limit 5` |
 | Worktree snapshot guard (unchanged tree) | `python3 tools/gate_guard.py snapshot`   |
+| Prior PRs / Jules lane accept rates      | `python3 tools/prior_prs.py [--stats]`   |
 | Scoped Jest while iterating              | `npx jest <path>`                        |
 | Pull an extension (retriever)            | `make pull ID=<extension_id>`            |
 | Regenerate / drift-check Claude commands | `python3 tools/sync_commands.py`         |
@@ -180,7 +189,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   `docs/research/research-anki-skills-usage-guide.md`.
   `bin/coverage_rank.py` — the coverage ranking helper.
 - `tools/` — shared repository tooling (`gate_guard.py`, `check_thinking_comments.py`,
-  `sync_commands.py`, `tools/research/`). Scripts referenced across agent docs and
+  `sync_commands.py`, `prior_prs.py`, `tools/research/`). Scripts referenced across agent docs and
   skills are verified by `tools/__tests__/test_doc_tool_references.py`.
 - `tools/research/` — courseware research agent pipeline (`anki_generator.py`,
   `anki_card_validator.py`, `anki_density.py`, `anki_density_baseline.py`,
@@ -531,6 +540,12 @@ your task owns.
   interactive skills above: their shared contract is this file and their
   per-routine personas live in `.jules/<name>.md` (currently `testpilot`,
   `typist`, `janitor`, `architect`, `bolt`).
+- **Keep the scheduled-task UI prompt generic.** A stale task-specific prompt is
+  worse than the generic one: Typist's schedule once kept an old goal after it
+  was done and produced zero-file PRs the owner had to close by hand (#75, #78).
+  With a generic invocation the persona decides what work exists; with a stale
+  goal the routine satisfies it vacuously and still publishes the empty PR. If a
+  lane is finished, pause its schedule — don't leave a satisfied goal running.
 
 ## Lanes (keep PRs disjoint to avoid collisions)
 
