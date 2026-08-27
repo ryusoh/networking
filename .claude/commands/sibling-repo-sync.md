@@ -19,7 +19,11 @@ repos:
   (`__init__.py` present) — import-linter works there.
 - `~/dev/ryusoh.github.io` — JS-only static site; default branch is `master`,
   not `main`; has `.pre-commit-config.yaml`; CI-parity gate = `make
-precommit-fix` (Prettier, ESLint, Stylelint, tsc, Jest + coverage);
+precommit-fix` (Prettier, ESLint, Stylelint, tsc, Jest + coverage) — it stages
+  auto-fixes via `git add -u`, so use `make gate` (non-staging variant) when
+  the tree holds uncommitted work; its pytest suite (`tools/__tests__/`) runs
+  in NO Makefile gate but IS wired into a pre-push pre-commit hook
+  (`pytest -q || [ $? -eq 5 ]`; checked 2026-08);
   `package-lock.json` is authoritative and `pnpm-lock.yaml` drifts by
   convention — don't regenerate it.
 
