@@ -1,0 +1,28 @@
+name: pip-audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Staggered to 03:23 UTC so it doesn't align with the Monday 03:17 mutation run.
+    - cron: '23 3 * * *'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Run pip-audit
+        # Baseline verified clean locally (pip-audit 2.10.1); fails the job on
+        # any known vulnerability in requirements-dev.txt (the only pip
+        # requirements file — there is no requirements.txt).
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements-dev.txt
