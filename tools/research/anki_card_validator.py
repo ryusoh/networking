@@ -379,49 +379,11 @@ def _validate_card(front: str, back: str) -> list[str]:
     if ctrl_count:
         card_issues.append(f"Contains {ctrl_count} control character(s) (PDF extraction artifact)")
 
-    if _has_slide_title(front):
-        card_issues.append("Front looks like a slide title/page number, not a conceptual question")
-
-    if _has_diagram_artifacts(back):
-        card_issues.append("Back contains ASCII diagram/table fragments instead of explanation")
-
-    if _is_generic_topic(front):
-        card_issues.append("Front is a generic topic label, not a specific question")
-
-    if _has_ocr_errors(back):
-        card_issues.append("Back contains likely OCR/extraction errors (fragmented words)")
-
-    if _has_paper_metadata(back):
-        card_issues.append("Back contains paper metadata dump (ACM categories, section headings)")
-
-    if _has_author_block(back):
-        card_issues.append("Back contains author/affiliation block instead of explanation")
-
     if _has_date_stamp(front) or _has_date_stamp(back):
         card_issues.append("Contains slide date stamp (e.g. 8/13/2008)")
 
-    if _is_template_front(front):
-        card_issues.append("Front is the generator's fallback template, not a concrete question")
-
-    invented = _front_gloss_violations(front)
-    if invented:
-        shown = ", ".join(f"'{g}'" for g in invented[:3])
-        card_issues.append(
-            f"Front title carries a multi-word English gloss: {shown} — drop it; "
-            "front English is limited to acronyms and single-token standard names"
-        )
-
-    if _count_section_headers(back) < 2:
-        card_issues.append("Back lacks structured section headers (<b>...</b>:)")
-
-    annotations = _english_annotations(back)
-    if len(annotations) > MAX_ENGLISH_ANNOTATIONS:
-        shown = ", ".join(f"'{a}'" for a in annotations[:5])
-        card_issues.append(
-            f"Back sprinkles {len(annotations)} English annotations "
-            f"(max {MAX_ENGLISH_ANNOTATIONS}): {shown} — write the body in Chinese; "
-            "annotate only terms a domain reader would not already know"
-        )
+    card_issues.extend(_check_front_content(front))
+    card_issues.extend(_check_back_content(back))
 
     unexplained = _unexplained_acronyms(front, back)
     if unexplained:
@@ -429,12 +391,51 @@ def _validate_card(front: str, back: str) -> list[str]:
             "Acronym(s) used but never expanded/explained: " + ", ".join(sorted(unexplained))
         )
 
-    citation_issue = _check_citation_section(back)
-    if citation_issue:
-        card_issues.append(citation_issue)
-
     return card_issues
 
+
+
+def _check_front_content(front: str) -> list[str]:
+    issues: list[str] = []
+    if _has_slide_title(front):
+        issues.append("Front looks like a slide title/page number, not a conceptual question")
+    if _is_generic_topic(front):
+        issues.append("Front is a generic topic label, not a specific question")
+    if _is_template_front(front):
+        issues.append("Front is the generator's fallback template, not a concrete question")
+    invented = _front_gloss_violations(front)
+    if invented:
+        shown = ", ".join(f"'{g}'" for g in invented[:3])
+        issues.append(
+            f"Front title carries a multi-word English gloss: {shown} — drop it; "
+            "front English is limited to acronyms and single-token standard names"
+        )
+    return issues
+
+def _check_back_content(back: str) -> list[str]:
+    issues: list[str] = []
+    if _has_diagram_artifacts(back):
+        issues.append("Back contains ASCII diagram/table fragments instead of explanation")
+    if _has_ocr_errors(back):
+        issues.append("Back contains likely OCR/extraction errors (fragmented words)")
+    if _has_paper_metadata(back):
+        issues.append("Back contains paper metadata dump (ACM categories, section headings)")
+    if _has_author_block(back):
+        issues.append("Back contains author/affiliation block instead of explanation")
+    if _count_section_headers(back) < 2:
+        issues.append("Back lacks structured section headers (<b>...</b>:)")
+    annotations = _english_annotations(back)
+    if len(annotations) > MAX_ENGLISH_ANNOTATIONS:
+        shown = ", ".join(f"'{a}'" for a in annotations[:5])
+        issues.append(
+            f"Back sprinkles {len(annotations)} English annotations "
+            f"(max {MAX_ENGLISH_ANNOTATIONS}): {shown} — write the body in Chinese; "
+            "annotate only terms a domain reader would not already know"
+        )
+    citation_issue = _check_citation_section(back)
+    if citation_issue:
+        issues.append(citation_issue)
+    return issues
 
 def _check_citation_section(back: str) -> str | None:
     """Validate the mandatory final citation section and its line-anchored links."""
