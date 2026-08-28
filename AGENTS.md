@@ -75,6 +75,18 @@ eBPF (`vps_kernel_proxy/`, Docker-only).
     a satisfied goal is a no-op, not a PR. (Typist opened empty PRs like #75 and
     #78 this way; CI now hard-fails empty PRs — see the "Reject empty pull
     request" step in `ci.yml` — but don't rely on the backstop.)
+11. **Never push an empty or no-op commit** — including add-then-remove
+    placeholder files (`dummy_file.txt`). Before every push,
+    `git show --stat HEAD` must show a real diff that matches the commit
+    message and, when responding to review feedback, actually addresses it.
+    If you have nothing real to push, push nothing. (The sibling anki repo's
+    PR #494: five churn/empty commits pushed after review questions, none
+    answering them — closed unmerged.) Machine-enforced for bot-authored
+    commits by `tools/check_bot_pr_hygiene.py` (`make bot-pr-check`, part of
+    `make precommit`, plus the "Reject bot PR hygiene violations" step in
+    `ci.yml`): the gate fails on bot commits that are empty, add zero-content
+    files, or delete lines from test files — bot lanes are append-only in
+    tests (Testpilot owns `__tests__/` and `tests/`).
 
 ## Reading the gate output (this repo is noisy on purpose)
 
@@ -143,6 +155,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 | JS lint / format                         | `make lint` / `make fmt-check`           |
 | Dependency-structure gate (JS)           | `make depcheck`                          |
 | Stream-of-consciousness gate             | `make thinking-check`                    |
+| Bot PR hygiene gate (Jules commits)      | `make bot-pr-check`                      |
 | Jest with coverage (floor-gated)         | `make test`                              |
 | Python tests + coverage (floor-gated)    | `make test-py`                           |
 | JS type-check (JSDoc, non-blocking)      | `make type`                              |
@@ -278,6 +291,31 @@ done by an interactive agent explicitly directed to change
 build/lint config (non-negotiable #6 binds Jules routines, not interactive
 agents).
 
+### Bot PR hygiene gate (`make bot-pr-check`)
+
+`make bot-pr-check` (wired into `make precommit` and `precommit-fix`) runs
+`tools/check_bot_pr_hygiene.py`, a stdlib-only deterministic check over every
+commit authored by `google-labs-jules[bot]` in `origin/main..HEAD` (falls back
+to `main`), enforcing non-negotiable #11. Wording alone did not stop the empty
+Typist PRs (#75, #78) here or the anki repo's PR #494 (existing tests deleted
+in a coverage PR, then five empty/no-op commits including an add-then-remove
+`dummy_file.txt`), so the gate fails on bot commits that: change no files
+(empty commit), touch a file with zero content lines (the placeholder/dummy
+pattern), or delete lines from a test file — test paths are `__tests__/` and
+`tests/` dirs, `test_*.py`, and `*.test.js`; bot lanes are append-only in
+tests (Testpilot owns them). Human-authored commits are skipped: interactive
+agents may legitimately rewrite tests on request. CI runs the same check on
+every PR (the "Reject bot PR hygiene violations" step in `ci.yml`, next to the
+empty-PR guard; the checkout uses `fetch-depth: 0` so the branch commits are
+visible behind the merge commit — a shallow checkout would silently no-op the
+check). Tests live in `tools/__tests__/test_check_bot_pr_hygiene.py` (real git
+repos in `tmp_path`, run by `make test-py`). Probe-tested: a bot-authored
+empty commit fails the wired gate and a clean range passes it, with exit-code
+propagation through `make` verified on a synthetic fixture repo. This wiring
+was done by an interactive agent explicitly directed to change
+build/lint config (non-negotiable #6 binds Jules routines, not interactive
+agents).
+
 ### Mutation testing (NON-BLOCKING scaffold)
 
 `make mutate-js` (StrykerJS, `stryker.config.mjs`) and `make mutate-py`
@@ -348,9 +386,11 @@ isn't.
 
 ### System dependencies and CI
 
-- `.github/workflows/ci.yml` runs on push/PR to `main` and is just
-  `make precommit` (check-only) on `ubuntu-latest` — add new checks to the
-  `precommit`/`precommit-fix` targets, not to the workflow.
+- `.github/workflows/ci.yml` runs on push/PR to `main` and is `make precommit`
+  (check-only) on `ubuntu-latest`, plus two PR-only hard guards that must run
+  against the base ref before the gate: "Reject empty pull request" and
+  "Reject bot PR hygiene violations" (see "Bot PR hygiene gate" above). Add
+  new checks to the `precommit`/`precommit-fix` targets, not to the workflow.
 - CI installs `libcurl4-openssl-dev` (the NAS C tests and several `bin/*.c`
   accelerators compile with `-lcurl`) plus Python deps from
   `requirements-dev.txt` (pytest + pytest-cov); gcc/make come with the runner.
@@ -567,7 +607,9 @@ If your finding belongs to another lane, **skip it** — that lane will get it.
 > (`make depcheck`, wired into `make lint` — see "Dependency-structure gate"
 > above). Whole-suite coverage **is** gated — a global Jest
 > `coverageThreshold` (94/85/94/94) and pytest `--cov-fail-under=94`, both
-> ~1 point under the day-one measurement (see "Coverage reports" above). Only
+> ~1 point under the day-one measurement (see "Coverage reports" above).
+> Bot-authored commit hygiene **is** machine-gated too (`make bot-pr-check`,
+> in `make precommit` and CI — see "Bot PR hygiene gate" above). Only
 > the JS type-check (`make type`) is **non-blocking**. The Testpilot and
 > Typist targets are therefore judgment-guided, not machine-gated. Your real
 > gate is a green `make precommit` plus the scoped proof your lane requires.

@@ -37,6 +37,15 @@ jobs:
             exit 1
           fi
 
+      # Machine enforcement of AGENTS.md non-negotiable #11 for bot-authored
+      # commits: fails on empty commits, zero-content placeholder files, and
+      # test deletions in any commit by google-labs-jules[bot]. The checkout
+      # above uses fetch-depth: 0 so origin/<base> and the branch commits are
+      # all visible behind the merge commit.
+      - name: Reject bot PR hygiene violations
+        if: ${{ github.event_name == 'pull_request' }}
+        run: python3 tools/check_bot_pr_hygiene.py --base "origin/${{ github.base_ref }}"
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:

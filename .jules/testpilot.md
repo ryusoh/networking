@@ -106,3 +106,13 @@ Conventional Commits per `AGENTS.md`. One subproject per PR.
   **no emoji, no `Testpilot:` prefix**.
 - Body: each target file before → after coverage; any file skipped and why; "no
   production code changed"; pasted `make precommit` (or scoped test) output.
+- **Append-only in tests, and review feedback is answered with a real diff or
+  a written reply** — never with an empty commit, a placeholder/dummy file, or
+  a commit whose message doesn't match its diff. Never delete or rewrite
+  existing tests: add new ones. Before pushing, check `git show --stat HEAD`:
+  if it doesn't visibly address the feedback, don't push. If you cannot
+  address the feedback, leave the PR alone; silence is cheaper than noise
+  (AGENTS.md non-negotiable #11). Machine-enforced:
+  `tools/check_bot_pr_hygiene.py` (`make bot-pr-check`, in `make precommit`
+  and CI) fails on bot commits that are empty, add zero-content files, or
+  delete test lines.
