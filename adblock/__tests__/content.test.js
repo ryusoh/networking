@@ -21,6 +21,29 @@ describe('Clean AdBlock Content Script', () => {
     expect(() => loadContentScript()).not.toThrow();
   });
 
+  test('should not crash when isContextValid throws', () => {
+    delete window.location;
+    window.location = new URL('https://example.com');
+    document.body.innerHTML = '<div></div>';
+
+    // Mock chrome such that hasValidRuntime throws
+    global.chrome = {
+      get runtime() {
+        throw new Error('Extension context invalidated.');
+      }
+    };
+
+    // We mock console.error if needed
+    expect(() => {
+      const code = instrumentFile(contentScriptPath);
+      eval(code);
+
+      const event = document.createEvent('Event');
+      event.initEvent('DOMContentLoaded', true, true);
+      document.dispatchEvent(event);
+      jest.advanceTimersByTime(2000);
+    }).not.toThrow();
+  });
   test('should not crash when chrome.storage is missing', () => {
     global.chrome = {
       runtime: {
@@ -211,6 +234,305 @@ describe('Clean AdBlock Content Script - heuristics', () => {
     jest.clearAllMocks();
   });
 
+  test('should traverse shadow DOM elements', () => {
+    delete window.location;
+    window.location = new URL('https://example.com');
+
+    document.body.innerHTML = '<div></div>';
+
+    const host = document.createElement('div');
+    host.id = 'shadow-host';
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    const shadowChild = document.createElement('div');
+    shadowChild.id = 'shadow-child';
+    shadowChild.style.position = 'fixed';
+    shadowChild.style.zIndex = '999999';
+    shadowChild.textContent = 'Please disable your adblocker';
+    shadowRoot.appendChild(shadowChild);
+    document.body.appendChild(host);
+
+    const originalGetComputedStyle = window.getComputedStyle;
+    window.getComputedStyle = jest.fn((el) => {
+      if (el.id === 'shadow-child') {
+        return { position: 'fixed', zIndex: '999999', display: 'block', visibility: 'visible' };
+      }
+      return originalGetComputedStyle(el);
+    });
+
+    global.chrome = {
+      runtime: { id: 'test-id', onMessage: { addListener: jest.fn() } },
+      storage: {
+        sync: { get: jest.fn((keys, cb) => cb({ enabled: true, mode: 'all' })) },
+        local: { get: jest.fn((keys, cb) => cb({})) }
+      }
+    };
+
+    // Override innerWidth/innerHeight for the dimension check
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1000
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      writable: true,
+      configurable: true,
+      value: 800
+    });
+
+    shadowChild.getBoundingClientRect = () => ({ width: 600, height: 300 });
+
+    loadContentScript();
+
+    jest.useFakeTimers();
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+    jest.advanceTimersByTime(2000);
+    jest.useRealTimers();
+
+    expect(shadowChild.style.display).toBe('none');
+
+    window.getComputedStyle = originalGetComputedStyle;
+  });
+
+  test('should detect foreign strong keywords', () => {
+    delete window.location;
+    window.location = new URL('https://example.com');
+
+    document.body.innerHTML = `
+      <div id="adblock-message-de" style="position: fixed; z-index: 1000; width: 100vw; height: 100vh;">
+        Bitte deaktivieren Sie Ihren werbeblocker.
+      </div>
+      <div id="adblock-message-fr" style="position: fixed; z-index: 1000; width: 100vw; height: 100vh;">
+        Désactivez votre bloqueur pour continuer.
+      </div>
+      <div id="adblock-message-es" style="position: fixed; z-index: 1000; width: 100vw; height: 100vh;">
+        Desactiva el bloqueador.
+      </div>
+      <div id="adblock-message-zh" style="position: fixed; z-index: 1000; width: 100vw; height: 100vh;">
+        请关闭 广告拦截。
+      </div>
+      <div id="adblock-message-ja" style="position: fixed; z-index: 1000; width: 100vw; height: 100vh;">
+        広告ブロック をオフにしてください。
+      </div>
+    `;
+
+    const originalGetComputedStyle = window.getComputedStyle;
+    window.getComputedStyle = jest.fn((el) => {
+      if (el.id && el.id.startsWith('adblock-message')) {
+        return { position: 'fixed', zIndex: '1000', display: 'block', visibility: 'visible' };
+      }
+      return originalGetComputedStyle(el);
+    });
+
+    global.chrome = {
+      runtime: { id: 'test-id', onMessage: { addListener: jest.fn() } },
+      storage: {
+        sync: { get: jest.fn((keys, cb) => cb({ enabled: true, mode: 'all' })) },
+        local: { get: jest.fn((keys, cb) => cb({})) }
+      }
+    };
+
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1000
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      writable: true,
+      configurable: true,
+      value: 800
+    });
+
+    document.querySelectorAll('[id^=adblock-message]').forEach((el) => {
+      el.getBoundingClientRect = () => ({ width: 600, height: 300 });
+    });
+
+    loadContentScript();
+
+    jest.useFakeTimers();
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+    jest.advanceTimersByTime(2000);
+    jest.useRealTimers();
+
+    const de = document.getElementById('adblock-message-de');
+    const fr = document.getElementById('adblock-message-fr');
+    const es = document.getElementById('adblock-message-es');
+    const zh = document.getElementById('adblock-message-zh');
+    const ja = document.getElementById('adblock-message-ja');
+
+    expect(de.style.display).toBe('none');
+    expect(fr.style.display).toBe('none');
+    expect(es.style.display).toBe('none');
+    expect(zh.style.display).toBe('none');
+    expect(ja.style.display).toBe('none');
+
+    window.getComputedStyle = originalGetComputedStyle;
+  });
+
+  test('should traverse shadow DOM elements', () => {
+    delete window.location;
+    window.location = new URL('https://example.com');
+
+    document.body.innerHTML = '<div></div>';
+
+    const host = document.createElement('div');
+    host.id = 'shadow-host';
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    const shadowChild = document.createElement('div');
+    shadowChild.id = 'shadow-child';
+    shadowChild.style.position = 'fixed';
+    shadowChild.style.zIndex = '999999';
+    shadowChild.textContent = 'Please disable your adblocker';
+    shadowRoot.appendChild(shadowChild);
+    document.body.appendChild(host);
+
+    const originalGetComputedStyle = window.getComputedStyle;
+    window.getComputedStyle = jest.fn((el) => {
+      if (el.id === 'shadow-child') {
+        return { position: 'fixed', zIndex: '999999', display: 'block', visibility: 'visible' };
+      }
+      return originalGetComputedStyle(el);
+    });
+
+    global.chrome = {
+      runtime: { id: 'test-id', onMessage: { addListener: jest.fn() } },
+      storage: {
+        sync: { get: jest.fn((keys, cb) => cb({ enabled: true, mode: 'all' })) },
+        local: { get: jest.fn((keys, cb) => cb({})) }
+      }
+    };
+
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1000
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      writable: true,
+      configurable: true,
+      value: 800
+    });
+
+    shadowChild.getBoundingClientRect = () => ({ width: 600, height: 300 });
+
+    loadContentScript();
+
+    jest.useFakeTimers();
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+    jest.advanceTimersByTime(2000);
+    jest.useRealTimers();
+
+    expect(shadowChild.style.display).toBe('none');
+
+    window.getComputedStyle = originalGetComputedStyle;
+  });
+
+  test('should detect foreign strong keywords', () => {
+    delete window.location;
+    window.location = new URL('https://example.com');
+
+    document.body.innerHTML = `
+      <div id="adblock-message-de" style="position: fixed; z-index: 1000; width: 100vw; height: 100vh;">
+        Bitte deaktivieren Sie Ihren werbeblocker.
+      </div>
+      <div id="adblock-message-fr" style="position: fixed; z-index: 1000; width: 100vw; height: 100vh;">
+        Désactivez votre bloqueur pour continuer.
+      </div>
+      <div id="adblock-message-es" style="position: fixed; z-index: 1000; width: 100vw; height: 100vh;">
+        Desactiva el bloqueador.
+      </div>
+      <div id="adblock-message-zh" style="position: fixed; z-index: 1000; width: 100vw; height: 100vh;">
+        请关闭 广告拦截。
+      </div>
+      <div id="adblock-message-ja" style="position: fixed; z-index: 1000; width: 100vw; height: 100vh;">
+        広告ブロック をオフにしてください。
+      </div>
+    `;
+
+    const originalGetComputedStyle = window.getComputedStyle;
+    window.getComputedStyle = jest.fn((el) => {
+      if (el.id && el.id.startsWith('adblock-message')) {
+        return { position: 'fixed', zIndex: '1000', display: 'block', visibility: 'visible' };
+      }
+      return originalGetComputedStyle(el);
+    });
+
+    global.chrome = {
+      runtime: { id: 'test-id', onMessage: { addListener: jest.fn() } },
+      storage: {
+        sync: { get: jest.fn((keys, cb) => cb({ enabled: true, mode: 'all' })) },
+        local: { get: jest.fn((keys, cb) => cb({})) }
+      }
+    };
+
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1000
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      writable: true,
+      configurable: true,
+      value: 800
+    });
+
+    document.querySelectorAll('[id^=adblock-message]').forEach((el) => {
+      el.getBoundingClientRect = () => ({ width: 600, height: 300 });
+    });
+
+    loadContentScript();
+
+    jest.useFakeTimers();
+    const event = document.createEvent('Event');
+    event.initEvent('DOMContentLoaded', true, true);
+    document.dispatchEvent(event);
+    jest.advanceTimersByTime(2000);
+    jest.useRealTimers();
+
+    const de = document.getElementById('adblock-message-de');
+    const fr = document.getElementById('adblock-message-fr');
+    const es = document.getElementById('adblock-message-es');
+    const zh = document.getElementById('adblock-message-zh');
+    const ja = document.getElementById('adblock-message-ja');
+
+    expect(de.style.display).toBe('none');
+    expect(fr.style.display).toBe('none');
+    expect(es.style.display).toBe('none');
+    expect(zh.style.display).toBe('none');
+    expect(ja.style.display).toBe('none');
+
+    window.getComputedStyle = originalGetComputedStyle;
+  });
+
+  test('should not crash when isContextValid throws', () => {
+    delete window.location;
+    window.location = new URL('https://example.com');
+    document.body.innerHTML = '<div></div>';
+
+    global.chrome = {
+      get runtime() {
+        throw new Error('Extension context invalidated.');
+      }
+    };
+
+    expect(() => {
+      const code = instrumentFile(contentScriptPath);
+      eval(code);
+
+      const event = document.createEvent('Event');
+      event.initEvent('DOMContentLoaded', true, true);
+      document.dispatchEvent(event);
+
+      jest.useFakeTimers();
+      jest.advanceTimersByTime(2000);
+      jest.useRealTimers();
+    }).not.toThrow();
+  });
   test('should detect and hide adblock overlay based on heuristics', () => {
     delete window.location;
     window.location = new URL('https://example.com');

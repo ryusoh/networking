@@ -67,6 +67,53 @@ describe('forum-ad-blocker.js', () => {
     expect(document.getElementById('adpushup-123').style.display).toBe('none');
   });
 
+  it('hides Douban ads', () => {
+    document.body.innerHTML = `
+      <div class="customize-slot">
+        <a href="https://erebor.douban.com/ad">Ad</a>
+      </div>
+    `;
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'forum-ad-blocker.js'));
+    eval(code);
+
+    // Check if the container is hidden
+    const container = document.querySelector('.customize-slot');
+    expect(container.style.display).toBe('none');
+  });
+
+  it('removes ad scripts with shouldBlockScript', () => {
+    document.body.innerHTML = `
+      <script src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+    `;
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'forum-ad-blocker.js'));
+    eval(code);
+
+    // Ensure it gets removed
+    expect(document.querySelector('script')).toBeNull();
+  });
+
+  it('restores scroll on body and documentElement if overflow is hidden', () => {
+    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.overflowY = 'hidden';
+    document.body.style.overflow = 'hidden';
+    document.body.style.overflowY = 'hidden';
+
+    const originalGetComputedStyle = window.getComputedStyle;
+    window.getComputedStyle = (el) => el.style;
+
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(require('path').join(__dirname, '..', 'forum-ad-blocker.js'));
+    eval(code);
+
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+
+    expect(document.documentElement.style.getPropertyValue('overflow')).toBe('auto');
+    expect(document.body.style.getPropertyValue('overflow')).toBe('auto');
+
+    window.getComputedStyle = originalGetComputedStyle;
+  });
   it('removes script tags', () => {
     const script = document.createElement('script');
     script.src = 'https://adrecover.com/script.js';
