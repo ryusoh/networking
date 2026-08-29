@@ -39,7 +39,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: StrykerJS smoke (clean_adblock/picker.js)
+      - name: StrykerJS smoke (adblock/picker.js)
         run: make mutate-js
 
       - name: mutmut smoke (retriever, nas_proxy, vps_kernel_proxy)

@@ -18,7 +18,7 @@ failed attempt before they were understood.
   `__tests__/` convention is **not** usable here — put tests in `tests/`
   (plain). Jest finds them by the `*.test.js` filename pattern regardless of
   directory name. If the subproject already contains `__tests__/` (e.g.
-  `clean_adblock`) or a stray `_metadata/`, do **not** load the checkout
+  `adblock`) or a stray `_metadata/`, do **not** load the checkout
   directly — run `bin/pack-extension <dir>` and load `<dir>/dist` instead
   (generated, git- and prettier-ignored).
 - **`.gitignore` ignores bare build-artifact names** (`tests`, `lan_scanner`,
@@ -33,11 +33,11 @@ failed attempt before they were understood.
 
 1. `manifest.json` — MV3.
 2. **Icons: always default to the shared set.** Every new extension in this
-   repo uses the same icons as `stall_guard`/`clean_adblock` unless the user
+   repo uses the same icons as `stall_guard`/`adblock` unless the user
    explicitly asks for different artwork: copy
-   `clean_adblock/assets/icon{16,48,128}.png` into `<dir>/assets/` and declare
+   `adblock/assets/icon{16,48,128}.png` into `<dir>/assets/` and declare
    both `icons` and `action.default_icon` in the manifest (see
-   `clean_adblock/manifest.json` or `stall_guard/manifest.json` for the exact
+   `adblock/manifest.json` or `stall_guard/manifest.json` for the exact
    wiring). Do not ship a new extension without icons, and do not invent new
    ones.
 3. Content script — write the logic as pure, testable functions and expose
@@ -72,7 +72,7 @@ failed attempt before they were understood.
 
 ## Code style (matches what eslint/prettier enforce here)
 
-- `const`/`let`, never `var` (`no-var` is on; clean_adblock is warning-free —
+- `const`/`let`, never `var` (`no-var` is on; adblock is warning-free —
   keep new code the same).
 - Browser globals come from the limited `eslint.config.cjs` set; anything else
   (`module`, extra DOM constructors) needs an inline `/* global ... */`.

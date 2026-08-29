@@ -25,7 +25,7 @@ format); `.claude/commands/` is generated from it by `tools/sync_commands.py`,
 
 This repo (net-tools) is a collection of **independent networking and browser
 tooling subprojects** spanning several languages: a Chrome MV3 extension
-(`clean_adblock/`, JavaScript, Jest + jsdom), Python packages
+(`adblock/`, JavaScript, Jest + jsdom), Python packages
 (`nas_proxy/`, `retriever/`, `vps_kernel_proxy/`, `nas_tools/`, pytest), C
 tooling (`nas_proxy/`, `nas_tools/`, `bin/*.c`, compiled with `-lcurl`), and
 eBPF (`vps_kernel_proxy/`, Docker-only).
@@ -49,7 +49,7 @@ eBPF (`vps_kernel_proxy/`, Docker-only).
 4. **Don't commit to `main`.** Branch off `main`, open a PR.
 5. **Do not upgrade `jest` or `jest-environment-jsdom`.** They are pinned to v29
    on purpose; v30/v26 break the `window.location` mocking used across the
-   `clean_adblock` suite (rationale in "Jest & jsdom version pin" below). A
+   `adblock` suite (rationale in "Jest & jsdom version pin" below). A
    dependency bump that touches these will be closed.
 6. **Don't add dependencies or change build/lint/test config** unless your lane
    explicitly allows it. No new npm or pip packages, no edits to `package.json`
@@ -121,7 +121,7 @@ A PR with no pasted verification output reads as unverified and will be closed.
 ## Changed lines must be covered
 
 Coverage is reported but **not gated** (Jest `collectCoverageFrom:
-clean_adblock/*.js`; pytest `--cov` on the three Python packages; neither enforces
+adblock/*.js`; pytest `--cov` on the three Python packages; neither enforces
 a threshold). This is on your honour:
 
 - If your change adds or alters runtime behaviour (a bug fix, a security fix), ship
@@ -138,7 +138,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 - **No Conversational Wrappers**: The commit message and final output must contain no greetings (e.g., "Hello! Jules here"), no conversational sign-offs (e.g., "Let me know if you need anything else"), and no conversational preambles/suffixes. Start directly with the commit title and proceed directly to the structured body.
 - Format: `type(scope): summary` — type ∈ `feat`, `fix`, `refactor`, `perf`,
   `test`, `docs`, `chore`, `build`, `ci`; scope is the subproject or area
-  (`clean_adblock`, `nas_proxy`, `retriever`, `vps_kernel_proxy`, `nas_tools`,
+  (`adblock`, `nas_proxy`, `retriever`, `vps_kernel_proxy`, `nas_tools`,
   `types`, `deps`); summary imperative, lower-case, no trailing period, ≤ 72 chars.
 - **No emoji, and no routine-name prefix in the subject.** Routine attribution
   rides on the `Co-authored-by: google-labs-jules[bot]` trailer.
@@ -183,20 +183,21 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 
 ## Layout
 
-- `clean_adblock/` — Chrome MV3 extension; per-site content scripts + background
-  service worker; tests in `clean_adblock/__tests__/` (jsdom).
+- `adblock/` — Chrome MV3 extension; per-site content scripts + background
+  service worker; tests in `adblock/__tests__/` (jsdom).
 - `nas_proxy/`, `nas_tools/` — C tooling (`make -C <dir> test`); `nas_tools` also
   has Python wrappers with privileged, self-skipping tests.
 - `retriever/` — the `pull` script. `vps_kernel_proxy/` — kernel/user proxy +
   eBPF. `vps_user_proxy/` — userspace proxy variant.
-- `tianditu_bypass/`, `vmware/`, `bin/` — misc tools and C build accelerators.
+- `gov_bypass/`, `vmware/`, `bin/` — misc tools and C build accelerators.
 - `stall_guard/` — Chrome MV3 extension that auto-recovers HTML5 video stalls:
   seek-back-and-resume, escalating to a page reload (via postMessage from the
   player iframe to the top frame) when repeated recoveries make no progress.
   Tests in `stall_guard/tests/` — **not** `__tests__/`,
   because Chrome refuses to load extensions containing `_`-prefixed dirs. See
   the `add-extension` skill for the full new-extension checklist.
-- `docs/` — subsystem specs and research notes: `ebpf-research.md`,
+- `docs/` — subsystem specs and research notes: `gates.md` (gate internals),
+  `ci-gotchas.md` (gate-output field guide), `ebpf-research.md`,
   `nas-strategy.md`, `docs/research/anki-card-pipeline-spec.md`,
   `docs/research/research-agent-spec.md`,
   `docs/research/research-anki-skills-usage-guide.md`.
@@ -204,26 +205,10 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 - `tools/` — shared repository tooling (`gate_guard.py`, `check_thinking_comments.py`,
   `sync_commands.py`, `prior_prs.py`, `tools/research/`). Scripts referenced across agent docs and
   skills are verified by `tools/__tests__/test_doc_tool_references.py`.
-- `tools/research/` — courseware research agent pipeline (`anki_generator.py`,
-  `anki_card_validator.py`, `anki_density.py`, `anki_density_baseline.py`,
-  `anki_density_gate.py`, `anki_graph_bridge.py`, `anki_import_verifier.py`,
-  `scene_builder.py`, `search_chunks.py`, `dense_indexer.py`,
-  `citation_engine.py`, `memory_host.py`, `parse_chunks.py`,
-  `curriculum_service.py`, `synthesis_service.py`, `batch_runner.py`,
-  `resource_governor.py`). Scripts that import sibling modules under
-  `tools.research` add the repo root to `sys.path` so they can be invoked
-  directly as `python3 tools/research/<script>.py` from the repository root.
-  **Safety Rule:** Never execute raw SQLite `INSERT`/`UPDATE` mutations directly
-  on live Anki collections (`collection.anki2` / `collection.anki21b`); use
-  AnkiConnect REST API or TSV/APKG package export (`open -a Anki`) to prevent
-  database lock collisions and collation errors.
-  **Testing hygiene:** commands like `anki_generator.py --count/--import`,
-  `anki_density_baseline.py`, and `memory_host.py --record*` mutate
-  `research/.anki_coverage.json`, `research/.anki_density_baseline.json`, and
-  `research/.durable_memory.json`. Tests must use temp paths (monkeypatch
-  `DEFAULT_MEMORY_PATH` / `DEFAULT_COVERAGE_PATH` / `DEFAULT_BASELINE_CACHE_PATH`
-  or pass explicit paths); when testing manually, back up these files first and
-  restore them afterward.
+- `tools/research/` — courseware research agent pipeline (parser, indexer, scene
+  builder, citation engine, memory host, Anki generator/validator, etc.).
+  Safety rules (no raw SQLite mutations on live Anki collections; testing
+  hygiene for pipeline state files) live in `research/README.md`.
 - `research/` — courseware data, chunk manifests, Anki pipeline state files, and
   durable memory. See `research/README.md` for a map of where data, code, specs,
   and skills live.
@@ -244,104 +229,36 @@ macOS ships `/bin/bash` 3.2, and the `bin/*.sh` tools run on it:
 ### Dependency-structure gate (`make depcheck`)
 
 `make depcheck` (wired into `make lint`, hence into `make precommit`) runs
-dependency-cruiser over `clean_adblock tianditu_bypass jest.setup.js` with the
+dependency-cruiser over `adblock gov_bypass jest.setup.js` with the
 rules in `.dependency-cruiser.cjs`: no circular deps, no cross-subproject
 imports (mirrors non-negotiable #2), production source never imports
-`__tests__`. Measured **zero violations** on day one (56 modules, 51
-dependencies, fully resolved — no `couldNotResolve`), so no baseline was
-needed; the gate is purely preventive. Probe-tested: a cross-subproject import
-and a prod→test import each fail the gate; `git restore` returns green. This
-wiring was done by an interactive agent explicitly directed to change
-build/lint config (non-negotiable #6 binds Jules routines, not interactive
-agents).
-
-- **No alias config, on purpose:** this repo has no path aliases (no import
-  map, no `jsconfig.json` `paths`, no bare specifiers). If aliases are ever
-  added, resolve them via a webpack-config stub — **never** `options.tsConfig`,
-  which makes dependency-cruiser look for a typescript <7 compiler (this repo
-  has v7) and print a spurious "missing-typescript-transpiler" warning.
-- **Python import-linter: deliberately skipped after measuring.** The
-  `test-py` scope (`nas_proxy`, `retriever`, `vps_kernel_proxy` are real
-  packages with `__init__.py`; `nas_tools`, `bin` are PEP 420 namespace dirs)
-  was graphed with grimp (import-linter's builder): **zero** cross-top-level
-  import edges across all five dirs — every package imports only itself and
-  the stdlib. A `layers`/`independence` contract would gate an empty relation,
-  so nothing was wired and import-linter was not added to
-  `requirements-dev.txt`. Unblock condition: if real cross-package imports
-  appear, revisit with a minimal contract.
-- **grimp measurement gotcha:** running grimp/import-linter in the repo root
-  writes a `.grimp_cache/` dir that fails `fmt-check` — measure in a venv and
-  delete the cache afterwards.
+`__tests__`. Zero-baseline and purely preventive. Alias/import-linter/grimp
+rationale and gotchas: `docs/gates.md`.
 
 ### Stream-of-consciousness gate (`make thinking-check`)
 
 `make thinking-check` (wired into `make precommit`) runs
-`tools/check_thinking_comments.py`, a stdlib-only deterministic scan of all
-git-tracked sources (py/js/css/c/h/sh) enforcing non-negotiable #9: Python
-comments matched via `tokenize` (strings never match), JS/CSS/C via a
-block-comment-aware line scan that ignores URL schemes, shell via full-line
-`#` comments only, plus abandoned-test detection (pytest-collectable
-`pass`/`...`/docstring-only bodies, JS `it()`/`test()` with empty callbacks).
-Measured **8 violations** on day one (all in test files: coverage-chasing
-"to hit line N" notes, "Let's mock ..." reasoning, one abandoned `pass`-only
-test) — fixed in place, no baseline needed; the gate is purely preventive.
-Probe-tested: a thinking comment plus an abandoned `pass`-only test appended
-to a tracked file fails the gate; `git restore` returns green. This wiring was
-done by an interactive agent explicitly directed to change
-build/lint config (non-negotiable #6 binds Jules routines, not interactive
-agents).
+`tools/check_thinking_comments.py`, a deterministic scan of all git-tracked
+py/js/css/c/h/sh sources enforcing non-negotiable #9, including abandoned-test
+detection. Zero-baseline and purely preventive. Detector mechanics:
+`docs/gates.md`.
 
 ### Bot PR hygiene gate (`make bot-pr-check`)
 
-`make bot-pr-check` (wired into `make precommit` and `precommit-fix`) runs
-`tools/check_bot_pr_hygiene.py`, a stdlib-only deterministic check over every
-commit authored by `google-labs-jules[bot]` in `origin/main..HEAD` (falls back
-to `main`), enforcing non-negotiable #11. Wording alone did not stop the empty
-Typist PRs (#75, #78) here or the anki repo's PR #494 (existing tests deleted
-in a coverage PR, then five empty/no-op commits including an add-then-remove
-`dummy_file.txt`), so the gate fails on bot commits that: change no files
-(empty commit), touch a file with zero content lines (the placeholder/dummy
-pattern), or delete lines from a test file — test paths are `__tests__/` and
-`tests/` dirs, `test_*.py`, and `*.test.js`; bot lanes are append-only in
-tests (Testpilot owns them). Human-authored commits are skipped: interactive
-agents may legitimately rewrite tests on request. CI runs the same check on
-every PR (the "Reject bot PR hygiene violations" step in `ci.yml`, next to the
-empty-PR guard; the checkout uses `fetch-depth: 0` so the branch commits are
-visible behind the merge commit — a shallow checkout would silently no-op the
-check). Tests live in `tools/__tests__/test_check_bot_pr_hygiene.py` (real git
-repos in `tmp_path`, run by `make test-py`). Probe-tested: a bot-authored
-empty commit fails the wired gate and a clean range passes it, with exit-code
-propagation through `make` verified on a synthetic fixture repo. This wiring
-was done by an interactive agent explicitly directed to change
-build/lint config (non-negotiable #6 binds Jules routines, not interactive
-agents).
+`make bot-pr-check` (wired into `make precommit` and `precommit-fix`, plus the
+"Reject bot PR hygiene violations" CI step) runs
+`tools/check_bot_pr_hygiene.py` over bot-authored commits in
+`origin/main..HEAD`, enforcing non-negotiable #11: no empty commits, no
+zero-content files, no deleted test lines (`__tests__/`, `tests/`,
+`test_*.py`, `*.test.js` — bot lanes are append-only in tests). Human-authored
+commits are skipped. Full rules and history: `docs/gates.md`.
 
 ### Mutation testing (NON-BLOCKING scaffold)
 
-`make mutate-js` (StrykerJS, `stryker.config.mjs`) and `make mutate-py`
-(mutmut, `[tool.mutmut]` in `pyproject.toml`) are **informational only** —
-deliberately not wired into `make precommit`, and the weekly
-`.github/workflows/mutation.yml` runs them `continue-on-error`. Mutation
-scores are signal for humans, not thresholds.
-
-- **JS scope:** `clean_adblock/picker.js` only (small, 100% statement
-  coverage), incremental mode. Day-one smoke: 146 mutants, 61 killed, 85
-  survived, score **41.78%** in ~9 s. Widen `mutate` one file at a time.
-- **Python scope:** the three `test-py` source packages, `*/__tests__/*`
-  excluded via `do_not_mutate` (mutmut otherwise mutates the test files
-  themselves — day one that produced 1602 mutants with hundreds of noise
-  "survived" results in `test_ebpf`). Source-only smoke: 1012 mutants, 292
-  killed, 575 survived, 143 no-tests, 2 timeouts (~25 s).
-- **mutmut vs. `os.getcwd` mocks:** 8 retriever tests patch `os.getcwd` on the
-  shared os module; mutmut 3.6.0's `record_trampoline_hit` resolves its
-  relative `source_paths` against that mocked cwd
-  (`Path("retriever").resolve(strict=True)` → `FileNotFoundError`), crashing
-  baseline stats collection. They are excluded via the `-k` filter in
-  `pytest_add_cli_args` (they still run in `make test-py`).
-- **Artifacts** (`.stryker-tmp/`, `reports/`, `mutants/`, `.mutmut-cache/`)
-  are git- and prettier-ignored; delete them freely, they regenerate.
-- `mutmut` is pinned in `requirements-dev.txt`, so it is also present in the
-  `Dockerfile.precommit` image (installed, never run by the gate).
+`make mutate-js` (StrykerJS) and `make mutate-py` (mutmut) are
+**informational only** — deliberately not wired into `make precommit`;
+mutation scores are signal for humans, not thresholds. Scopes, day-one
+numbers, and the mutmut `os.getcwd` gotcha: `docs/gates.md`.
 
 ### Acceptance tests
 
@@ -358,8 +275,8 @@ hand-computed expectations.
 ### Coverage reports and the fmt-check gotcha
 
 Both `make precommit` and `precommit-fix` print a coverage table after the tests:
-Jest (all three JS extensions — `clean_adblock`, `stall_guard`,
-`tianditu_bypass` — scoped via `collectCoverageFrom` in `package.json`)
+Jest (all three JS extensions — `adblock`, `stall_guard`,
+`gov_bypass` — scoped via `collectCoverageFrom` in `package.json`)
 and pytest (source modules only; test files/`__init__.py` omitted via the
 `[tool.coverage.run]` section in `pyproject.toml`).
 
@@ -368,8 +285,8 @@ and pytest (source modules only; test files/`__init__.py` omitted via the
 functions 85) and pytest enforces `--cov-fail-under=94` in `make test-py`
 (day-one measurement 95.47%). The
 Jest floor sits ~1 point under the day-one measurement over the widened
-three-extension set (87.42/81.18/85.96/87.35; clean_adblock alone measured
-95.08/86.27/95.61/95.04 when the scope was clean_adblock-only), so the gate is
+three-extension set (87.42/81.18/85.96/87.35; adblock alone measured
+95.08/86.27/95.61/95.04 when the scope was adblock-only), so the gate is
 a ratchet against regression, not a target — raising a floor is a deliberate
 Testpilot PR, lowering one is a red flag. New JS extensions are added to
 `collectCoverageFrom` when created so their gaps stay visible to
@@ -419,7 +336,7 @@ isn't.
   tags are created by action maintainers at different cadences; an assumed
   version will fail the runner with "unable to find version".
 
-### clean_adblock conventions
+### adblock conventions
 
 #### MutationObserver callbacks must guard against a missing `document`
 
@@ -458,7 +375,7 @@ with a top-level observer, add the same guard.
   eval(code); // keep the eval in the test so the jsdom scope is unchanged
   ```
 
-  `instrumentFile` (in `clean_adblock/__tests__/helpers/instrument.js`)
+  `instrumentFile` (in `adblock/__tests__/helpers/instrument.js`)
   instruments with the same `__coverage__` global Jest's `babel` provider
   collects. Pass an **absolute** path so the key matches `collectCoverageFrom`.
   Don't use it on a file that's also `require`d elsewhere (double
@@ -477,7 +394,7 @@ hygiene notes live in `docs/ci-gotchas.md`.
 
 - **Separation of concerns:** ESLint (`npm run lint`) and TypeScript
   (`make type`) are distinct verification gates. ESLint checks syntax, styles,
-  and defined globals. `make type` runs type-checking over `clean_adblock/*.js`
+  and defined globals. `make type` runs type-checking over `adblock/*.js`
   utilizing JSDoc annotations and the TypeScript compiler (configured via
   `jsconfig.json`). When asked to "fix lint errors", developers or tools may
   refer to either ESLint output or the TypeScript compilation errors — verify
@@ -501,28 +418,14 @@ hygiene notes live in `docs/ci-gotchas.md`.
   (auto-detects Jest `coverage-summary.json` vs coverage.py JSON; tested in
   `bin/__tests__/test_coverage_rank.py`, run by `make test-py`).
 - **Typist** drives `make type` toward zero errors via JSDoc on
-  `clean_adblock/*.js`. The harness — `typescript` + `@types/chrome` dev-deps
+  `adblock/*.js`. The harness — `typescript` + `@types/chrome` dev-deps
   and `jsconfig.json` — is bootstrapped and non-blocking; when the backlog
   reaches zero, the finalize step makes it gate (see `.jules/typist.md`).
 
 ### Shipping multiple open PRs
 
-When tasked with "shipping all open PRs", follow this consolidation strategy to
-minimize conflicts:
-
-1. **Discovery:** identify all open PR branches (e.g.
-   `gh pr list --state open`).
-2. **Consolidation:**
-   - Create a temporary integration branch: `git checkout -b ship-all-prs`.
-   - Merge each PR branch into it one-by-one: `git merge <branch>`.
-3. **Conflict resolution (massive lockfile conflicts):**
-   - If `package-lock.json` has massive conflicts, do not resolve them manually.
-   - Manually edit `package.json` to include the target versions from all
-     branches.
-   - Run `npm install` to regenerate a clean lockfile.
-   - `git add package.json package-lock.json && git commit`.
-4. **Verification:** run `make precommit` on the integration branch.
-5. **Final merge:** merge the integration branch into `main` using `--no-ff`.
+The consolidation strategy (integration branch, lockfile regeneration, merge
+order) lives in the `ship` skill under "Shipping multiple open PRs".
 
 ### Output logs stay out of git
 
@@ -596,7 +499,7 @@ your task owns.
 | Architect | behaviour-preserving complexity/readability refactors                                                        | error-handling, security, tests, features         |
 | Janitor   | dead code, stale deps, real TODOs within subprojects                                                         | tools/, bin/, docs, .jules/, complexity, Jest pin |
 | Bolt      | one measurable performance/efficiency win per run                                                            | complexity-only refactors, security, dead code    |
-| Typist    | incremental JS strict-typing via JSDoc on `clean_adblock/*.js`                                               | runtime logic, tests, Python, C                   |
+| Typist    | incremental JS strict-typing via JSDoc on `adblock/*.js`                                                     | runtime logic, tests, Python, C                   |
 
 If your finding belongs to another lane, **skip it** — that lane will get it.
 

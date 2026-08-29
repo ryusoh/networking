@@ -14,7 +14,7 @@ Work through these steps:
    If `{{args}}` is non-empty, focus the retrospective there.
 
 2. **Map each friction point to a durable fix.** For every item, decide where the knowledge belongs so it never has to be rediscovered:
-   - `AGENTS.md` for conventions, gotchas, how to run tests/lint/format, project layout, and per-subproject notes (this repo has many: `clean_adblock`, `nas_proxy`, `retriever`, `vps_*`, etc.).
+   - `AGENTS.md` for conventions, gotchas, how to run tests/lint/format, project layout, and per-subproject notes (this repo has many: `adblock`, `nas_proxy`, `retriever`, `vps_*`, etc.).
    - A new or updated `.agents/skills/<name>/SKILL.md` for any multi-step prompt worth replaying on demand (`.claude/commands/` is generated from these by `tools/sync_commands.py` — don't edit it directly).
    - The relevant `docs/*.md` for domain/architecture knowledge.
    - Test fixtures, helpers, or `jest.setup.js` for repeated test scaffolding.

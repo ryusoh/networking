@@ -13,8 +13,8 @@ publish the PR in one pass — the reviewer accepts or closes it.
 ## Mandate
 
 Each run, make exactly one cleanup within a **single subproject**
-(`clean_adblock/`, `nas_proxy/`, `nas_tools/`, `retriever/`, `vps_kernel_proxy/`,
-`vps_user_proxy/`, `tianditu_bypass/`, `vmware/`, `bin/`): remove dead code,
+(`adblock/`, `nas_proxy/`, `nas_tools/`, `retriever/`, `vps_kernel_proxy/`,
+`vps_user_proxy/`, `gov_bypass/`, `vmware/`, `bin/`): remove dead code,
 resolve one genuine `TODO`/`FIXME` in application logic, or tidy one stale
 dependency. One concern per PR.
 
@@ -26,9 +26,9 @@ pending or previously-rejected cleanups — pick a different target.
 ## Lane
 
 - You own: dead-code removal, genuine `TODO`/`FIXME` resolution, and stale
-  dependency cleanup within the targeted application subprojects (`clean_adblock/`,
+  dependency cleanup within the targeted application subprojects (`adblock/`,
   `nas_proxy/`, `nas_tools/`, `retriever/`, `vps_kernel_proxy/`, `vps_user_proxy/`,
-  `tianditu_bypass/`, `vmware/`) — the last of these is the one lane-explicit
+  `gov_bypass/`, `vmware/`) — the last of these is the one lane-explicit
   exception to non-negotiable #6 ("don't add dependencies or change build/lint/test config"),
   since removing or bumping a genuinely stale dep _is_ the cleanup.
 - You must NOT touch:

@@ -9,7 +9,7 @@ build and never seem to get fixed:
    `cookie-banner-blocker-skip.test.js` (`fs` line 1, `originalQuery` line 85, `sel`
    line 86) and `forum-ad-blocker-more.test.js` (`fs` line 1) — ending in
    `✖ 4 problems (0 errors, 4 warnings)`.
-2. Dozens of `make type` (JSDoc/TypeScript) errors in six `clean_adblock/*.js`
+2. Dozens of `make type` (JSDoc/TypeScript) errors in six `adblock/*.js`
    files, ending in `make type: non-blocking JS type errors remain (Typist lane)`.
 
 Why do neither fail CI, and why hasn't the automated Typist routine burned the
@@ -30,7 +30,7 @@ regardless of how many type errors JSDoc-checking finds.
 
 The type backlog isn't being burned down blindly — it _is_ being worked, just
 slowly and by design. `.jules/typist.md` defines Typist's mandate as exactly
-**one file per run**, selecting the `clean_adblock/*.js` file with the _fewest_
+**one file per run**, selecting the `adblock/*.js` file with the _fewest_
 remaining errors each time, explicitly prohibited from batching or from touching
 `jsconfig.json`/the Makefile to flip the gate early — that only happens once the
 entire repo-wide backlog hits zero. Git history confirms Typist is real and
@@ -65,10 +65,10 @@ lane's defined scope, so it sits untouched indefinitely.
   warnings named in the question, at the exact lines named, ending in
   `✖ 4 problems (0 errors, 4 warnings)`.
 - Source lines confirmed by reading the files directly:
-  `clean_adblock/__tests__/cookie-banner-blocker-skip.test.js:1` (`const fs = require('fs');`),
+  `adblock/__tests__/cookie-banner-blocker-skip.test.js:1` (`const fs = require('fs');`),
   `:85` (`const originalQuery = banner.querySelectorAll.bind(banner);`),
   `:86` (`.mockImplementation((sel) => {`); and
-  `clean_adblock/__tests__/forum-ad-blocker-more.test.js:1` (`const fs = require('fs');`).
+  `adblock/__tests__/forum-ad-blocker-more.test.js:1` (`const fs = require('fs');`).
 
 ### 2. Nothing turns warnings into failures
 
@@ -112,9 +112,9 @@ blocker.js` (15), `twitch-ad-blocker.js` (13), `popup.js` (12),
 ### 4. `jsconfig.json` has `strict: true`, consistent with TS7006-style errors
 
 - `jsconfig.json:3-6`: `"checkJs": true, "allowJs": true, "noEmit": true, "strict": true,`
-- `jsconfig.json:13-14`: scoped to `"include": ["clean_adblock/*.js"]`, explicitly
-  `"exclude": [..., "clean_adblock/__tests__"]` — type-checking never touches test
-  files, only production `clean_adblock/*.js` sources, matching the six files in
+- `jsconfig.json:13-14`: scoped to `"include": ["adblock/*.js"]`, explicitly
+  `"exclude": [..., "adblock/__tests__"]` — type-checking never touches test
+  files, only production `adblock/*.js` sources, matching the six files in
   the question.
 - `strict: true` enables `noImplicitAny` among other checks, which is exactly what
   produces TS7006 ("implicit any") errors — consistent with the question's
@@ -125,15 +125,15 @@ does not exist on type 'Element'/'Node'`)".
 ### 5. Typist's actual mandate: one file per run, ordered by fewest errors, gate flips only at zero backlog
 
 - `.jules/typist.md:24-26` (Mandate): "Each run, bring exactly **one**
-  `clean_adblock/*.js` file to type-clean... No runtime behavior change."
-- `.jules/typist.md:37-38` (Method): "Select TARGET = the `clean_adblock/*.js`
+  `adblock/*.js` file to type-clean... No runtime behavior change."
+- `.jules/typist.md:37-38` (Method): "Select TARGET = the `adblock/*.js`
   file with the **fewest** remaining `make type` errors (ties → smallest line
   count)."
 - `.jules/typist.md:51-56` (Finalize): the `|| echo` fallback is only removed
   "only when zero errors remain repo-wide" — i.e., the gate cannot flip to
   blocking piecemeal; it's all-or-nothing at the very end of the backlog.
 - `.jules/typist.md:30-33` (Lane): Typist owns only JSDoc annotations on
-  `clean_adblock/*.js` and `.d.ts` type declarations; explicitly "must NOT touch
+  `adblock/*.js` and `.d.ts` type declarations; explicitly "must NOT touch
   ... runtime logic, tests, CSS, Python, or C" — so it structurally cannot be the
   one fixing the ESLint warnings living in `__tests__/*.test.js` files.
 - `AGENTS.md:159-163` ("Enforcement note"): states plainly that "the JS
@@ -146,7 +146,7 @@ does not exist on type 'Element'/'Node'`)".
 - Bootstrap: `2b209f6` (2026-06-26) `build(types): bootstrap JS type-check
 harness and Typist persona`.
 - First real annotation: `301f924` (2026-06-26) `Hello! Jules here. I have
-successfully annotated clean_adblock/cookie-popup-blocker-main.js for
+successfully annotated adblock/cookie-popup-blocker-main.js for
 type-checking.` (pre-dates the current commit-message conventions in
   `AGENTS.md`, hence the conversational text `AGENTS.md` now explicitly forbids).
 - Subsequent commits, in order, one file each: `6319477` (06-27, `xhs-

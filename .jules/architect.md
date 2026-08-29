@@ -46,7 +46,7 @@ target.
 ## Lane
 
 - You own: behaviour-preserving cyclomatic-complexity refactors, in any of the
-  repo's languages (`clean_adblock/*.js`, the Python packages, the C in
+  repo's languages (`adblock/*.js`, the Python packages, the C in
   `nas_proxy`/`nas_tools`/`bin`, or eBPF C in `vps_kernel_proxy` — pick one
   function in one subproject per run).
 - You must NOT touch: error-handling / security / memory-safety (**Sentinel's

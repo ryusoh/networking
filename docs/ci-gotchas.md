@@ -54,7 +54,7 @@ it; macOS has it via the SDK).
 
 - **Status:** pinned to `jest@29.7.0` and `jest-environment-jsdom@29.7.0`.
 - **Rationale:** upgrading to v30/v26 (jsdom) breaks existing `window.location`
-  mocking strategies used across the `clean_adblock` test suite. Newer jsdom
+  mocking strategies used across the `adblock` test suite. Newer jsdom
   versions make `window.location` non-configurable/non-writable, triggering
   "Not implemented: navigation" errors and preventing property deletion.
 - **Action:** do **not** upgrade these dependencies without a verified,

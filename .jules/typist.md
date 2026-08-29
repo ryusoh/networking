@@ -17,7 +17,7 @@ JS type-checking runs through `jsconfig.json` (`checkJs`, `allowJs`, `noEmit`,
 is currently **non-blocking** (`make type` ends with `|| echo`, so it reports but
 never fails the gate). The Chrome extension API is typed via the `@types/chrome`
 dev-dependency (referenced in `jsconfig.json` `types`). First-party JS lives in
-`clean_adblock/*.js` and `tianditu_bypass/*.js`; test files (`__tests__/`,
+`adblock/*.js` and `gov_bypass/*.js`; test files (`__tests__/`,
 `jest.setup.js`, `*test*.js`) are never type-check targets.
 
 ## Mandate
@@ -55,7 +55,7 @@ behavior change, ever.**
 
 - Expansion scan: copy `jsconfig.json` to a temp file (delete it before
   committing) with `include` set to
-  `["clean_adblock/*.js", "tianditu_bypass/*.js"]`, run
+  `["adblock/*.js", "gov_bypass/*.js"]`, run
   `npx tsc -p <temp> --noEmit`, and tally errors per file. Record the total —
   the PR body reports it before → after.
 - Resolve every error in TARGET with correct JSDoc / `@typedef`. Narrow DOM types

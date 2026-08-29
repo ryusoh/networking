@@ -14,8 +14,8 @@ verify, and publish in one pass; the reviewer accepts or closes the PR.
 
 Each run, add real tests to the **least-covered** files first (up to 5 target files
 within a single subproject), then open one PR. **Never modify production code.**
-Coverage spans two systems: Jest (`clean_adblock/*.js`, `stall_guard/*.js`,
-`tianditu_bypass/*.js` — all in `collectCoverageFrom`) and pytest
+Coverage spans two systems: Jest (`adblock/*.js`, `stall_guard/*.js`,
+`gov_bypass/*.js` — all in `collectCoverageFrom`) and pytest
 (`nas_proxy`, `retriever`, `vps_kernel_proxy`). Pick one system per run.
 
 ## Select targets — lowest coverage first (mandatory)
@@ -53,11 +53,11 @@ already at 100% while the worst files scroll off the top. Instead:
 
 ## Lane
 
-- You own: JS extension tests (`clean_adblock/__tests__/**`,
-  `tianditu_bypass/__tests__/**`, `stall_guard/tests/**` — plain `tests/`, not
+- You own: JS extension tests (`adblock/__tests__/**`,
+  `gov_bypass/__tests__/**`, `stall_guard/tests/**` — plain `tests/`, not
   `__tests__/`, because Chrome rejects `_`-prefixed dirs in extensions) and
   `*/__tests__/**` / `test_*.py` under the Python packages (pytest).
-- You must NOT touch any production source — `clean_adblock/*.js`, the Python
+- You must NOT touch any production source — `adblock/*.js`, the Python
   modules, or any C. If a file can only be covered by changing production code,
   skip it and say why in the PR body (that gap is Sentinel's or Architect's lane).
 
@@ -66,7 +66,7 @@ already at 100% while the worst files scroll off the top. Instead:
 - **Jest is pinned to v29.** Mock `window.location` with the established
   "delete and reassign in `beforeEach`" pattern (see `GEMINI.md`). Do **not** use
   the v30 `Object.defineProperty` pattern — it fails against this jsdom.
-- **`eval`'d scripts report 0% unless instrumented.** `clean_adblock` tests load
+- **`eval`'d scripts report 0% unless instrumented.** `adblock` tests load
   content scripts via `require()` or by `eval`-ing the source. Plain
   `eval(fs.readFileSync(...))` runs uninstrumented, so coverage shows 0% even when
   the test exercises the code. Use
@@ -83,7 +83,7 @@ already at 100% while the worst files scroll off the top. Instead:
 - **Privileged Python tests self-skip** (`skipUnless` for ICMP/`eth0`, the eBPF
   compile test). A skip on macOS or a bare runner is expected; don't try to force
   them to run, and don't assert on a skipped path.
-- The `clean_adblock/__tests__/helpers/` dir is excluded from test discovery
+- The `adblock/__tests__/helpers/` dir is excluded from test discovery
   (`testPathIgnorePatterns`); put fixtures/helpers there, not new test files.
 
 ## Verification gate (before opening a PR)
@@ -102,7 +102,7 @@ already at 100% while the worst files scroll off the top. Instead:
 Conventional Commits per `AGENTS.md`. One subproject per PR.
 
 - Title / commit subject: `test(<scope>): cover <area> low-coverage paths`
-  (scope e.g. `clean_adblock`, `nas_proxy`). Imperative, lower-case, ≤ 72 chars,
+  (scope e.g. `adblock`, `nas_proxy`). Imperative, lower-case, ≤ 72 chars,
   **no emoji, no `Testpilot:` prefix**.
 - Body: each target file before → after coverage; any file skipped and why; "no
   production code changed"; pasted `make precommit` (or scoped test) output.

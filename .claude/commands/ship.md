@@ -69,6 +69,25 @@ Use this when no `<branch_name>` is given and the user has told you to ship.
 3. **Ask for acknowledgement before pushing.**
 4. Push: `git push origin <primary-branch>`.
 
+## Shipping multiple open PRs
+
+When tasked with "shipping all open PRs", follow this consolidation strategy to
+minimize conflicts:
+
+1. **Discovery:** identify all open PR branches (e.g.
+   `gh pr list --state open`).
+2. **Consolidation:**
+   - Create a temporary integration branch: `git checkout -b ship-all-prs`.
+   - Merge each PR branch into it one-by-one: `git merge <branch>`.
+3. **Conflict resolution (massive lockfile conflicts):**
+   - If `package-lock.json` has massive conflicts, do not resolve them manually.
+   - Manually edit `package.json` to include the target versions from all
+     branches.
+   - Run `npm install` to regenerate a clean lockfile.
+   - `git add package.json package-lock.json && git commit`.
+4. **Verification:** run `make precommit` on the integration branch.
+5. **Final merge:** merge the integration branch into `main` using `--no-ff`.
+
 ## Report
 
 - Summarize the actions taken, including any conflicts resolved.

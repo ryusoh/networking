@@ -34,7 +34,7 @@ entirely. It has **no bundler, no build step for JS**, **no SQL database**, and
   tile cache. Per-request `memcpy`/`malloc` in request-building and pooling
   code (e.g. `conn_pool.c`'s hostname/request buffer copies) is the realistic
   target, not algorithmic complexity.
-- **`clean_adblock/*.js` content scripts** — `MutationObserver` callbacks
+- **`adblock/*.js` content scripts** — `MutationObserver` callbacks
   firing on every DOM mutation of a live page (`content.js`,
   `forum-ad-blocker.js`, `gurufocus-unlocked.js`, `cookie-banner-blocker.js`
   are the largest). The cost center is repeated `querySelectorAll`/regex work
@@ -66,7 +66,7 @@ entirely. It has **no bundler, no build step for JS**, **no SQL database**, and
   a computed length instead of re-`strlen`ing the same buffer in a loop; reuse
   a pooled connection struct instead of allocating a fresh one per request
   where the pool already exists (`conn_pool.c`).
-- JS (`clean_adblock`): hoist a `querySelector`/`querySelectorAll` call or
+- JS (`adblock`): hoist a `querySelector`/`querySelectorAll` call or
   compiled `RegExp` out of a `MutationObserver` callback body when the
   selector/pattern is invariant across mutations; early-return the callback
   when the mutation's `target`/`addedNodes` clearly can't match before doing

@@ -30,5 +30,5 @@ This document outlines how to use a home NAS (Network Attached Storage) to centr
 ## Workflow
 
 1. Deploy the `nas_proxy` container using the provided `docker-compose.yml`.
-2. Configure the `tianditu_bypass` extension to use your NAS IP as the primary proxy.
+2. Configure the `gov_bypass` extension to use your NAS IP as the primary proxy.
 3. (Optional) Set the NAS as your primary DNS server for house-wide ad blocking.

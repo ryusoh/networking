@@ -1,5 +1,5 @@
 /**
- * Tests for clean_adblock feature modules
+ * Tests for adblock feature modules
  */
 const fs = require('fs');
 const path = require('path');

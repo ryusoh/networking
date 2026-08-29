@@ -49,7 +49,7 @@ All features can be individually toggled on/off in the extension popup (except L
 
 1. Open Chrome and navigate to `chrome://extensions`.
 2. Enable **Developer mode** (top right).
-3. Click **Load unpacked** and select the `clean_adblock` directory.
+3. Click **Load unpacked** and select the `adblock` directory.
 
 ## Usage
 
