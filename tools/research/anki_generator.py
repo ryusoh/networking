@@ -1327,8 +1327,8 @@ def _handle_status(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
     return 0
 
 
-def _handle_custom_card(args: argparse.Namespace) -> int:
-    raw_tags = [t for t in args.tags.split() if t]
+def _process_tags(raw_tags_str: str) -> list[str]:
+    raw_tags = [t for t in raw_tags_str.split() if t]
     tag_list = canonicalize_tags(raw_tags)
     dropped = [t for t in raw_tags if canonical_tag(t) is None]
     if dropped:
@@ -1336,18 +1336,10 @@ def _handle_custom_card(args: argparse.Namespace) -> int:
             f"Warning: dropping non-canonical tag(s) {dropped}; "
             "use the canonical vocabulary in anki_card_validator.CANONICAL_TAGS."
         )
-    custom_card = AnkiCard(
-        chunk_id="custom-qa",
-        file_path="custom-qa",
-        heading=args.front[:60],
-        front_html=args.front,
-        back_html=args.back,
-        tags=tag_list if tag_list else ["research", "qa_export"],
-    )
-    cards = [custom_card]
-    connect_checker = AnkiConnectChecker()
+    return tag_list if tag_list else ["research", "qa_export"]
 
-    if args.auto_launch and not connect_checker.is_available():
+def _ensure_anki_running(auto_launch: bool, connect_checker: AnkiConnectChecker) -> None:
+    if auto_launch and not connect_checker.is_available():
         print("Anki GUI is closed. Launching /Applications/Anki.app in background...")
         os.system("open -a Anki")
         import time
@@ -1357,38 +1349,63 @@ def _handle_custom_card(args: argparse.Namespace) -> int:
             if connect_checker.is_available():
                 break
 
-    imported_via_api = False
-    if not args.tsv and connect_checker.is_available():
-        try:
-            note_ids = connect_checker.add_notes(cards, deck_name=args.deck)
-            print("🎉 CUSTOM Q&A CARD INGESTION SUCCESSFUL!")
-            print(
-                f"Directly imported 1 custom Q&A card into Anki deck '{args.deck}' via AnkiConnect API."
-            )
-            print(f"Anki Note ID: {note_ids}")
-            imported_via_api = True
-        except Exception as err:
-            print(
-                f"AnkiConnect import warning: {err}. Falling back to TSV package export..."
-            )
+def _import_via_api(cards: list[AnkiCard], deck_name: str, connect_checker: AnkiConnectChecker) -> bool:
+    try:
+        note_ids = connect_checker.add_notes(cards, deck_name=deck_name)
+        print("🎉 CUSTOM Q&A CARD INGESTION SUCCESSFUL!")
+        print(
+            f"Directly imported 1 custom Q&A card into Anki deck '{deck_name}' via AnkiConnect API."
+        )
+        print(f"Anki Note ID: {note_ids}")
+        return True
+    except Exception as err:
+        print(
+            f"AnkiConnect import warning: {err}. Falling back to TSV package export..."
+        )
+        return False
 
-    if not imported_via_api:
-        exporter = TSVExporter()
-        tsv_path = exporter.export(cards)
-        print("Exported 1 custom Q&A card to TSV package file:")
-        print(f"  Path: {tsv_path}")
-        print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
+def _export_to_tsv(cards: list[AnkiCard]) -> None:
+    exporter = TSVExporter()
+    tsv_path = exporter.export(cards)
+    print("Exported 1 custom Q&A card to TSV package file:")
+    print(f"  Path: {tsv_path}")
+    print(f"  Instructions: Run 'open -a Anki {tsv_path}' or import manually.")
 
-    manifest_path = Path(args.manifest).resolve()
+def _print_coverage_report(manifest_path_str: str, coverage_path_str: str) -> None:
+    manifest_path = Path(manifest_path_str).resolve()
     if manifest_path.exists():
         try:
             manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
             chunks = manifest_data.get("chunks", [])
-            tracker = CoverageTracker(coverage_path=Path(args.coverage).resolve())
+            tracker = CoverageTracker(coverage_path=Path(coverage_path_str).resolve())
             visited_dict = tracker.data.get("visited_chunk_ids", {})
             CoverageProgressReporter.print_report(chunks, visited_dict)
         except Exception:
             pass
+
+def _handle_custom_card(args: argparse.Namespace) -> int:
+    tag_list = _process_tags(args.tags)
+    custom_card = AnkiCard(
+        chunk_id="custom-qa",
+        file_path="custom-qa",
+        heading=args.front[:60],
+        front_html=args.front,
+        back_html=args.back,
+        tags=tag_list,
+    )
+    cards = [custom_card]
+    connect_checker = AnkiConnectChecker()
+
+    _ensure_anki_running(args.auto_launch, connect_checker)
+
+    imported_via_api = False
+    if not args.tsv and connect_checker.is_available():
+        imported_via_api = _import_via_api(cards, args.deck, connect_checker)
+
+    if not imported_via_api:
+        _export_to_tsv(cards)
+
+    _print_coverage_report(args.manifest, args.coverage)
     return 0
 
 
