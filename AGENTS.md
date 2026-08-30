@@ -452,6 +452,16 @@ agent's work may be sitting in the same tree. Keep concurrent agents on
 disjoint file sets; if a rebase/conflict lands mid-run, resolve only files
 your task owns.
 
+### Externalized state & transaction boundaries
+
+On multi-step workflows (action-item sweeps, TDD loops, bug diagnosis), never
+rely on conversation memory as an execution ledger. Track task progress in
+disk-backed state files (`.agents/state/`) or in the governing findings document.
+At each transaction boundary (after commits or gate checks) and on session
+resumption, follow the skill's `## Resume protocol`: re-anchor working memory
+directly from authoritative ground truth (`git status`, `git log`, state file)
+before dispatching tools.
+
 ## Skills and slash commands
 
 - **`.agents/skills/<name>/SKILL.md` is canonical** — the open Agent Skills
