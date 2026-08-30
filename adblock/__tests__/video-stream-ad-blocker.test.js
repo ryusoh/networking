@@ -238,6 +238,30 @@ describe('video-stream-ad-blocker.js additional coverage', () => {
     jest.clearAllMocks();
   });
 
+  test('removeAdFromVideo handles track missing label', () => {
+    const srcPath = path.resolve(__dirname, '../video-stream-ad-blocker.js');
+    const instrumented = instrumentFile(srcPath);
+
+    eval(instrumented);
+
+    const video = document.createElement('video');
+    const track = document.createElement('track');
+    // Track without label
+    video.appendChild(track);
+    document.body.appendChild(video);
+
+    // We trigger the observer by appending an element, which calls removeAdFromVideo internally
+    Object.defineProperty(video, 'textTracks', {
+      value: [{ mode: 'showing' }]
+    });
+
+    const newDiv = document.createElement('div');
+    newDiv.className = 'ad-container';
+    document.body.appendChild(newDiv);
+    jest.advanceTimersByTime(100);
+
+    expect(video.textTracks[0].mode).not.toBe('hidden');
+  });
   test('removeAdFromVideo handles null video', () => {
     const srcPath = path.resolve(__dirname, '../video-stream-ad-blocker.js');
     const instrumented = instrumentFile(srcPath);
