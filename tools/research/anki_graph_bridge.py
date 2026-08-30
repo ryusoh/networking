@@ -153,6 +153,50 @@ class AnkiGraphBridge:
                 return m.group(1).lower()
         return None
 
+    def _get_candidate_nodes(self, text_words: set[str]) -> dict[str, dict[str, Any]]:
+        candidate_nodes: dict[str, dict[str, Any]] = {}
+        for w in text_words:
+            if w in self.term_index:
+                for node in self.term_index[w]:
+                    nid = node.get("id") or node.get("l") or ""
+                    candidate_nodes[nid] = node
+        return candidate_nodes
+
+    def _verify_candidates(
+        self, candidate_nodes: dict[str, dict[str, Any]], text_words: set[str]
+    ) -> dict[str, dict[str, Any]]:
+        verified: dict[str, dict[str, Any]] = {}
+        for nid, node in candidate_nodes.items():
+            label = node.get("label") or node.get("l") or ""
+            label_words = set(re.findall(r"\b[A-Za-z0-9_-]{3,}\b", label.lower()))
+            significant = {w for w in label_words if len(w) >= 5} - STOPWORDS
+            overlap = significant & text_words
+
+            if not significant:
+                continue
+
+            if len(significant) == 1 and len(overlap) == 1:
+                verified[nid] = node
+            elif len(overlap) >= 2:
+                verified[nid] = node
+        return verified
+
+    def _filter_and_score_matches(
+        self, verified: dict[str, dict[str, Any]], domain_prefix: str | None
+    ) -> list[tuple[str, float, str]]:
+        matches = []
+        for node in verified.values():
+            label = node.get("label") or node.get("l") or ""
+            node_course = node.get("course")
+            if domain_prefix and not (
+                (node_course and str(node_course).lower() == domain_prefix.lower())
+                or label.lower().startswith(domain_prefix.lower())
+            ):
+                continue
+            pr = float(node.get("pagerank") or node.get("p") or 0.0)
+            matches.append((label, pr, self.target_deck))
+        return matches
+
     def get_related_hubs(
         self, text: str, top_n: int = 3, domain_prefix: str | None = None
     ) -> list[tuple[str, float, str]]:
@@ -172,43 +216,11 @@ class AnkiGraphBridge:
             return []
 
         norm_text = text.lower()
-        candidate_nodes: dict[str, dict[str, Any]] = {}
-
-        # Phase 1: fast index lookup for candidate nodes
         text_words = set(re.findall(r"\b[A-Za-z0-9_-]{3,}\b", norm_text))
-        for w in text_words:
-            if w in self.term_index:
-                for node in self.term_index[w]:
-                    nid = node.get("id") or node.get("l") or ""
-                    candidate_nodes[nid] = node
 
-        # Phase 2: post-filter requiring >= 2 significant word overlap (or 1 if label is a single word)
-        verified: dict[str, dict[str, Any]] = {}
-        for nid, node in candidate_nodes.items():
-            label = node.get("label") or node.get("l") or ""
-            label_words = set(re.findall(r"\b[A-Za-z0-9_-]{3,}\b", label.lower()))
-            significant = {w for w in label_words if len(w) >= 5} - STOPWORDS
-            overlap = significant & text_words
-
-            if not significant:
-                continue
-
-            if len(significant) == 1 and len(overlap) == 1:
-                verified[nid] = node
-            elif len(overlap) >= 2:
-                verified[nid] = node
-
-        matches = []
-        for node in verified.values():
-            label = node.get("label") or node.get("l") or ""
-            node_course = node.get("course")
-            if domain_prefix and not (
-                (node_course and str(node_course).lower() == domain_prefix.lower())
-                or label.lower().startswith(domain_prefix.lower())
-            ):
-                continue
-            pr = float(node.get("pagerank") or node.get("p") or 0.0)
-            matches.append((label, pr, self.target_deck))
+        candidate_nodes = self._get_candidate_nodes(text_words)
+        verified = self._verify_candidates(candidate_nodes, text_words)
+        matches = self._filter_and_score_matches(verified, domain_prefix)
 
         matches.sort(key=lambda x: x[1], reverse=True)
         return matches[:top_n]
