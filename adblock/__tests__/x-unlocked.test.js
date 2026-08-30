@@ -489,3 +489,47 @@ describe('x-unlocked.js extra extra coverage', () => {
     jest.useRealTimers();
   });
 });
+
+describe('x-unlocked.js even more coverage', () => {
+  const contentScriptPath = require('path').resolve(__dirname, '../x-unlocked.js');
+  const { instrumentFile } = require('./helpers/instrument');
+
+  function loadContentScript() {
+    const code = instrumentFile(contentScriptPath);
+    eval(code);
+  }
+
+  beforeEach(() => {
+    delete window.location;
+    window.location = new URL('https://x.com/');
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  test('covers missing body early return in init', () => {
+    document.documentElement.removeChild(document.body);
+    loadContentScript();
+
+    // restore
+    document.documentElement.appendChild(document.createElement('body'));
+  });
+
+  test('covers throttle logic full paths', () => {
+    jest.useFakeTimers();
+
+    document.documentElement.innerHTML = '<head></head><body></body>';
+    window.location = new URL('https://x.com/');
+
+    loadContentScript();
+
+    // trigger observer
+    document.body.appendChild(document.createElement('div'));
+
+    // timer is now set. Trigger observer again to hit early return
+    document.body.appendChild(document.createElement('div'));
+
+    jest.advanceTimersByTime(300);
+
+    jest.useRealTimers();
+  });
+});
