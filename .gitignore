@@ -60,3 +60,7 @@ venv/
 reports/
 mutants/
 .mutmut-cache/
+
+# Agent task state ledgers
+.agents/state/
+
