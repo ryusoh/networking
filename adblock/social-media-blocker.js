@@ -99,10 +99,17 @@
           return NodeFilter.FILTER_SKIP;
         }
         // Only match elements with short direct text (likely labels, not containers)
-        const directText = Array.from(node.childNodes)
-          .filter((n) => n.nodeType === Node.TEXT_NODE)
-          .map((n) => (n.textContent || '').trim())
-          .join(' ');
+        let directText = '';
+        const childNodes = node.childNodes;
+        for (let i = 0; i < childNodes.length; i++) {
+          const n = childNodes[i];
+          if (n.nodeType === Node.TEXT_NODE) {
+            const txt = (n.textContent || '').trim();
+            if (txt) {
+              directText += (directText ? ' ' : '') + txt;
+            }
+          }
+        }
         if (
           directText.length > 0 &&
           directText.length < 200 &&
