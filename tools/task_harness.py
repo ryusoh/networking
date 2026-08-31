@@ -259,167 +259,157 @@ def reconcile_state(state: TaskState, repo_root: Path) -> tuple[bool, GateItem |
     return converged, pc, "\n".join(lines)
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Task harness state ledger for autonomous agent gate management."
+def _handle_init(args: argparse.Namespace, repo: Path) -> int:
+    doc_path = args.doc if args.doc.is_absolute() else repo / args.doc
+    if not doc_path.is_file():
+        print(f"Error: Doc not found: {doc_path}", file=sys.stderr)
+        return 1
+    content = doc_path.read_text(encoding="utf-8")
+    state = parse_work_orders(
+        content, str(doc_path.relative_to(repo) if doc_path.is_relative_to(repo) else doc_path)
     )
-    parser.add_argument("--repo", type=Path, default=Path.cwd(), help="Path to repository root")
-    parser.add_argument("--state-file", type=Path, default=None, help="Custom path to state file")
+    state_file = args.state_file or get_default_state_path(repo, state.task_id)
+    save_state(state, state_file)
+    print(f"Initialized {state.total_gates} gates from {doc_path.name} -> {state_file}")
+    return 0
 
-    sub = parser.add_subparsers(dest="command", required=True)
+def _handle_status(state: TaskState) -> int:
+    done = sum(1 for g in state.gates if g.status == "DONE")
+    skipped = sum(1 for g in state.gates if g.status == "SKIPPED")
+    pending = sum(1 for g in state.gates if g.status in ("PENDING", "IN_PROGRESS"))
+    print(f"Task: {state.task_id} ({state.source_doc})")
+    print(f"Progress: {done}/{state.total_gates} done, {skipped} skipped, {pending} pending")
+    for g in state.gates:
+        commit_str = f" [{g.commit[:8]}]" if g.commit else ""
+        print(f"  [{g.status:10}] Gate {g.number}: {g.title} ({g.tag}){commit_str}")
+    return 0
 
-    # init <doc>
-    init_parser = sub.add_parser("init", help="Initialize state from markdown document.")
-    init_parser.add_argument("doc", type=Path, help="Path to markdown document")
-
-    # status
-    sub.add_parser("status", help="Print overall task status.")
-
-    # current
-    sub.add_parser("current", help="Print current active gate as JSON.")
-
-    # reconcile
-    sub.add_parser(
-        "reconcile", help="Reconcile state ledger against git ground truth and advance PC."
-    )
-
-    # render-worker-prompt <gate>
-    prompt_parser = sub.add_parser(
-        "render-worker-prompt",
-        help="Render a stateless, zero-tacit-context prompt for a specific gate.",
-    )
-    prompt_parser.add_argument("gate", help="Gate number or ID (e.g. 1 or gate-1)")
-
-    # record-commit <gate_num> <commit_sha>
-    record_parser = sub.add_parser("record-commit", help="Record commit for gate.")
-    record_parser.add_argument("gate", help="Gate number or ID (e.g. 1 or gate-1)")
-    record_parser.add_argument("commit", help="Commit SHA hash")
-
-    # skip <gate_num>
-    skip_parser = sub.add_parser("skip", help="Mark a gate as skipped.")
-    skip_parser.add_argument("gate", help="Gate number or ID")
-    skip_parser.add_argument("--reason", default="", help="Reason for skipping")
-
-    # verify-all
-    sub.add_parser("verify-all", help="Verify all gates are done or skipped.")
-
-    args = parser.parse_args(argv)
-    repo = args.repo
-
-    if args.command == "init":
-        doc_path = args.doc if args.doc.is_absolute() else repo / args.doc
-        if not doc_path.is_file():
-            print(f"Error: Doc not found: {doc_path}", file=sys.stderr)
-            return 1
-        content = doc_path.read_text(encoding="utf-8")
-        state = parse_work_orders(
-            content, str(doc_path.relative_to(repo) if doc_path.is_relative_to(repo) else doc_path)
-        )
-        state_file = args.state_file or get_default_state_path(repo, state.task_id)
-        save_state(state, state_file)
-        print(f"Initialized {state.total_gates} gates from {doc_path.name} -> {state_file}")
+def _handle_current(state: TaskState) -> int:
+    pending_gates = [g for g in state.gates if g.status in ("PENDING", "IN_PROGRESS")]
+    if not pending_gates:
+        print(json.dumps({"status": "ALL_GATES_COMPLETED"}))
         return 0
+    current_gate = pending_gates[0]
+    print(json.dumps(asdict(current_gate), indent=2))
+    return 0
 
+def _handle_reconcile(state: TaskState, repo: Path, state_file: Path) -> int:
+    converged, pc, summary = reconcile_state(state, repo)
+    save_state(state, state_file)
+    print(summary)
+    return 0 if converged else 0
+
+def _handle_render_worker_prompt(state: TaskState, args: argparse.Namespace) -> int:
+    try:
+        prompt = render_worker_prompt(state, args.gate)
+        print(prompt)
+        return 0
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+def _find_gate(state: TaskState, gate_query: str) -> GateItem | None:
+    query = str(gate_query).strip().lower()
+    for g in state.gates:
+        if str(g.number) == query or g.id.lower() == query:
+            return g
+    return None
+
+def _handle_record_commit(state: TaskState, args: argparse.Namespace, repo: Path, state_file: Path) -> int:
+    target = _find_gate(state, args.gate)
+    if not target:
+        print(f"Error: Gate '{args.gate}' not found.", file=sys.stderr)
+        return 1
+    if not validate_commit(repo, args.commit):
+        print(f"Warning: Commit '{args.commit}' not verified in git, recording anyway.", file=sys.stderr)
+    target.status = "DONE"
+    target.commit = args.commit
+    save_state(state, state_file)
+    print(f"Recorded Gate {target.number} as DONE with commit {args.commit}")
+    return 0
+
+def _handle_skip(state: TaskState, args: argparse.Namespace, state_file: Path) -> int:
+    target = _find_gate(state, args.gate)
+    if not target:
+        print(f"Error: Gate '{args.gate}' not found.", file=sys.stderr)
+        return 1
+    target.status = "SKIPPED"
+    if args.reason:
+        target.notes = args.reason
+    save_state(state, state_file)
+    print(f"Marked Gate {target.number} as SKIPPED")
+    return 0
+
+def _handle_verify_all(state: TaskState) -> int:
+    unresolved = [g for g in state.gates if g.status in ("PENDING", "IN_PROGRESS", "FAILED")]
+    if unresolved:
+        print(f"Error: {len(unresolved)} gates unresolved:", file=sys.stderr)
+        for g in unresolved:
+            print(f"  - Gate {g.number}: {g.title} [{g.status}]", file=sys.stderr)
+        return 1
+    print(f"All {state.total_gates} gates verified (done or skipped).")
+    return 0
+
+def _get_active_state_file(repo: Path, args: argparse.Namespace) -> Path:
     state_file = args.state_file or get_default_state_path(repo, "task-workflow")
-    # If default doesn't exist, pick the newest json file in .agents/state/
     if not state_file.is_file() and not args.state_file:
         state_dir = repo / ".agents" / "state"
         if state_dir.is_dir():
             files = sorted(state_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
             if files:
                 state_file = files[0]
+    return state_file
 
+def _setup_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Task harness state ledger for autonomous agent gate management.")
+    parser.add_argument("--repo", type=Path, default=Path.cwd(), help="Path to repository root")
+    parser.add_argument("--state-file", type=Path, default=None, help="Custom path to state file")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    init_parser = sub.add_parser("init", help="Initialize state from markdown document.")
+    init_parser.add_argument("doc", type=Path, help="Path to markdown document")
+
+    sub.add_parser("status", help="Print overall task status.")
+    sub.add_parser("current", help="Print current active gate as JSON.")
+    sub.add_parser("reconcile", help="Reconcile state ledger against git ground truth and advance PC.")
+
+    prompt_parser = sub.add_parser("render-worker-prompt", help="Render a stateless, zero-tacit-context prompt for a specific gate.")
+    prompt_parser.add_argument("gate", help="Gate number or ID (e.g. 1 or gate-1)")
+
+    record_parser = sub.add_parser("record-commit", help="Record commit for gate.")
+    record_parser.add_argument("gate", help="Gate number or ID (e.g. 1 or gate-1)")
+    record_parser.add_argument("commit", help="Commit SHA hash")
+
+    skip_parser = sub.add_parser("skip", help="Mark a gate as skipped.")
+    skip_parser.add_argument("gate", help="Gate number or ID")
+    skip_parser.add_argument("--reason", default="", help="Reason for skipping")
+
+    sub.add_parser("verify-all", help="Verify all gates are done or skipped.")
+    return parser
+
+def main(argv: list[str] | None = None) -> int:
+    parser = _setup_parser()
+    args = parser.parse_args(argv)
+    repo = args.repo
+
+    if args.command == "init":
+        return _handle_init(args, repo)
+
+    state_file = _get_active_state_file(repo, args)
     if not state_file.is_file():
         print("Error: No active state file found. Run 'init' first.", file=sys.stderr)
         return 1
 
     state = load_state(state_file)
-
-    if args.command == "status":
-        done = sum(1 for g in state.gates if g.status == "DONE")
-        skipped = sum(1 for g in state.gates if g.status == "SKIPPED")
-        pending = sum(1 for g in state.gates if g.status in ("PENDING", "IN_PROGRESS"))
-        print(f"Task: {state.task_id} ({state.source_doc})")
-        print(f"Progress: {done}/{state.total_gates} done, {skipped} skipped, {pending} pending")
-        for g in state.gates:
-            commit_str = f" [{g.commit[:8]}]" if g.commit else ""
-            print(f"  [{g.status:10}] Gate {g.number}: {g.title} ({g.tag}){commit_str}")
-        return 0
-
-    if args.command == "current":
-        pending_gates = [g for g in state.gates if g.status in ("PENDING", "IN_PROGRESS")]
-        if not pending_gates:
-            print(json.dumps({"status": "ALL_GATES_COMPLETED"}))
-            return 0
-        current_gate = pending_gates[0]
-        print(json.dumps(asdict(current_gate), indent=2))
-        return 0
-
-    if args.command == "reconcile":
-        converged, pc, summary = reconcile_state(state, repo)
-        save_state(state, state_file)
-        print(summary)
-        return 0 if converged else 0
-
-    if args.command == "render-worker-prompt":
-        try:
-            prompt = render_worker_prompt(state, args.gate)
-            print(prompt)
-            return 0
-        except ValueError as e:
-            print(f"Error: {e}", file=sys.stderr)
-            return 1
-
-    if args.command == "record-commit":
-        gate_query = str(args.gate).strip().lower()
-        target = None
-        for g in state.gates:
-            if str(g.number) == gate_query or g.id.lower() == gate_query:
-                target = g
-                break
-        if not target:
-            print(f"Error: Gate '{args.gate}' not found.", file=sys.stderr)
-            return 1
-        if not validate_commit(repo, args.commit):
-            print(
-                f"Warning: Commit '{args.commit}' not verified in git, recording anyway.",
-                file=sys.stderr,
-            )
-        target.status = "DONE"
-        target.commit = args.commit
-        save_state(state, state_file)
-        print(f"Recorded Gate {target.number} as DONE with commit {args.commit}")
-        return 0
-
-    if args.command == "skip":
-        gate_query = str(args.gate).strip().lower()
-        target = None
-        for g in state.gates:
-            if str(g.number) == gate_query or g.id.lower() == gate_query:
-                target = g
-                break
-        if not target:
-            print(f"Error: Gate '{args.gate}' not found.", file=sys.stderr)
-            return 1
-        target.status = "SKIPPED"
-        if args.reason:
-            target.notes = args.reason
-        save_state(state, state_file)
-        print(f"Marked Gate {target.number} as SKIPPED")
-        return 0
-
-    if args.command == "verify-all":
-        unresolved = [g for g in state.gates if g.status in ("PENDING", "IN_PROGRESS", "FAILED")]
-        if unresolved:
-            print(f"Error: {len(unresolved)} gates unresolved:", file=sys.stderr)
-            for g in unresolved:
-                print(f"  - Gate {g.number}: {g.title} [{g.status}]", file=sys.stderr)
-            return 1
-        print(f"All {state.total_gates} gates verified (done or skipped).")
-        return 0
+    if args.command == "status": return _handle_status(state)
+    if args.command == "current": return _handle_current(state)
+    if args.command == "reconcile": return _handle_reconcile(state, repo, state_file)
+    if args.command == "render-worker-prompt": return _handle_render_worker_prompt(state, args)
+    if args.command == "record-commit": return _handle_record_commit(state, args, repo, state_file)
+    if args.command == "skip": return _handle_skip(state, args, state_file)
+    if args.command == "verify-all": return _handle_verify_all(state)
 
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
