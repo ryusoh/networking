@@ -64,6 +64,25 @@
   }
 
   /**
+   * @param {Node} node
+   * @returns {string}
+   */
+  function extractDirectText(node) {
+    let directText = '';
+    const childNodes = node.childNodes;
+    for (let i = 0; i < childNodes.length; i++) {
+      const n = childNodes[i];
+      if (n.nodeType === Node.TEXT_NODE) {
+        const txt = (n.textContent || '').trim();
+        if (txt) {
+          directText += (directText ? ' ' : '') + txt;
+        }
+      }
+    }
+    return directText;
+  }
+
+  /**
    * @param {Document | Element} root
    * @param {PlatformConfig} config
    * @param {HTMLElement[]} results
@@ -85,6 +104,25 @@
   }
 
   /**
+   * @param {Node} node
+   * @returns {string}
+   */
+  function extractDirectText(node) {
+    let directText = '';
+    const childNodes = node.childNodes;
+    for (let i = 0; i < childNodes.length; i++) {
+      const n = childNodes[i];
+      if (n.nodeType === Node.TEXT_NODE) {
+        const txt = (n.textContent || '').trim();
+        if (txt) {
+          directText += (directText ? ' ' : '') + txt;
+        }
+      }
+    }
+    return directText;
+  }
+
+  /**
    * @param {Document | Element} root
    * @param {PlatformConfig} config
    * @param {HTMLElement[]} results
@@ -98,18 +136,9 @@
         if (processedElements.has(node) || !isVisible(/** @type {Element} */ (node))) {
           return NodeFilter.FILTER_SKIP;
         }
-        // Only match elements with short direct text (likely labels, not containers)
-        let directText = '';
-        const childNodes = node.childNodes;
-        for (let i = 0; i < childNodes.length; i++) {
-          const n = childNodes[i];
-          if (n.nodeType === Node.TEXT_NODE) {
-            const txt = (n.textContent || '').trim();
-            if (txt) {
-              directText += (directText ? ' ' : '') + txt;
-            }
-          }
-        }
+
+        const directText = extractDirectText(node);
+
         if (
           directText.length > 0 &&
           directText.length < 200 &&
