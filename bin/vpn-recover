@@ -200,6 +200,8 @@ say "verdict: repairs applied but connectivity still failing."
 say "next steps:"
 say "  - quit and relaunch the SS/vmess client (Clash Verge, Shadowrocket), or toggle its TUN mode"
 say "  - if Shadowrocket: check that your JMS/subscription node is actually online (not expired)"
+say "  - if only direct-routed (domestic) domains time out while proxied sites work:"
+say "    run 'bin/shadowrocket-dns-fix' — Shadowrocket's dns-server=system loops into fake-ip DNS"
 say "  - if Astrill is fully quit but utun interfaces keep accumulating, reboot once"
 say "  - run 'bin/check-ss <local-socks-port>' or 'bin/vpn-proxy-check' to test the proxy itself"
 exit 1

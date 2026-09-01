@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# shadowrocket-dns-fix — diagnose and repair Shadowrocket's circular
+# "dns-server = system" failure on macOS.
+#
+# Background: in fake-ip TUN mode the macOS system resolver points at the
+# tunnel itself (198.18.x.x). With Shadowrocket's `dns-server = system`
+# setting, the tunnel resolves DIRECT-routed domains through the system
+# resolver — i.e. through itself — so every direct connection dies after a
+# DNS timeout (browsers report DNS_PROBE_FINISHED_BAD_CONFIG while proxied
+# sites still work). The upstream resolver is captured when the tunnel
+# starts, so any restart while fake-ip DNS is still registered (sleep/wake,
+# network switch, VPN reconnect) arms the loop.
+#
+# The fix writes an explicit upstream resolver (default 223.5.5.5) into the
+# config database and bounces the app + packet tunnel.
+#
+# Usage:
+#   shadowrocket-dns-fix              diagnose only (no changes)
+#   shadowrocket-dns-fix --fix [dns]  set dns-server (default 223.5.5.5)
+#                                     and restart Shadowrocket
+#
+# Exit code: 0 = healthy / repaired, 1 = vulnerable config found (diagnose)
+# or verification failed (fix).
+#
+# Test hooks: SR_DB and SR_BACKUP_DIR override default paths, and
+# SR_NO_APP_RESTART=1 skips quitting/relaunching the app (used by
+# bin/__tests__/test_shadowrocket_dns_fix.py).
+
+set -uo pipefail
+
+FIX=0
+NEW_DNS="223.5.5.5"
+if [[ "${1:-}" == "--fix" ]]; then
+    FIX=1
+    [[ -n "${2:-}" ]] && NEW_DNS="$2"
+fi
+
+SR_DB="${SR_DB:-$HOME/Library/Containers/com.liguangming.Shadowrocket/Data/Documents/Databases/default.db}"
+SR_BACKUP_DIR="${SR_BACKUP_DIR:-$HOME/.shadowrocket-dns-fix-backup}"
+
+say() { echo "$@"; }
+
+dns_server_value() {
+    sqlite3 "$SR_DB" "select value from config where section='general' and name='dns-server';" 2>/dev/null
+}
+
+system_dns_is_fake_ip() {
+    # 198.18.0.0/15 is the benchmark range Shadowrocket uses for fake-ip.
+    scutil --dns 2>/dev/null | awk '/nameserver\[/ {print $NF}' | grep -qE '^198\.(18|19)\.'
+}
+
+shadowrocket_running() {
+    pgrep -x Shadowrocket >/dev/null 2>&1
+}
+
+# ---------------------------------------------------------------------------
+say "== shadowrocket-dns-fix =="
+
+if [[ ! -f "$SR_DB" ]]; then
+    say "config database not found: $SR_DB"
+    say "(Shadowrocket not installed, or never launched — nothing to do.)"
+    exit 0
+fi
+
+CURRENT=$(dns_server_value)
+if [[ -z "$CURRENT" ]]; then
+    say "could not read general.dns-server from the config database."
+    exit 1
+fi
+say "dns-server setting: $CURRENT"
+
+FAKE=0
+if system_dns_is_fake_ip; then
+    FAKE=1
+    say "system resolver:    fake-ip (198.18.x.x — tunnel DNS is active)"
+else
+    say "system resolver:    not a tunnel fake-ip address"
+fi
+
+vulnerable=0
+if [[ "$CURRENT" == "system" ]]; then
+    if [[ $FAKE -eq 1 ]]; then
+        say "verdict: BROKEN — dns-server=system resolves through the tunnel's own fake-ip DNS; direct-routed domains time out."
+    else
+        say "verdict: vulnerable — dns-server=system becomes circular the next time the tunnel restarts while fake-ip DNS is registered."
+    fi
+    vulnerable=1
+else
+    say "verdict: healthy — explicit upstream resolver configured."
+fi
+
+if [[ $FIX -eq 0 ]]; then
+    if [[ $vulnerable -eq 1 ]]; then
+        say "run 'shadowrocket-dns-fix --fix' to set an explicit resolver (223.5.5.5)."
+        exit 1
+    fi
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+say
+say "== applying fix (dns-server -> $NEW_DNS) =="
+
+if [[ "$CURRENT" == "$NEW_DNS" ]]; then
+    say "already set to $NEW_DNS — nothing to change."
+    exit 0
+fi
+
+mkdir -p "$SR_BACKUP_DIR"
+for f in "$SR_DB" "$SR_DB-wal" "$SR_DB-shm"; do
+    [[ -f "$f" ]] && cp -p "$f" "$SR_BACKUP_DIR/"
+done
+say "backup: $SR_BACKUP_DIR"
+
+if [[ "${SR_NO_APP_RESTART:-0}" != "1" ]]; then
+    if shadowrocket_running; then
+        say "quitting Shadowrocket"
+        osascript -e 'tell application "Shadowrocket" to quit' 2>/dev/null || true
+        for _ in $(seq 1 10); do
+            shadowrocket_running || break
+            sleep 0.5
+        done
+        pkill -x Shadowrocket 2>/dev/null || true
+    fi
+    pkill -f MacPacketTunnel 2>/dev/null || true
+    sleep 1
+fi
+
+sqlite3 "$SR_DB" "update config set value='$NEW_DNS' where section='general' and name='dns-server';"
+UPDATED=$(dns_server_value)
+if [[ "$UPDATED" != "$NEW_DNS" ]]; then
+    say "ERROR: update did not stick (read back '$UPDATED')."
+    exit 1
+fi
+say "dns-server is now: $UPDATED"
+
+if [[ "${SR_NO_APP_RESTART:-0}" == "1" ]]; then
+    say "SR_NO_APP_RESTART=1 — skipping app restart and verification."
+    exit 0
+fi
+
+say "relaunching Shadowrocket"
+open -a Shadowrocket
+
+# Wait for the tunnel to come back, then verify a direct-routed domain.
+for _ in $(seq 1 30); do
+    ifconfig utun8 >/dev/null 2>&1 && break
+    sleep 1
+done
+
+rc=0
+check() {
+    local label="$1"; shift
+    if curl -sS -o /dev/null --max-time 10 "$@" 2>/dev/null; then
+        say "  $label: OK"
+    else
+        say "  $label: FAIL"
+        rc=1
+    fi
+}
+check "direct-routed domain (bilibili.com)" https://www.bilibili.com
+check "proxied domain (google.com)" https://www.google.com
+
+if [[ $rc -eq 0 ]]; then
+    say "verdict: repaired — direct and proxied traffic both work."
+else
+    say "verdict: dns-server updated but verification failed."
+    say "next steps:"
+    say "  - toggle the Shadowrocket connection off/on in the app"
+    say "  - check that your proxy node is online (bin/vpn-proxy-check)"
+fi
+exit $rc
