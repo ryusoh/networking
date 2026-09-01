@@ -13,12 +13,14 @@ research/.durable_memory.json
 research/.anki_coverage.json
 research/.anki_density_baseline.json
 research/.dense_vectors.json
+research/.search_log.jsonl
 research/anki_import.txt
 research/anki_import.chunks.json
 research/anki_candidates.jsonl
 research/anki_cards.jsonl
 research/anki_review.jsonl
 research/anki_density_verdicts.jsonl
+research/anki_import_batch.json
 *.so
 *.dylib
 tile_storage

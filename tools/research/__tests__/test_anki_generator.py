@@ -2,6 +2,7 @@
 
 import sqlite3
 from pathlib import Path
+from typing import Any
 from tools.research.anki_generator import (
     AnkiCard,
     AnkiConnectChecker,
@@ -1270,4 +1271,54 @@ def test_import_without_verdicts_file_imports_all(monkeypatch, tmp_path: Path):
     )
     assert ret == 0
     assert len(imported_cards) == 2
+
+
+def test_import_writes_batch_marker(monkeypatch, tmp_path: Path):
+    """Successful import writes anki_import_batch.json marker in cards directory."""
+    import json
+    from tools.research.anki_generator import AnkiConnectChecker, import_reviewed_cards
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(AnkiConnectChecker, "add_notes", lambda self, cards, deck_name: [12345])
+
+    cards_file = tmp_path / "anki_cards.jsonl"
+    cards_data = [
+        {
+            "chunk_id": "c1",
+            "front": "拜占庭将军问题: 口头消息的可解条件是什么？",
+            "back": (
+                "<div><b>定义:</b></div><div>仅使用 <b>oral messages</b> 时，可解当且仅当超过三分之二忠诚。</div>"
+                "<div><b>源码与文档引用 (Source Citation):</b> [research/x.md#L1-L5](file:///tmp/x.md#L1-L5)</div>"
+            ),
+            "tags": ["research"],
+        }
+    ]
+    cards_file.write_text(
+        json.dumps(cards_data[0], ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    coverage_file = tmp_path / "cov.json"
+    coverage_file.write_text("{}", encoding="utf-8")
+    review_file = tmp_path / "review.jsonl"
+    nonexistent_verdicts = tmp_path / "nonexistent_verdicts.jsonl"
+
+    ret = import_reviewed_cards(
+        "金融",
+        coverage_file,
+        cards_path=cards_file,
+        review_path=review_file,
+        verdicts_path=nonexistent_verdicts,
+    )
+    assert ret == 0
+    marker_path = tmp_path / "anki_import_batch.json"
+    assert marker_path.exists()
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert marker["deck"] == "金融"
+    assert marker["source"] == "anki_cards.jsonl"
+    assert marker["imported"] == 1
+    assert marker["attempted"] == 1
+    assert marker["note_ids"] == [12345]
+    assert "closed_at" in marker
+
 

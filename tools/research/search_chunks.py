@@ -14,6 +14,7 @@ import json
 import math
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -240,6 +241,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         if not ranked_results:
             print(f"No results found for query: '{args.query}'")
+            log_path = manifest_path.parent / ".search_log.jsonl"
+            with log_path.open("a", encoding="utf-8") as fh:
+                fh.write(
+                    json.dumps(
+                        {
+                            "ts": datetime.now(timezone.utc).isoformat(),
+                            "query": args.query,
+                            "mode": "rrf" if args.rrf else "bm25",
+                            "hits": 0,
+                        }
+                    )
+                    + "\n"
+                )
             return 0
 
         print(f"Top {len(ranked_results)} results for query: '{args.query}'\n")

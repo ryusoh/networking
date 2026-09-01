@@ -1211,6 +1211,23 @@ def import_reviewed_cards(
 
     imported = _record_import_coverage(anki_cards, note_ids, deck_name, coverage_path, review_path)
 
+    marker_path = cards_path.parent / "anki_import_batch.json"
+    marker_path.write_text(
+        json.dumps(
+            {
+                "closed_at": datetime.now(timezone.utc).isoformat(),
+                "deck": deck_name,
+                "source": source_path.name,
+                "imported": imported,
+                "attempted": len(anki_cards),
+                "note_ids": note_ids,
+            },
+            indent=2,
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
     print(f"Imported {imported}/{len(cards)} reviewed cards into deck '{deck_name}'.")
     print(f"Anki Note IDs: {note_ids}")
     return 0

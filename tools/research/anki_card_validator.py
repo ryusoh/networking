@@ -463,6 +463,23 @@ def _tag_issues(tags: Any) -> list[str]:
     return issues
 
 
+def _external_source_issues(sources: Any) -> list[str]:
+    """Shape-check the optional external_sources provenance list when present."""
+    if sources is None:
+        return []
+    if not isinstance(sources, list):
+        return ["external_sources must be a list of {url, retrieved, claim} objects"]
+    issues: list[str] = []
+    for i, src in enumerate(sources):
+        if not isinstance(src, dict) or not all(
+            k in src for k in ("url", "retrieved", "claim")
+        ):
+            issues.append(
+                f"external_sources[{i}] must be an object with url, retrieved, claim"
+            )
+    return issues
+
+
 def validate_cards(cards: list[dict[str, Any]]) -> dict[str, list[str]]:
     """Validate a list of card dicts {front, back, chunk_id?, tags?}."""
     issues: dict[str, list[str]] = {}
@@ -471,7 +488,7 @@ def validate_cards(cards: list[dict[str, Any]]) -> dict[str, list[str]]:
         front = card.get("front", "")
         back = card.get("back", "")
         fronts.append(front)
-        card_issues = _validate_card(front, back) + _tag_issues(card.get("tags"))
+        card_issues = _validate_card(front, back) + _tag_issues(card.get("tags")) + _external_source_issues(card.get("external_sources"))
         if card_issues:
             issues[f"card {i}"] = card_issues
 

@@ -142,6 +142,9 @@ class SceneBuilder:
             "## MANDATORY CITATION CONTRACT",
             "When answering or explaining concepts from this context, you MUST cite all claims and code details using exact line-anchored Markdown links in the following format:",
             "`[file_path#Lstart-Lend](file:///absolute_path#Lstart-Lend)`",
+            "",
+            "## ACCEPTANCE CONTRACT",
+            "Before delivering the answer: (1) every claim from these blocks carries a citation in the format above; (2) the answer contains at least 3 citations; (3) `python3 tools/research/citation_engine.py <answer_file>` exits 0. Fix and re-verify on any failure.",
         ]
 
         if memory_context:

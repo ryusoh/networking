@@ -321,7 +321,7 @@ Resolves the two documented spec exceptions (dead `pending_import` state,
 stale `anki_import.chunks.json`) by making roles visible by inspection.
 
 - **File:** `docs/research/anki-card-pipeline-spec.md`
-- **Find:** `All JSONL files above are ignored by `.gitignore`.`
+- **Find:** ``All JSONL files above are ignored by `.gitignore`.``
 - **Change:** immediately after that line, insert a blank line and this block:
 
   ```text
@@ -348,7 +348,12 @@ stale `anki_import.chunks.json`) by making roles visible by inspection.
 ### 2. `[low]` Scene-level acceptance contract (enhancement 5)
 
 - **File:** `tools/research/scene_builder.py`
-- **Find:** `            "## MANDATORY CITATION CONTRACT",`
+- **Find:**
+
+  ```python
+              "## MANDATORY CITATION CONTRACT",
+  ```
+
 - **Change:** in `_render_markdown_scene`, immediately after the list entry
   `` `[file_path#Lstart-Lend](file:///absolute_path#Lstart-Lend)`", ``
   insert these entries (same indentation, trailing commas):
@@ -367,7 +372,11 @@ stale `anki_import.chunks.json`) by making roles visible by inspection.
 
 - **Files:** `tools/research/anki_generator.py`, `.gitignore`
 - **Find (anki_generator.py):**
-  `    imported = _record_import_coverage(anki_cards, note_ids, deck_name, coverage_path, review_path)`
+
+  ```python
+      imported = _record_import_coverage(anki_cards, note_ids, deck_name, coverage_path, review_path)
+  ```
+
 - **Change:** immediately after that line in `import_reviewed_cards`, insert:
 
   ```python
@@ -477,9 +486,17 @@ stale `anki_import.chunks.json`) by making roles visible by inspection.
   ```
 
   Then — **Find:**
-  `        card_issues = _validate_card(front, back) + _tag_issues(card.get("tags"))`
+
+  ```python
+          card_issues = _validate_card(front, back) + _tag_issues(card.get("tags"))
+  ```
+
   — replace with:
-  `        card_issues = _validate_card(front, back) + _tag_issues(card.get("tags")) + _external_source_issues(card.get("external_sources"))`
+
+  ```python
+          card_issues = _validate_card(front, back) + _tag_issues(card.get("tags")) + _external_source_issues(card.get("external_sources"))
+  ```
+
 - **Verify:** `python3 -m pytest tools/research/__tests__/test_anki_card_validator.py -q`
 - **Guardrail:** the field is optional — a card without `external_sources`
   must produce zero issues, so keep the `sources is None` early return.
@@ -510,7 +527,7 @@ Do this only after work order 5 lands.
   Then run `python3 tools/sync_commands.py` to regenerate
   `.claude/commands/research-agent.md` and include it in the same commit.
 - **File:** `docs/research/anki-card-pipeline-spec.md`
-- **Find:** `does not strip or require `citation` in the raw JSONL loader.`
+- **Find:** ``does not strip or require `citation` in the raw JSONL loader.``
 - **Change:** immediately after that bullet, insert:
 
   ```text

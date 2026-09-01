@@ -82,13 +82,30 @@ in §4.
 | :------------------------------------- | :-------------------------------------------------------------------------------------------------------- | :------------------------------ |
 | `research/anki_candidates.jsonl`       | Selected chunks with `chunk_id`, `file_path`, `heading`, `start_line`, `end_line`, `content`, `citation`  | `--candidates`                  |
 | `research/anki_cards.jsonl`            | Agent-authored cards: `{chunk_id, front, back, tags, citation}`                                           | LLM agent                       |
-| `research/anki_density_verdicts.jsonl` | Density gate verdicts: `{chunk_id, density, threshold, decision, consolidation_group?, enrich_context?}` | `anki_density_gate.py`          |
+| `research/anki_density_verdicts.jsonl` | Density gate verdicts: `{chunk_id, density, threshold, decision, consolidation_group?, enrich_context?}`  | `anki_density_gate.py`          |
 | `research/.anki_density_baseline.json` | Pinned deck baseline metrics and domain lexicon cache                                                     | `anki_density_baseline.py`      |
 | `research/anki_review.jsonl`           | Append-only audit log: `{ts, chunk_id, verdict, reason?, note_id?}`                                       | `--reject-chunk`, `--import`    |
 | `research/.anki_coverage.json`         | Coverage state (see §4 for writers)                                                                       | CLI verbs + import verifier     |
 | `research/anki_import.txt`             | Legacy TSV package (fallback)                                                                             | `--front/--back` or legacy path |
 
 All JSONL files above are ignored by `.gitignore`.
+
+Artifact roles (one per file; planning reads canonical state, derived views
+and audit snapshots explain decisions but never override their sources):
+
+- `research/.anki_coverage.json` — canonical_state (single writer:
+  `CoverageTracker`; the import-verifier rewrite in §4 is a documented
+  exception)
+- `research/.anki_density_baseline.json` — canonical_state (preregistered
+  baseline, written only by `anki_density_baseline.py`)
+- `research/anki_cards.jsonl` — canonical_state for the batch under review
+  (writer: the LLM agent)
+- `research/anki_density_verdicts.jsonl` — validation_signal
+- `research/anki_candidates.jsonl` — derived_view (rebuildable via
+  `--candidates`; never edit by hand)
+- `research/anki_review.jsonl` — audit_snapshot (append-only)
+- `research/anki_import.txt` + `research/anki_import.chunks.json` —
+  partial_output (legacy; stale, nothing regenerates them)
 
 Notes:
 
@@ -222,6 +239,10 @@ Development)`) — this one **is** machine-enforced.
   line-anchored Markdown link. The validator now enforces the presence of this
   section and the format of its `file://` line-anchored links; `--import` still
   does not strip or require `citation` in the raw JSONL loader.
+- **External sources (optional):** cards enriched via web search may carry an
+  `external_sources` list in the JSONL — objects with `url`, `retrieved` (ISO
+  date), and `claim` (the exact claim the source supports). The validator
+  shape-checks it when present (§9); absence is not an error.
 
 The validator enforces the mechanical subset of these rules; `--import` refuses
 violating cards unless `--force`.

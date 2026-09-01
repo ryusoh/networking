@@ -117,6 +117,11 @@ When invoking the Anki pipeline or reviewing candidate flashcards:
 5. **Card Enhancement:** Enrich the Back field with synthesized web search
    insights under **背景与痛点 (Motivation & Pain Points)** and **核心机制
    (Core Mechanism)** alongside the primary courseware line citations.
+6. **External-source provenance:** when a web search informs a card, add an
+   `external_sources` list to the card's JSONL object:
+   `[{"url": ..., "retrieved": "YYYY-MM-DD", "claim": "exact claim the source supports"}]`.
+   The validator shape-checks it when present; web-derived claims stay out of
+   the line-anchored courseware citation section.
 
 ### 6. Re-index Courseware Chunks (if files changed)
 
