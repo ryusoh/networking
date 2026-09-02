@@ -283,22 +283,64 @@ static void resolve_hostname(Host *h) {
 
 /* --- Detect local subnet --- */
 
+static int is_valid_candidate(struct ifaddrs *ifa, const char *iface) {
+    if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET) return 0;
+    if (ifa->ifa_flags & IFF_LOOPBACK) return 0;
+    if (iface && strcmp(ifa->ifa_name, iface) != 0) return 0;
+    return 1;
+}
+
+static int score_ip_range(unsigned char first, unsigned char second) {
+    if (first == 169 && second == 254) return -1;
+    if (first == 10) return 100;
+    if (first == 192 && second == 168) return 100;
+    if (first == 172 && second >= 16 && second <= 31) return 100;
+    return 50;
+}
+
+static int score_iface_name(const char *name) {
+    int penalty = 0;
+    int bonus = 0;
+    if (strncmp(name, "docker", 6) == 0 ||
+        strncmp(name, "veth", 4) == 0 ||
+        strncmp(name, "br-", 3) == 0 ||
+        strncmp(name, "virbr", 5) == 0) {
+        penalty = 80;
+    }
+    if (strncmp(name, "eth0", 4) == 0 ||
+        strncmp(name, "en", 2) == 0 ||
+        strncmp(name, "br0", 3) == 0 ||
+        strncmp(name, "bond", 4) == 0) {
+        bonus = 10;
+    }
+    return bonus - penalty;
+}
+
+static int extract_subnet(const char *best_ip, const char *best_iface, char *base_ip, int base_ip_size) {
+    char *last_dot = strrchr(best_ip, '.');
+    if (last_dot) {
+        size_t prefix_len = last_dot - best_ip;
+        if (prefix_len < (size_t)base_ip_size) {
+            memcpy(base_ip, best_ip, prefix_len);
+            base_ip[prefix_len] = '\0';
+            snprintf(g_self_ip, sizeof(g_self_ip), "%s", best_ip);
+            printf("[scanner] Detected subnet: %s.0/24 (%s)\n", base_ip, best_iface);
+            return 0;
+        }
+    }
+    return -1;
+}
+
 static int detect_subnet(const char *iface, char *base_ip, int base_ip_size) {
     struct ifaddrs *ifaddr, *ifa;
     if (getifaddrs(&ifaddr) != 0) return -1;
 
-    /* When no interface specified, pick the best candidate:
-       skip loopback, link-local (169.254.x.x), and virtual/docker interfaces */
     char best_ip[16] = {0};
     char best_iface[32] = {0};
     int best_score = -1;
 
     for (ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
-        if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET) continue;
-        if (ifa->ifa_flags & IFF_LOOPBACK) continue;
-
-        /* If interface specified, match it */
-        if (iface && strcmp(ifa->ifa_name, iface) != 0) continue;
+        if (!is_valid_candidate(ifa, iface)) continue;
 
         struct sockaddr_in *sa = (struct sockaddr_in *)ifa->ifa_addr;
         char ip[16];
@@ -308,60 +350,25 @@ static int detect_subnet(const char *iface, char *base_ip, int base_ip_size) {
         unsigned char first = (addr >> 24) & 0xFF;
         unsigned char second = (addr >> 16) & 0xFF;
 
-        /* Skip link-local 169.254.x.x */
-        if (first == 169 && second == 254) continue;
-
-        /* Score interfaces: prefer real LAN interfaces */
-        int score = 0;
-
-        /* Private ranges (10.x, 192.168.x, 172.16-31.x) get high score */
-        if (first == 10) score = 100;
-        else if (first == 192 && second == 168) score = 100;
-        else if (first == 172 && second >= 16 && second <= 31) score = 100;
-        else score = 50; /* public IP, less likely on LAN */
-
-        /* Penalize virtual/docker interfaces */
-        const char *name = ifa->ifa_name;
-        if (strncmp(name, "docker", 6) == 0 ||
-            strncmp(name, "veth", 4) == 0 ||
-            strncmp(name, "br-", 3) == 0 ||
-            strncmp(name, "virbr", 5) == 0) {
-            score -= 80;
-        }
-
-        /* Prefer common physical names */
-        if (strncmp(name, "eth0", 4) == 0 ||
-            strncmp(name, "en", 2) == 0 ||
-            strncmp(name, "br0", 3) == 0 ||
-            strncmp(name, "bond", 4) == 0) {
-            score += 10;
-        }
+        int score = score_ip_range(first, second);
+        if (score < 0) continue;
+        score += score_iface_name(ifa->ifa_name);
 
         if (iface || score > best_score) {
             best_score = score;
             snprintf(best_ip, sizeof(best_ip), "%s", ip);
-            snprintf(best_iface, sizeof(best_iface), "%s", name);
-            if (iface) break; /* exact match requested */
+            snprintf(best_iface, sizeof(best_iface), "%s", ifa->ifa_name);
+            if (iface) break;
         }
     }
 
+    int ret = -1;
     if (best_score >= 0) {
-        char *last_dot = strrchr(best_ip, '.');
-        if (last_dot) {
-            size_t prefix_len = last_dot - best_ip;
-            if (prefix_len < (size_t)base_ip_size) {
-                memcpy(base_ip, best_ip, prefix_len);
-                base_ip[prefix_len] = '\0';
-                snprintf(g_self_ip, sizeof(g_self_ip), "%s", best_ip);
-                freeifaddrs(ifaddr);
-                printf("[scanner] Detected subnet: %s.0/24 (%s)\n", base_ip, best_iface);
-                return 0;
-            }
-        }
+        ret = extract_subnet(best_ip, best_iface, base_ip, base_ip_size);
     }
 
     freeifaddrs(ifaddr);
-    return -1;
+    return ret;
 }
 
 /* --- Threaded ping sweep --- */
