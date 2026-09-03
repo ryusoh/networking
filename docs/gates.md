@@ -60,18 +60,19 @@ agents).
 `tools/check_bot_pr_hygiene.py`, a stdlib-only deterministic check over every
 commit authored by `google-labs-jules[bot]` in `origin/main..HEAD` (falls back
 to `main`), enforcing non-negotiable #11. Wording alone did not stop the empty
-Typist PRs (#75, #78) here or the anki repo's PR #494 (existing tests deleted
-in a coverage PR, then five empty/no-op commits including an add-then-remove
-`dummy_file.txt`), so the gate fails on bot commits that: change no files
-(empty commit), touch a file with zero content lines (the placeholder/dummy
-pattern), or delete lines from a test file — test paths are `__tests__/` and
-`tests/` dirs, `test_*.py`, and `*.test.js`; bot lanes are append-only in
-tests (Testpilot owns them). Human-authored commits are skipped: interactive
-agents may legitimately rewrite tests on request. CI runs the same check on
-every PR (the "Reject bot PR hygiene violations" step in `ci.yml`, next to the
-empty-PR guard; the checkout uses `fetch-depth: 0` so the branch commits are
-visible behind the merge commit — a shallow checkout would silently no-op the
-check). Tests live in `tools/__tests__/test_check_bot_pr_hygiene.py` (real git
+Typist PRs (#75, #78) here, the sibling anki repo's PR #494 (test deletions / dummy
+files), or PR #178 (complexity ratchet suppression and committed pr_body.txt), so the
+gate fails on bot commits that: change no files (empty commit), touch a file with zero
+content lines (the placeholder/dummy pattern), delete lines from a test file — test
+paths are `__tests__/` and `tests/` dirs, `test_*.py`, and `*.test.js`; bot lanes are
+append-only in tests (Testpilot owns them), commit stray bot artifacts (e.g.
+`pr_body.txt`, scratch/temp files), or touch `eslint-suppressions.json` from a
+non-refactor lane or increase suppressions (complexity ratchet violation). Human-authored
+commits are skipped: interactive agents may legitimately rewrite tests on request. CI
+runs the same check on every PR (the "Reject bot PR hygiene violations" step in `ci.yml`,
+next to the empty-PR guard; the checkout uses `fetch-depth: 0` so the branch commits are
+visible behind the merge commit — a shallow checkout would silently no-op the check).
+Tests live in `tools/__tests__/test_check_bot_pr_hygiene.py` (real git
 repos in `tmp_path`, run by `make test-py`). Probe-tested: a bot-authored
 empty commit fails the wired gate and a clean range passes it, with exit-code
 propagation through `make` verified on a synthetic fixture repo. This wiring

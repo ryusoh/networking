@@ -174,12 +174,12 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   then runs pytest. If `--cov` is unrecognized, install dev deps:
   `python3 -m pip install -r requirements-dev.txt --break-system-packages`.
 - **Complexity ratchet** — `make lint` also gates cyclomatic complexity: ESLint
-  `complexity` errors above 20 with `eslint-suppressions.json` baselining the 6
-  legacy violations (any NEW or worsened one fails; shrink the baseline with
-  `npx eslint --prune-suppressions` after a fix), and `xenon` freezes Python's
-  complexity ranks (`--max-average A --max-modules C --max-absolute C` over the
-  `make test-py` source dirs). Never raise the ceilings or hand-edit the
-  suppressions file.
+  `complexity` errors above 20 with `eslint-suppressions.json` baselining legacy
+  violations. All legacy violations have been eliminated (`{}`); the baseline is
+  now frozen at 0. Any new suppression or count increase fails `bot-pr-check`.
+  `xenon` freezes Python's complexity ranks (`--max-average A --max-modules C
+--max-absolute C` over the `make test-py` source dirs). Never raise the
+  ceilings or hand-edit the suppressions file.
 
 ## Layout
 
@@ -250,8 +250,11 @@ detection. Zero-baseline and purely preventive. Detector mechanics:
 `tools/check_bot_pr_hygiene.py` over bot-authored commits in
 `origin/main..HEAD`, enforcing non-negotiable #11: no empty commits, no
 zero-content files, no deleted test lines (`__tests__/`, `tests/`,
-`test_*.py`, `*.test.js` — bot lanes are append-only in tests). Human-authored
-commits are skipped. Full rules and history: `docs/gates.md`.
+`test_*.py`, `*.test.js` — bot lanes are append-only in tests), no stray
+bot artifacts (`pr_body.txt`, scratch files), and no complexity ratchet
+violations (no added suppressions in `eslint-suppressions.json`; only Architect
+may touch it to prune). Human-authored commits are skipped. Full rules and
+history: `docs/gates.md`.
 
 ### Mutation testing (NON-BLOCKING scaffold)
 
