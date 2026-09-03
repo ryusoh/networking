@@ -1,9 +1,0 @@
-Optimized DOM querying in \`removeInert\` and \`hideOverlays\` by replacing \`.forEach()\` with index-based \`for\` loops. This avoids closure allocations in hot paths triggered by \`setInterval\` and \`MutationObserver\`.
-
-Local JSDOM microbenchmark over 5000 iterations:
-Before (forEach): 1.197s
-After (for loop): 982.385ms (~18% faster)
-
-Behaviour unchanged.
-
-[make precommit green]
