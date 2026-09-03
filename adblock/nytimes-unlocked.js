@@ -106,39 +106,49 @@
   window.scroll = window.scrollTo;
 
   function removeInert() {
-    document.querySelectorAll('[inert]').forEach((el) => {
+    const inerts = document.querySelectorAll('[inert]');
+    for (let i = 0; i < inerts.length; i++) {
+      const el = inerts[i];
       el.removeAttribute('inert');
       el.removeAttribute('aria-hidden');
-    });
+    }
   }
 
   function hideOverlays() {
     // Gateway overlays
-    document
-      .querySelectorAll('#gateway-content, [data-testid="onsite-messaging-unit-gateway"]')
-      .forEach((el) => {
-        if (el instanceof HTMLElement) {
-          el.style.setProperty('display', 'none', 'important');
-        }
-      });
+    const overlays = document.querySelectorAll(
+      '#gateway-content, [data-testid="onsite-messaging-unit-gateway"]'
+    );
+    for (let i = 0; i < overlays.length; i++) {
+      const el = overlays[i];
+      if (el instanceof HTMLElement) {
+        el.style.setProperty('display', 'none', 'important');
+      }
+    }
     // vi-gateway-container: wraps the page as position:fixed — unfix to allow scroll
-    document.querySelectorAll('.vi-gateway-container').forEach((el) => {
+    const viGateways = document.querySelectorAll('.vi-gateway-container');
+    for (let i = 0; i < viGateways.length; i++) {
+      const el = viGateways[i];
       if (el instanceof HTMLElement) {
         el.style.setProperty('position', 'static', 'important');
         el.style.setProperty('overflow', 'visible', 'important');
         el.style.setProperty('width', 'auto', 'important');
         el.style.setProperty('height', 'auto', 'important');
       }
-    });
+    }
     // Scrim div
-    document.querySelectorAll('.css-gx5sib').forEach((el) => {
+    const scrims = document.querySelectorAll('.css-gx5sib');
+    for (let i = 0; i < scrims.length; i++) {
+      const el = scrims[i];
       if (el instanceof HTMLElement) {
         el.style.setProperty('display', 'none', 'important');
       }
-    });
+    }
 
     // Regiwall iframes — hide and disable
-    document.querySelectorAll('iframe').forEach((iframe) => {
+    const iframes = document.querySelectorAll('iframe');
+    for (let i = 0; i < iframes.length; i++) {
+      const iframe = iframes[i];
       const src = iframe.src || iframe.getAttribute('src') || '';
       if (src.includes('regiwall') || src.includes('RegiWall') || src.includes('gateway')) {
         iframe.style.setProperty('display', 'none', 'important');
@@ -146,47 +156,51 @@
         iframe.style.setProperty('width', '0', 'important');
         iframe.style.setProperty('height', '0', 'important');
       }
-    });
+    }
 
     // Also hide any container wrapping a regiwall iframe
-    document
-      .querySelectorAll('iframe[src*="regiwall"], iframe[src*="RegiWall"], iframe[src*="gateway"]')
-      .forEach((iframe) => {
-        let el = iframe.parentElement;
-        while (el && el !== document.body) {
-          if (el.tagName === 'DIV') {
-            const s = window.getComputedStyle(el);
-            if ((s.position === 'fixed' || s.position === 'absolute') && s.display !== 'none') {
-              el.style.setProperty('display', 'none', 'important');
-              break;
-            }
+    const regiwallIframes = document.querySelectorAll(
+      'iframe[src*="regiwall"], iframe[src*="RegiWall"], iframe[src*="gateway"]'
+    );
+    for (let i = 0; i < regiwallIframes.length; i++) {
+      let el = regiwallIframes[i].parentElement;
+      while (el && el !== document.body) {
+        if (el.tagName === 'DIV') {
+          const s = window.getComputedStyle(el);
+          if ((s.position === 'fixed' || s.position === 'absolute') && s.display !== 'none') {
+            el.style.setProperty('display', 'none', 'important');
+            break;
           }
-          el = el.parentElement;
         }
-      });
+        el = el.parentElement;
+      }
+    }
 
     // Subscribe CTA
-    document
-      .querySelectorAll(
-        'p[role="note"] a[href*="subscription"], p[role="note"] a[href*="campaignId"]'
-      )
-      .forEach((a) => {
-        const p = a.closest('p[role="note"]');
-        if (p instanceof HTMLElement) {
-          p.style.setProperty('display', 'none', 'important');
-        }
-      });
+    const ctas = document.querySelectorAll(
+      'p[role="note"] a[href*="subscription"], p[role="note"] a[href*="campaignId"]'
+    );
+    for (let i = 0; i < ctas.length; i++) {
+      const p = ctas[i].closest('p[role="note"]');
+      if (p instanceof HTMLElement) {
+        p.style.setProperty('display', 'none', 'important');
+      }
+    }
 
     // Restore scroll
     if (document.body) {
       for (const el of [document.body, document.documentElement]) {
         el.style.setProperty('overflow', 'visible', 'important');
         // Remove scroll-lock classes
+        /** @type {string[]} */ const classesToRemove = [];
         el.classList.forEach((c) => {
           if (/noScroll|no-scroll|modal|overflow/i.test(c)) {
-            el.classList.remove(c);
+            classesToRemove.push(c);
           }
         });
+        for (let i = 0; i < classesToRemove.length; i++) {
+          el.classList.remove(classesToRemove[i]);
+        }
       }
     }
   }

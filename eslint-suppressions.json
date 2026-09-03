@@ -1,1 +1,7 @@
-{}
+{
+  "adblock/nytimes-unlocked.js": {
+    "complexity": {
+      "count": 1
+    }
+  }
+}
