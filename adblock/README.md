@@ -65,3 +65,5 @@ All features can be individually toggled on/off in the extension popup (except L
 - **Manifest V3**: Uses modern Chrome extension standards.
 - **Privacy First**: All settings and site lists are stored locally on your device or synced via Chrome Storage. No data is sent to external servers.
 - **Performance**: Optimized DOM scanning using `TreeWalker` and throttled `MutationObserver`.
+
+<!-- typist no-op trigger -->
