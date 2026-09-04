@@ -257,7 +257,8 @@ class MemoryHost:
         return "\n".join(lines)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+
+def _setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Manage student durable memory and mastery matrix.")
     parser.add_argument("--student", default="default_user", help="Student ID.")
     parser.add_argument("--record", action="store_true", help="Record topic mastery score.")
@@ -274,39 +275,37 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--flush", action="store_true", help="Flush working memory into durable session history.")
     parser.add_argument("--summary", help="Optional summary for --flush.")
     parser.add_argument("--json", action="store_true", help="Emit report as JSON.")
-    args = parser.parse_args(argv)
+    return parser
 
-    memory_host = MemoryHost()
+def _handle_record_turn(memory_host: MemoryHost, args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    if not args.module or not args.topic or args.query is None or args.response is None:
+        parser.error("--record-turn requires --module, --topic, --query, and --response.")
+    memory_host.record_turn(
+        args.student, args.module, args.topic, args.query, args.response
+    )
+    print(f"Recorded working-memory turn for {args.student}: {args.module} / {args.topic}")
+    return 0
 
-    if args.record_turn:
-        if not args.module or not args.topic or args.query is None or args.response is None:
-            parser.error("--record-turn requires --module, --topic, --query, and --response.")
-        turn = memory_host.record_turn(
-            args.student, args.module, args.topic, args.query, args.response
-        )
-        print(f"Recorded working-memory turn for {args.student}: {args.module} / {args.topic}")
-        return 0
+def _handle_flush(memory_host: MemoryHost, args: argparse.Namespace) -> int:
+    result = memory_host.flush_working_memory(args.student, summary=args.summary)
+    print(f"Flushed {result['flushed']} turn(s) for {args.student}.")
+    return 0
 
-    if args.flush:
-        result = memory_host.flush_working_memory(args.student, summary=args.summary)
-        print(f"Flushed {result['flushed']} turn(s) for {args.student}.")
-        return 0
+def _handle_record_performance(memory_host: MemoryHost, args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    if not args.module or not args.topic or args.raw_score is None:
+        parser.error("--record-performance requires --module, --topic, and --raw-score.")
+    entry = memory_host.record_performance(args.student, args.module, args.topic, args.raw_score)
+    print(f"Computed mastery for {args.student}: {args.module} / {args.topic} = {entry['mastery_score']:.4f} (from {entry['computed_from']} event(s))")
+    return 0
 
-    if args.record_performance:
-        if not args.module or not args.topic or args.raw_score is None:
-            parser.error("--record-performance requires --module, --topic, and --raw-score.")
-        entry = memory_host.record_performance(args.student, args.module, args.topic, args.raw_score)
-        print(f"Computed mastery for {args.student}: {args.module} / {args.topic} = {entry['mastery_score']:.4f} (from {entry['computed_from']} event(s))")
-        return 0
+def _handle_record(memory_host: MemoryHost, args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    if not args.module or not args.topic or args.score is None:
+        parser.error("--record requires --module, --topic, and --score arguments.")
+    entry = memory_host.record_mastery(args.student, args.module, args.topic, args.score)
+    print(f"Successfully recorded mastery for {args.student}: {args.module} / {args.topic} = {entry['mastery_score']}")
+    return 0
 
-    if args.record:
-        if not args.module or not args.topic or args.score is None:
-            parser.error("--record requires --module, --topic, and --score arguments.")
-        entry = memory_host.record_mastery(args.student, args.module, args.topic, args.score)
-        print(f"Successfully recorded mastery for {args.student}: {args.module} / {args.topic} = {entry['mastery_score']}")
-        return 0
-
-    report = memory_host.get_student_report(args.student)
+def _print_report(report: dict[str, Any], args: argparse.Namespace) -> None:
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
     else:
@@ -327,8 +326,27 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"  - {t['module']} / {t['topic']}: {t['score'] * 100:.1f}%")
             print()
 
-    return 0
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = _setup_parser()
+    args = parser.parse_args(argv)
 
+    memory_host = MemoryHost()
+
+    if args.record_turn:
+        return _handle_record_turn(memory_host, args, parser)
+
+    if args.flush:
+        return _handle_flush(memory_host, args)
+
+    if args.record_performance:
+        return _handle_record_performance(memory_host, args, parser)
+
+    if args.record:
+        return _handle_record(memory_host, args, parser)
+
+    report = memory_host.get_student_report(args.student)
+    _print_report(report, args)
+    return 0
 
 if __name__ == "__main__":
     raise SystemExit(main())
