@@ -236,3 +236,27 @@ def test_main_returns_0_on_empty_range(repo: Path) -> None:
 
 def test_main_returns_2_on_missing_base(repo: Path) -> None:
     assert main(["--repo", str(repo), "--base", "no-such-ref"]) == 2
+
+
+def test_bot_empty_pr_bypass_commit_message_flagged(repo: Path) -> None:
+    _write_and_commit(
+        repo,
+        "adblock/foo.js",
+        "// test\n",
+        "chore: formatting trigger to allow non-empty PR in typist no-op",
+        bot=True,
+    )
+    violations = find_violations(repo, "main")
+    assert any("bypass attempt" in v and "allow non-empty pr" in v for v in violations)
+
+
+def test_bot_typist_markdown_touch_flagged(repo: Path) -> None:
+    _write_and_commit(
+        repo,
+        "adblock/README.md",
+        "<!-- trigger -->\n",
+        "refactor(types): update docs",
+        bot=True,
+    )
+    violations = find_violations(repo, "main")
+    assert any("lane violation: Typist may not touch adblock/README.md" in v for v in violations)

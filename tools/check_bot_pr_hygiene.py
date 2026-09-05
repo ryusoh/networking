@@ -29,6 +29,13 @@ import sys
 from pathlib import Path
 
 BOT_AUTHOR_MARKER = "google-labs-jules"
+BYPASS_MARKERS = (
+    "bypass empty pr",
+    "allow non-empty pr",
+    "no-op trigger",
+    "typist no-op",
+    "trigger to allow non-empty",
+)
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -133,6 +140,17 @@ def find_violations(repo: Path, base: str, head: str = "HEAD") -> list[str]:
         if BOT_AUTHOR_MARKER not in author:
             continue
         subject = _git(repo, "show", "-s", "--format=%s", sha).strip()
+        full_msg = _git(repo, "show", "-s", "--format=%B", sha).lower()
+        for marker in BYPASS_MARKERS:
+            if marker in full_msg:
+                violations.append(
+                    f"{sha[:8]} bypass attempt: commit message matches prohibited evasion phrase {marker!r}"
+                )
+                break
+        is_typist = (
+            subject.startswith(("refactor(types)", "build(types)", "chore(types)"))
+            or "typist" in full_msg
+        )
         rows = _numstat(repo, sha)
         if not rows:
             violations.append(f"{sha[:8]} empty commit: changes no files")
@@ -148,6 +166,10 @@ def find_violations(repo: Path, base: str, head: str = "HEAD") -> list[str]:
             if _is_stray_artifact(path):
                 violations.append(
                     f"{sha[:8]} stray artifact: {path} must not be committed"
+                )
+            if is_typist and (path.endswith(".md") or _is_test_path(path) or path.endswith((".py", ".c", ".h", ".css"))):
+                violations.append(
+                    f"{sha[:8]} lane violation: Typist may not touch {path}"
                 )
             if path == "eslint-suppressions.json" or path.endswith("/eslint-suppressions.json"):
                 if not subject.startswith("refactor"):

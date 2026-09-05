@@ -10,15 +10,16 @@ Fully autonomous. Never ask for permission, confirmation, or instruction, and ne
 pause to propose a plan. Decide, implement, verify, and open the PR in one pass —
 the reviewer accepts or closes it.
 
-## The harness (already bootstrapped)
+## The harness (already bootstrapped and blocking)
 
 JS type-checking runs through `jsconfig.json` (`checkJs`, `allowJs`, `noEmit`,
-`"strict": true`) over a growing `include` whitelist, invoked by `make type`. It
-is currently **non-blocking** (`make type` ends with `|| echo`, so it reports but
-never fails the gate). The Chrome extension API is typed via the `@types/chrome`
-dev-dependency (referenced in `jsconfig.json` `types`). First-party JS lives in
-`adblock/*.js` and `gov_bypass/*.js`; test files (`__tests__/`,
-`jest.setup.js`, `*test*.js`) are never type-check targets.
+`"strict": true`) over all first-party JS files (`adblock/*.js`, `gov_bypass/*.js`,
+`stall_guard/*.js`), invoked by `make type`. It is **strictly blocking**
+(`make type` runs `npx tsc -p jsconfig.json --noEmit` and gates CI). The Chrome
+extension API is typed via the `@types/chrome` dev-dependency (referenced in
+`jsconfig.json` `types`). First-party JS lives in `adblock/*.js`, `gov_bypass/*.js`,
+and `stall_guard/*.js`; test files (`__tests__/`, `tests/`, `jest.setup.js`,
+`*test*.js`) are never type-check targets.
 
 ## Mandate
 
@@ -26,9 +27,13 @@ Each run, do exactly one of the following, checked in order. **No runtime
 behavior change, ever.**
 
 0. **Early exit** — if your run's driving goal is already satisfied by the
-   current repo state (e.g. the task says "make JS type-checking blocking" and
-   the gate already is), that is a no-op: **end the run with no PR** (AGENTS.md
-   non-negotiable #10). A no-op summary belongs in the run log, not in a PR.
+   current repo state (e.g. all first-party files are included, `make type`
+   reports zero errors, and the gate is already blocking), that is a no-op:
+   **end the run with no PR and zero commits** (AGENTS.md non-negotiables #10 and #11).
+   CRITICAL: Do NOT execute `git commit` (never run `git commit --allow-empty`).
+   Do NOT push a branch. Do NOT touch `.md` files or add dummy comments (`<!-- trigger -->`)
+   to fabricate a diff. If there is no diff, stop immediately. A no-op summary belongs in
+   the run log, not in a PR or git commit.
 
 1. **Fix** — if `npx tsc -p jsconfig.json --noEmit` reports errors, TARGET = the
    included file with the fewest errors (ties → smallest line count). Bring
@@ -40,9 +45,9 @@ behavior change, ever.**
    to zero errors in the same PR. **Never open an empty "no errors found" PR —
    when the whitelist is clean, expanding it is the job.**
 3. **Finalize** — only when the expansion scan shows every first-party file
-   already included and clean: make the check blocking by removing the
-   `|| echo` fallback from the Makefile `type` target so `make type` gates, and
-   confirm `make precommit` passes. If already blocking, end the run with no PR.
+   already included and clean: ensure the Makefile `type` target gates, and
+   confirm `make precommit` passes. If already blocking and clean, end the run
+   with no commits and no PR.
 
 ## Lane
 

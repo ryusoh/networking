@@ -26,14 +26,14 @@ jobs:
           submodules: 'false'
 
       # Hard guard: the automated Typist routine historically opened empty PRs
-      # (e.g. #75, #78) when it mis-detected the "finalize" state. Fail fast
+      # (e.g. #75, #78, #180) when it mis-detected the "finalize" state. Fail fast
       # here so an empty diff can never pass CI.
       - name: Reject empty pull request
         if: ${{ github.event_name == 'pull_request' }}
         run: |
           git fetch origin ${{ github.base_ref }} --depth=1
           if git diff --quiet origin/${{ github.base_ref }}; then
-            echo "::error::PR contains no changes. Empty PRs are not allowed."
+            echo "::error::PR contains no changes. Do not push dummy commits or placeholder trigger comments to bypass this check — close the PR instead."
             exit 1
           fi
 

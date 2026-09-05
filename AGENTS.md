@@ -420,10 +420,10 @@ hygiene notes live in `docs/ci-gotchas.md`.
 - **Testpilot** ranks least-covered files with `python3 bin/coverage_rank.py`
   (auto-detects Jest `coverage-summary.json` vs coverage.py JSON; tested in
   `bin/__tests__/test_coverage_rank.py`, run by `make test-py`).
-- **Typist** drives `make type` toward zero errors via JSDoc on
-  `adblock/*.js`. The harness — `typescript` + `@types/chrome` dev-deps
-  and `jsconfig.json` — is bootstrapped and non-blocking; when the backlog
-  reaches zero, the finalize step makes it gate (see `.jules/typist.md`).
+- **Typist** drove `make type` toward zero errors via JSDoc on
+  first-party JS (`adblock/*.js`, `gov_bypass/*.js`, `stall_guard/*.js`). The
+  harness — `typescript` + `@types/chrome` dev-deps and `jsconfig.json` — is
+  complete and strictly blocking in `make type` and `make precommit` (see `.jules/typist.md`).
 
 ### Shipping multiple open PRs
 
@@ -528,10 +528,10 @@ If your finding belongs to another lane, **skip it** — that lane will get it.
 > `coverageThreshold` (94/85/94/94) and pytest `--cov-fail-under=94`, both
 > ~1 point under the day-one measurement (see "Coverage reports" above).
 > Bot-authored commit hygiene **is** machine-gated too (`make bot-pr-check`,
-> in `make precommit` and CI — see "Bot PR hygiene gate" above). Only
-> the JS type-check (`make type`) is **non-blocking**. The Testpilot and
-> Typist targets are therefore judgment-guided, not machine-gated. Your real
-> gate is a green `make precommit` plus the scoped proof your lane requires.
+> in `make precommit` and CI — see "Bot PR hygiene gate" above). The JS
+> type-check (`make type`) is **blocking**. The Testpilot targets are therefore
+> judgment-guided, not machine-gated. Your real gate is a green `make precommit`
+> plus the scoped proof your lane requires.
 
 ## `.jules/` personas — editing rules
 
