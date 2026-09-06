@@ -119,29 +119,34 @@ class AnkiGraphBridge:
 
             filtered_node_ids = set()
             for node in raw_nodes:
-                deck_name = node.get("deck") or node.get("d") or ""
-                if deck_name == self.target_deck:
-                    self.nodes.append(node)
-                    filtered_node_ids.add(node.get("id"))
-
-                    label = node.get("label") or node.get("l") or ""
-                    if label:
-                        self.term_index[label.lower()].append(node)
-                        words = re.findall(r"\b[A-Za-z0-9_-]{3,}\b", label)
-                        for w in words:
-                            wl = w.lower()
-                            if wl not in STOPWORDS:
-                                self.term_index[wl].append(node)
+                self._process_node(node, filtered_node_ids)
 
             for link in raw_links:
-                src = link.get("source") or link.get("s")
-                tgt = link.get("target") or link.get("t")
-                if src in filtered_node_ids and tgt in filtered_node_ids:
-                    self.links.append(link)
+                self._process_link(link, filtered_node_ids)
         except Exception as e:
             sys.stderr.write(
                 f"Warning: AnkiGraphBridge could not load graph data from {self.graph_path}: {e}\n"
             )
+
+    def _process_node(self, node: dict[str, Any], filtered_node_ids: set[Any]) -> None:
+        deck_name = node.get("deck") or node.get("d") or ""
+        if deck_name == self.target_deck:
+            self.nodes.append(node)
+            filtered_node_ids.add(node.get("id"))
+            label = node.get("label") or node.get("l") or ""
+            if label:
+                self.term_index[label.lower()].append(node)
+                words = re.findall(r"\b[A-Za-z0-9_-]{3,}\b", label)
+                for w in words:
+                    wl = w.lower()
+                    if wl not in STOPWORDS:
+                        self.term_index[wl].append(node)
+
+    def _process_link(self, link: dict[str, Any], filtered_node_ids: set[Any]) -> None:
+        src = link.get("source") or link.get("s")
+        tgt = link.get("target") or link.get("t")
+        if src in filtered_node_ids and tgt in filtered_node_ids:
+            self.links.append(link)
 
     def _course_prefix(self, chunk: dict[str, Any]) -> str | None:
         """Extract the short course code (e.g. cs232) from a chunk file_path."""
