@@ -82,6 +82,9 @@
     ) {
       unblur(node);
     }
+    if (!node.firstElementChild) {
+      return;
+    }
     /** @type {NodeListOf<HTMLElement>} */
     const blurred = node.querySelectorAll('.blur, [style*="blur"]');
     for (let k = 0; k < blurred.length; k++) {
