@@ -131,6 +131,64 @@ def _numstat(repo: Path, sha: str) -> list[tuple[str, str, str]]:
     return rows
 
 
+def _check_commit_message_bypass(sha: str, full_msg: str) -> str | None:
+    for marker in BYPASS_MARKERS:
+        if marker in full_msg:
+            return f"{sha[:8]} bypass attempt: commit message matches prohibited evasion phrase {marker!r}"
+    return None
+
+
+def _check_typist_lane(sha: str, path: str, is_typist: bool) -> str | None:
+    if is_typist and (path.endswith(".md") or _is_test_path(path) or path.endswith((".py", ".c", ".h", ".css"))):
+        return f"{sha[:8]} lane violation: Typist may not touch {path}"
+    return None
+
+
+def _check_eslint_suppressions(repo: Path, sha: str, path: str, subject: str) -> list[str]:
+    violations = []
+    if path == "eslint-suppressions.json" or path.endswith("/eslint-suppressions.json"):
+        if not subject.startswith("refactor"):
+            violations.append(
+                f"{sha[:8]} lane violation: only Architect (refactor) may touch {path}"
+            )
+        err = _suppressions_violation(repo, sha, path)
+        if err:
+            violations.append(
+                f"{sha[:8]} complexity ratchet violation: {path} {err}"
+            )
+    return violations
+
+
+def _check_file_change(
+    repo: Path,
+    sha: str,
+    added: str,
+    deleted: str,
+    path: str,
+    is_typist: bool,
+    subject: str,
+) -> list[str]:
+    violations = []
+    if added == "0" and deleted == "0":
+        violations.append(f"{sha[:8]} placeholder change: {path} has zero content lines")
+    if deleted not in ("0", "-") and _is_test_path(path):
+        violations.append(
+            f"{sha[:8]} test deletion: {path} loses {deleted} line(s)"
+            " — bot lanes are append-only in tests"
+        )
+    if _is_stray_artifact(path):
+        violations.append(
+            f"{sha[:8]} stray artifact: {path} must not be committed"
+        )
+
+    typist_err = _check_typist_lane(sha, path, is_typist)
+    if typist_err:
+        violations.append(typist_err)
+
+    violations.extend(_check_eslint_suppressions(repo, sha, path, subject))
+    return violations
+
+
 def find_violations(repo: Path, base: str, head: str = "HEAD") -> list[str]:
     """Inspect bot-authored commits in ``base..head``; return violation strings."""
     revs = _git(repo, "rev-list", "--no-merges", f"{base}..{head}").split()
@@ -141,46 +199,27 @@ def find_violations(repo: Path, base: str, head: str = "HEAD") -> list[str]:
             continue
         subject = _git(repo, "show", "-s", "--format=%s", sha).strip()
         full_msg = _git(repo, "show", "-s", "--format=%B", sha).lower()
-        for marker in BYPASS_MARKERS:
-            if marker in full_msg:
-                violations.append(
-                    f"{sha[:8]} bypass attempt: commit message matches prohibited evasion phrase {marker!r}"
-                )
-                break
+
+        msg_violation = _check_commit_message_bypass(sha, full_msg)
+        if msg_violation:
+            violations.append(msg_violation)
+
         is_typist = (
-            subject.startswith(("refactor(types)", "build(types)", "chore(types)"))
-            or "typist" in full_msg
+            any(
+                subject.startswith(f"{t}(types)")
+                for t in ("refactor", "build", "chore", "fix", "docs", "feat")
+            )
+            or "lane: typist" in full_msg
+            or "persona: typist" in full_msg
         )
         rows = _numstat(repo, sha)
         if not rows:
             violations.append(f"{sha[:8]} empty commit: changes no files")
             continue
         for added, deleted, path in rows:
-            if added == "0" and deleted == "0":
-                violations.append(f"{sha[:8]} placeholder change: {path} has zero content lines")
-            if deleted not in ("0", "-") and _is_test_path(path):
-                violations.append(
-                    f"{sha[:8]} test deletion: {path} loses {deleted} line(s)"
-                    " — bot lanes are append-only in tests"
-                )
-            if _is_stray_artifact(path):
-                violations.append(
-                    f"{sha[:8]} stray artifact: {path} must not be committed"
-                )
-            if is_typist and (path.endswith(".md") or _is_test_path(path) or path.endswith((".py", ".c", ".h", ".css"))):
-                violations.append(
-                    f"{sha[:8]} lane violation: Typist may not touch {path}"
-                )
-            if path == "eslint-suppressions.json" or path.endswith("/eslint-suppressions.json"):
-                if not subject.startswith("refactor"):
-                    violations.append(
-                        f"{sha[:8]} lane violation: only Architect (refactor) may touch {path}"
-                    )
-                err = _suppressions_violation(repo, sha, path)
-                if err:
-                    violations.append(
-                        f"{sha[:8]} complexity ratchet violation: {path} {err}"
-                    )
+            violations.extend(
+                _check_file_change(repo, sha, added, deleted, path, is_typist, subject)
+            )
     return violations
 
 

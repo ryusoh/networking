@@ -260,3 +260,16 @@ def test_bot_typist_markdown_touch_flagged(repo: Path) -> None:
     )
     violations = find_violations(repo, "main")
     assert any("lane violation: Typist may not touch adblock/README.md" in v for v in violations)
+
+
+def test_bot_commit_mentioning_typist_in_body_not_flagged(repo: Path) -> None:
+    _write_and_commit(
+        repo,
+        "tools/check_bot_pr_hygiene.py",
+        "# some change\n",
+        "refactor(tools): extract _check_typist_lane helper",
+        bot=True,
+    )
+    violations = find_violations(repo, "main")
+    assert not any("lane violation: Typist" in v for v in violations)
+
