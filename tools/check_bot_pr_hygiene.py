@@ -87,6 +87,35 @@ def _read_json_at(repo: Path, ref: str, path: str) -> dict:
     return {}
 
 
+
+
+
+from typing import Any
+
+def _get_suppression_count(rule_data: Any) -> int:
+    """Extract the suppression count from a rule data object, defaulting to 1."""
+    if isinstance(rule_data, dict):
+        return int(rule_data.get("count", 1))
+    if isinstance(rule_data, int):
+        return rule_data
+    return 1
+
+
+def _check_file_rules(file_path: str, file_rules: dict, before_rules: dict) -> str | None:
+    """Check all rules for a specific file for complexity ratchet violations."""
+    for rule_name, rule_data in file_rules.items():
+        if rule_name not in before_rules:
+            return f"added suppression for new rule {rule_name} in {file_path}"
+        after_count = _get_suppression_count(rule_data)
+        before_count = _get_suppression_count(before_rules[rule_name])
+        if after_count > before_count:
+            return (
+                f"increased suppression count for {rule_name} in {file_path} "
+                f"({before_count} -> {after_count})"
+            )
+    return None
+
+
 def _suppressions_violation(repo: Path, sha: str, path: str) -> str | None:
     """Check if a commit added new suppressions or increased counts in eslint-suppressions.json."""
     before = _read_json_at(repo, f"{sha}^", path)
@@ -97,26 +126,11 @@ def _suppressions_violation(repo: Path, sha: str, path: str) -> str | None:
             return f"added suppression for new file {file_path}"
         if not isinstance(file_rules, dict):
             continue
-        before_rules = before[file_path] if isinstance(before[file_path], dict) else {}
-        for rule_name, rule_data in file_rules.items():
-            if rule_name not in before_rules:
-                return f"added suppression for new rule {rule_name} in {file_path}"
-            after_count = (
-                rule_data.get("count", 1)
-                if isinstance(rule_data, dict)
-                else (rule_data if isinstance(rule_data, int) else 1)
-            )
-            before_rule_data = before_rules[rule_name]
-            before_count = (
-                before_rule_data.get("count", 1)
-                if isinstance(before_rule_data, dict)
-                else (before_rule_data if isinstance(before_rule_data, int) else 1)
-            )
-            if after_count > before_count:
-                return (
-                    f"increased suppression count for {rule_name} in {file_path} "
-                    f"({before_count} -> {after_count})"
-                )
+        before_rules = before.get(file_path, {})
+        before_rules_dict = before_rules if isinstance(before_rules, dict) else {}
+        err = _check_file_rules(file_path, file_rules, before_rules_dict)
+        if err:
+            return err
     return None
 
 
