@@ -71,6 +71,20 @@
   }
 
   /** @param {HTMLElement} node */
+  function unblurDescendants(node) {
+    /** @type {NodeListOf<HTMLElement>} */
+    const blurred = node.querySelectorAll('.blur, [style*="blur"]');
+    for (let k = 0; k < blurred.length; k++) {
+      unblur(blurred[k]);
+    }
+    /** @type {NodeListOf<HTMLImageElement>} */
+    const blurImgs = node.querySelectorAll('img[src*="blur"]');
+    for (let l = 0; l < blurImgs.length; l++) {
+      blurImgs[l].remove();
+    }
+  }
+
+  /** @param {HTMLElement} node */
   function handleAddedNode(node) {
     if (node instanceof HTMLImageElement && node.src && node.src.indexOf('blur') !== -1) {
       node.remove();
@@ -85,16 +99,7 @@
     if (!node.firstElementChild) {
       return;
     }
-    /** @type {NodeListOf<HTMLElement>} */
-    const blurred = node.querySelectorAll('.blur, [style*="blur"]');
-    for (let k = 0; k < blurred.length; k++) {
-      unblur(blurred[k]);
-    }
-    /** @type {NodeListOf<HTMLImageElement>} */
-    const blurImgs = node.querySelectorAll('img[src*="blur"]');
-    for (let l = 0; l < blurImgs.length; l++) {
-      blurImgs[l].remove();
-    }
+    unblurDescendants(node);
   }
 
   const observer = new MutationObserver(function (mutations) {
