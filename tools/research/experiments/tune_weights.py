@@ -78,6 +78,53 @@ def score_card_with_weights(
     return max(0.0, min(1.0, comp))
 
 
+def _calculate_metrics(tp: int, fp: int, fn: int) -> tuple[float, float, float]:
+    """Calculate precision, recall, and f1 score."""
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = (
+        2 * precision * recall / (precision + recall)
+        if (precision + recall) > 0
+        else 0.0
+    )
+    return precision, recall, f1
+
+
+def _evaluate_threshold(
+    evaluation_set: list[dict],
+    lexicon: set[str],
+    w_comp: float,
+    w_lex: float,
+    w_concept: float,
+    w_domain: float,
+    threshold: float
+) -> tuple[int, int, int, int]:
+    """Evaluate a threshold against the evaluation set and return true/false positives/negatives."""
+    tp = fp = fn = tn = 0
+    for item in evaluation_set:
+        score = score_card_with_weights(
+            item["front"],
+            item["back"],
+            lexicon,
+            w_comp,
+            w_lex,
+            w_concept,
+            w_domain,
+        )
+        pred = 1 if score >= threshold else 0
+        actual = item["label"]
+
+        if pred == 1 and actual == 1:
+            tp += 1
+        elif pred == 1 and actual == 0:
+            fp += 1
+        elif pred == 0 and actual == 1:
+            fn += 1
+        else:
+            tn += 1
+    return tp, fp, fn, tn
+
+
 def run_tuning() -> dict:
     """Execute grid search over weights and threshold scale against hub and negative cards."""
     baseline = compute_baseline(deck="金融", k=10)
@@ -108,36 +155,11 @@ def run_tuning() -> dict:
         for scale in threshold_scales:
             threshold = baseline.mean_density * scale
 
-            tp = fp = fn = tn = 0
-            for item in evaluation_set:
-                score = score_card_with_weights(
-                    item["front"],
-                    item["back"],
-                    lexicon,
-                    w_comp,
-                    w_lex,
-                    w_concept,
-                    w_domain,
-                )
-                pred = 1 if score >= threshold else 0
-                actual = item["label"]
-
-                if pred == 1 and actual == 1:
-                    tp += 1
-                elif pred == 1 and actual == 0:
-                    fp += 1
-                elif pred == 0 and actual == 1:
-                    fn += 1
-                else:
-                    tn += 1
-
-            precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-            recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-            f1 = (
-                2 * precision * recall / (precision + recall)
-                if (precision + recall) > 0
-                else 0.0
+            tp, fp, fn, tn = _evaluate_threshold(
+                evaluation_set, lexicon, w_comp, w_lex, w_concept, w_domain, threshold
             )
+
+            precision, recall, f1 = _calculate_metrics(tp, fp, fn)
 
             if f1 > best_f1:
                 best_f1 = f1
