@@ -619,6 +619,18 @@ class CoverageTracker:
 
         self.save()
 
+    def _get_dir_weight(self, fpath: str) -> float:
+        """Calculate directory-based weight priority."""
+        if any(k in fpath for k in ("00-textbooks", "00-readings", "kurose-final-review", "review-slide-lectures")):
+            return 25.0
+        if any(k in fpath for k in ("00-materials", "01-readings", "lecture-notes", "04-final-paper")):
+            return 15.0
+        if "01-slides" in fpath:
+            return 0.0
+        if any(k in fpath for k in ("02-homework", "03-homework", "/hw", "/lab", "related-work", "03-exams", "04-finals")):
+            return -15.0
+        return 0.0
+
     def _calculate_chunk_priority(self, chunk: dict[str, Any], graph_bridge: AnkiGraphBridge | None = None) -> float:
         """Calculate overall selection priority for a candidate chunk.
 
@@ -626,30 +638,7 @@ class CoverageTracker:
         (prioritizing 00-textbooks, 00-readings, 00-materials, and lecture-notes over 01-slides and homework).
         """
         fpath = chunk.get("file_path", "").lower()
-        dir_weight = 0.0
-
-        # Prioritize core textbooks, seminal research readings, and detailed primary materials
-        if (
-            "00-textbooks" in fpath
-            or "00-readings" in fpath
-            or "kurose-final-review" in fpath
-            or "review-slide-lectures" in fpath
-        ):
-            dir_weight += 25.0
-        elif "00-materials" in fpath or "01-readings" in fpath or "lecture-notes" in fpath or "04-final-paper" in fpath:
-            dir_weight += 15.0
-        elif "01-slides" in fpath:
-            dir_weight += 0.0
-        elif (
-            "02-homework" in fpath
-            or "03-homework" in fpath
-            or "/hw" in fpath
-            or "/lab" in fpath
-            or "related-work" in fpath
-            or "03-exams" in fpath
-            or "04-finals" in fpath
-        ):
-            dir_weight -= 15.0
+        dir_weight = self._get_dir_weight(fpath)
 
         pr_score = graph_bridge.score_chunk_pagerank(chunk) if graph_bridge else 0.0
         return dir_weight + pr_score
