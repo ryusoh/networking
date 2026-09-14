@@ -185,18 +185,9 @@ class CoverageProgressReporter:
         return format_progress_bar(visited, total, width=width)
 
     @classmethod
-    def print_report(
-        cls,
-        manifest_chunks: list[dict[str, Any]],
-        visited_chunk_ids: set[str] | dict[str, Any],
-        active_file_path: str | None = None,
-        skipped_chunk_ids: set[str] | None = None,
-    ) -> None:
-        """Calculates and prints Submodule, Course, and Global progress bars."""
-        if not manifest_chunks:
-            return
-
-        # If passed a dict mapping cid -> info, split generated vs skipped
+    def _resolve_visited_sets(
+        cls, visited_chunk_ids: set[str] | dict[str, Any], skipped_chunk_ids: set[str] | None
+    ) -> tuple[set[str], set[str]]:
         if isinstance(visited_chunk_ids, dict):
             gen_set = {
                 cid
@@ -211,12 +202,10 @@ class CoverageProgressReporter:
         else:
             gen_set = visited_chunk_ids
             skip_set = skipped_chunk_ids or set()
+        return gen_set, skip_set
 
-        global_total = len(manifest_chunks)
-        global_generated = sum(1 for c in manifest_chunks if c["chunk_id"] in gen_set)
-        global_skipped = sum(1 for c in manifest_chunks if c["chunk_id"] in skip_set)
-        global_unvisited = global_total - global_generated - global_skipped
-
+    @classmethod
+    def _extract_directories(cls, active_file_path: str | None) -> tuple[str, str]:
         course_dir = ""
         submodule_dir = ""
         if active_file_path:
@@ -225,29 +214,30 @@ class CoverageProgressReporter:
                 course_dir = str(Path(*parts[:2]))
             if len(parts) >= 3:
                 submodule_dir = str(Path(*parts[:3]))
+        return course_dir, submodule_dir
 
-        print("\n" + "=" * 80)
-        print("📊 Anki Courseware Memorization Progress Report")
-        print("=" * 80)
+    @classmethod
+    def _print_submodule_report(cls, manifest_chunks: list[dict[str, Any]], gen_set: set[str], submodule_dir: str) -> None:
+        sub_chunks = [c for c in manifest_chunks if c["file_path"].startswith(submodule_dir)]
+        sub_vis = sum(1 for c in sub_chunks if c["chunk_id"] in gen_set)
+        sub_label = (
+            Path(submodule_dir).relative_to("research")
+            if submodule_dir.startswith("research")
+            else submodule_dir
+        )
+        print(f"  Submodule : {sub_label}")
+        print(f"              {cls.render_bar(sub_vis, len(sub_chunks))}\n")
 
-        if submodule_dir:
-            sub_chunks = [c for c in manifest_chunks if c["file_path"].startswith(submodule_dir)]
-            sub_vis = sum(1 for c in sub_chunks if c["chunk_id"] in gen_set)
-            sub_label = (
-                Path(submodule_dir).relative_to("research")
-                if submodule_dir.startswith("research")
-                else submodule_dir
-            )
-            print(f"  Submodule : {sub_label}")
-            print(f"              {cls.render_bar(sub_vis, len(sub_chunks))}\n")
+    @classmethod
+    def _print_course_report(cls, manifest_chunks: list[dict[str, Any]], gen_set: set[str], course_dir: str) -> None:
+        crs_chunks = [c for c in manifest_chunks if c["file_path"].startswith(course_dir)]
+        crs_vis = sum(1 for c in crs_chunks if c["chunk_id"] in gen_set)
+        crs_label = Path(course_dir).name
+        print(f"  Course    : {crs_label}")
+        print(f"              {cls.render_bar(crs_vis, len(crs_chunks))}\n")
 
-        if course_dir:
-            crs_chunks = [c for c in manifest_chunks if c["file_path"].startswith(course_dir)]
-            crs_vis = sum(1 for c in crs_chunks if c["chunk_id"] in gen_set)
-            crs_label = Path(course_dir).name
-            print(f"  Course    : {crs_label}")
-            print(f"              {cls.render_bar(crs_vis, len(crs_chunks))}\n")
-
+    @classmethod
+    def _print_global_report(cls, global_total: int, global_generated: int, global_skipped: int, global_unvisited: int) -> None:
         print("  Global    : research/ (cs231, cs232, cs233, cs234)")
         print(f"              {cls.render_bar(global_generated, global_total)}")
         print(
@@ -256,6 +246,38 @@ class CoverageProgressReporter:
             f"Unvisited: {global_unvisited} chunks ({global_unvisited / global_total * 100:.1f}%)]"
         )
         print("=" * 80 + "\n")
+
+    @classmethod
+    def print_report(
+        cls,
+        manifest_chunks: list[dict[str, Any]],
+        visited_chunk_ids: set[str] | dict[str, Any],
+        active_file_path: str | None = None,
+        skipped_chunk_ids: set[str] | None = None,
+    ) -> None:
+        """Calculates and prints Submodule, Course, and Global progress bars."""
+        if not manifest_chunks:
+            return
+
+        gen_set, skip_set = cls._resolve_visited_sets(visited_chunk_ids, skipped_chunk_ids)
+        course_dir, submodule_dir = cls._extract_directories(active_file_path)
+
+        global_total = len(manifest_chunks)
+        global_generated = sum(1 for c in manifest_chunks if c["chunk_id"] in gen_set)
+        global_skipped = sum(1 for c in manifest_chunks if c["chunk_id"] in skip_set)
+        global_unvisited = global_total - global_generated - global_skipped
+
+        print("\n" + "=" * 80)
+        print("📊 Anki Courseware Memorization Progress Report")
+        print("=" * 80)
+
+        if submodule_dir:
+            cls._print_submodule_report(manifest_chunks, gen_set, submodule_dir)
+
+        if course_dir:
+            cls._print_course_report(manifest_chunks, gen_set, course_dir)
+
+        cls._print_global_report(global_total, global_generated, global_skipped, global_unvisited)
 
 
 @dataclass
