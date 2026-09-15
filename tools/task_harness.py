@@ -228,23 +228,10 @@ Do not assume any conversational history from previous steps. All state is exter
 """
 
 
-def reconcile_state(state: TaskState, repo_root: Path) -> tuple[bool, GateItem | None, str]:
-    """Reconcile state against git repository ground truth (Orion state convergence)."""
-    # 1. Verify recorded commits
-    for g in state.gates:
-        if g.commit and g.status != "SKIPPED":
-            if validate_commit(repo_root, g.commit):
-                g.status = "DONE"
-
-    # 2. Find Program Counter (first uncompleted gate)
-    pending_gates = [g for g in state.gates if g.status in ("PENDING", "IN_PROGRESS")]
-    pc = pending_gates[0] if pending_gates else None
-    converged = pc is None
-
-    done_count = sum(1 for g in state.gates if g.status == "DONE")
-    skipped_count = sum(1 for g in state.gates if g.status == "SKIPPED")
-    pending_count = len(pending_gates)
-
+def _format_reconcile_summary(
+    state: TaskState, pc: GateItem | None, pending_count: int, done_count: int, skipped_count: int
+) -> str:
+    """Format the text summary of the current task state."""
     lines = [
         f"Reconciled task '{state.task_id}': {done_count}/{state.total_gates} DONE, {skipped_count} SKIPPED, {pending_count} PENDING."
     ]
@@ -255,8 +242,34 @@ def reconcile_state(state: TaskState, repo_root: Path) -> tuple[bool, GateItem |
         )
     else:
         lines.append("Status: Fully converged to declared intent (100% complete).")
+    return "\n".join(lines)
 
-    return converged, pc, "\n".join(lines)
+
+def _reconcile_commits(state: TaskState, repo_root: Path) -> None:
+    """Verify recorded commits and update status."""
+    for g in state.gates:
+        if g.commit and g.status != "SKIPPED":
+            if validate_commit(repo_root, g.commit):
+                g.status = "DONE"
+
+
+def reconcile_state(state: TaskState, repo_root: Path) -> tuple[bool, GateItem | None, str]:
+    """Reconcile state against git repository ground truth (Orion state convergence)."""
+    # 1. Verify recorded commits
+    _reconcile_commits(state, repo_root)
+
+    # 2. Find Program Counter (first uncompleted gate)
+    pending_gates = [g for g in state.gates if g.status in ("PENDING", "IN_PROGRESS")]
+    pc = pending_gates[0] if pending_gates else None
+    converged = pc is None
+
+    done_count = sum(1 for g in state.gates if g.status == "DONE")
+    skipped_count = sum(1 for g in state.gates if g.status == "SKIPPED")
+    pending_count = len(pending_gates)
+
+    summary = _format_reconcile_summary(state, pc, pending_count, done_count, skipped_count)
+
+    return converged, pc, summary
 
 
 def _handle_init(args: argparse.Namespace, repo: Path) -> int:
