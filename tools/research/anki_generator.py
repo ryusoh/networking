@@ -893,6 +893,18 @@ class AnkiConnectChecker:
             return res.get("result", [])
 
 
+def _is_duplicate_chunk(chunk: dict[str, Any], all_existing: set[str], seen_headings: set[str]) -> bool:
+    heading = chunk.get("heading", "").lower()
+    if not heading:
+        return False
+    if heading in all_existing:
+        return True
+    if heading in seen_headings:
+        return True
+    seen_headings.add(heading)
+    return False
+
+
 def filter_duplicate_chunks(
     chunks: list[dict[str, Any]],
     deck_name: str,
@@ -912,13 +924,8 @@ def filter_duplicate_chunks(
     seen_headings: set[str] = set()
     filtered = []
     for c in chunks:
-        heading = c.get("heading", "").lower()
-        if heading and heading in all_existing:
+        if _is_duplicate_chunk(c, all_existing, seen_headings):
             continue
-        if heading and heading in seen_headings:
-            continue
-        if heading:
-            seen_headings.add(heading)
         filtered.append(c)
     return filtered
 
