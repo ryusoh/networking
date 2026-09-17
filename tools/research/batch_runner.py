@@ -113,6 +113,21 @@ def run_batch(
     return results
 
 
+def _print_results(results: list[dict[str, Any]]) -> None:
+    """Print the final status of all batch jobs."""
+    print(f"Batch finished: {len(results)} job(s)")
+    for r in results:
+        status = r.get("status")
+        idx = r["job_index"]
+        cmd = r.get("command")
+        if status == "failure":
+            print(f"  {idx}. {cmd}: FAILED (return code {r['returncode']})")
+        elif status == "unknown_command":
+            print(f"  {idx}. {cmd}: UNKNOWN COMMAND")
+        else:
+            print(f"  {idx}. {cmd}: {status}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run a batch of research-agent CLI jobs.")
     parser.add_argument("--spec", default=str(DEFAULT_SPEC_PATH), help="Path to batch spec JSON.")
@@ -134,17 +149,7 @@ def main(argv: list[str] | None = None) -> int:
     any_failed = any(r.get("status") == "failure" for r in results)
     unknown = [r for r in results if r.get("status") == "unknown_command"]
 
-    print(f"Batch finished: {len(results)} job(s)")
-    for r in results:
-        status = r.get("status")
-        idx = r["job_index"]
-        cmd = r.get("command")
-        if status == "failure":
-            print(f"  {idx}. {cmd}: FAILED (return code {r['returncode']})")
-        elif status == "unknown_command":
-            print(f"  {idx}. {cmd}: UNKNOWN COMMAND")
-        else:
-            print(f"  {idx}. {cmd}: {status}")
+    _print_results(results)
 
     if unknown:
         return 2
