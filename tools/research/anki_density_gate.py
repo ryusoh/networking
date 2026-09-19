@@ -224,8 +224,7 @@ def evaluate_cards(
     return [verdicts_dict[i] for i in range(len(cards))]
 
 
-def main(argv: list[str] | None = None) -> int:
-    """CLI entry point for density gate."""
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Deterministic Anki Card Information Density Gate."
     )
@@ -270,7 +269,61 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Force recomputation of deck baseline cache",
     )
-    args = parser.parse_args(argv)
+    return parser.parse_args(argv)
+
+
+def _load_cards(path: Path) -> list[dict[str, Any]]:
+    cards: list[dict[str, Any]] = []
+    if not path.exists():
+        return cards
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line_str = line.strip()
+            if line_str:
+                cards.append(json.loads(line_str))
+    return cards
+
+
+def _print_summary(output: Path, verdicts: list[Verdict], mean_density: float, threshold_scale: float) -> None:
+    accepted = sum(1 for v in verdicts if v.decision == "accept")
+    enriched = sum(1 for v in verdicts if v.decision == "enrich")
+    consolidated = sum(1 for v in verdicts if v.decision == "consolidate")
+    total = len(verdicts)
+
+    print(
+        f"Density Gate Summary (Threshold: {mean_density * threshold_scale:.4f}):\n"
+        f"  Total Cards: {total}\n"
+        f"  Accepted:     {accepted}\n"
+        f"  Enriched:     {enriched}\n"
+        f"  Consolidated: {consolidated}\n"
+        f"Verdicts written to {output}"
+    )
+
+
+def _write_verdicts(output_path: Path, verdicts: list[Verdict]) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        for v in verdicts:
+            f.write(json.dumps(asdict(v), ensure_ascii=False) + "\n")
+
+
+def _load_candidates_map(path: Path) -> dict[str, dict[str, Any]]:
+    candidates_map: dict[str, dict[str, Any]] = {}
+    if not path.exists():
+        return candidates_map
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line_str = line.strip()
+            if line_str:
+                item = json.loads(line_str)
+                if "chunk_id" in item:
+                    candidates_map[item["chunk_id"]] = item
+    return candidates_map
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry point for density gate."""
+    args = _parse_args(argv)
 
     baseline = compute_baseline(
         deck="金融",
@@ -279,23 +332,8 @@ def main(argv: list[str] | None = None) -> int:
         force_recompute=args.rebuild_baseline,
     )
 
-    cards: list[dict[str, Any]] = []
-    if args.cards.exists():
-        with open(args.cards, "r", encoding="utf-8") as f:
-            for line in f:
-                line_str = line.strip()
-                if line_str:
-                    cards.append(json.loads(line_str))
-
-    candidates_map: dict[str, dict[str, Any]] = {}
-    if args.candidates.exists():
-        with open(args.candidates, "r", encoding="utf-8") as f:
-            for line in f:
-                line_str = line.strip()
-                if line_str:
-                    item = json.loads(line_str)
-                    if "chunk_id" in item:
-                        candidates_map[item["chunk_id"]] = item
+    cards = _load_cards(args.cards)
+    candidates_map = _load_candidates_map(args.candidates)
 
     config = {
         "threshold_scale": args.threshold_scale,
@@ -308,24 +346,12 @@ def main(argv: list[str] | None = None) -> int:
         candidates_map=candidates_map,
     )
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    with open(args.output, "w", encoding="utf-8") as f:
-        for v in verdicts:
-            f.write(json.dumps(asdict(v), ensure_ascii=False) + "\n")
+    _write_verdicts(args.output, verdicts)
+
+    _print_summary(args.output, verdicts, baseline.mean_density, args.threshold_scale)
 
     accepted = sum(1 for v in verdicts if v.decision == "accept")
-    enriched = sum(1 for v in verdicts if v.decision == "enrich")
-    consolidated = sum(1 for v in verdicts if v.decision == "consolidate")
     total = len(verdicts)
-
-    print(
-        f"Density Gate Summary (Threshold: {baseline.mean_density * args.threshold_scale:.4f}):\n"
-        f"  Total Cards: {total}\n"
-        f"  Accepted:     {accepted}\n"
-        f"  Enriched:     {enriched}\n"
-        f"  Consolidated: {consolidated}\n"
-        f"Verdicts written to {args.output}"
-    )
 
     if not args.report_only and total > 0 and accepted < total:
         print(
