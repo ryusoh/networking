@@ -74,6 +74,7 @@
     '.ad-progress',
     '[class*="sponsor"]'
   ];
+  const AD_CONTAINER_SELECTORS_JOINED = AD_CONTAINER_SELECTORS.join(',');
 
   const blockedRequests = new Set();
   let adContainersHidden = 0;
@@ -120,19 +121,18 @@
   }
 
   function hideAdContainers() {
-    for (const selector of AD_CONTAINER_SELECTORS) {
-      try {
-        const elements = document.querySelectorAll(selector);
-        for (const el of elements) {
-          if (el instanceof HTMLElement && el.offsetParent !== null) {
-            el.style.display = 'none';
-            el.setAttribute('data-blocked-by-clean-adblock', 'true');
-            adContainersHidden++;
-          }
+    try {
+      const elements = document.querySelectorAll(AD_CONTAINER_SELECTORS_JOINED);
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i];
+        if (el instanceof HTMLElement && el.offsetParent !== null) {
+          el.style.display = 'none';
+          el.setAttribute('data-blocked-by-clean-adblock', 'true');
+          adContainersHidden++;
         }
-      } catch {
-        // Invalid selector
       }
+    } catch {
+      // Invalid selector
     }
   }
 
