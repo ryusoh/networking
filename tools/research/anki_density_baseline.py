@@ -313,6 +313,59 @@ class BaselineReport:
     graph_hash: str
 
 
+def _load_cached_baseline(
+    cache_path: Path,
+    deck: str,
+    graph_hash: str,
+    current_zlib_ver: str,
+    current_jieba_ver: str,
+) -> BaselineReport | None:
+    """Attempt to load a valid cached baseline report."""
+    if not cache_path.exists():
+        return None
+    try:
+        cached = json.loads(cache_path.read_text(encoding="utf-8"))
+        if (
+            cached.get("deck") == deck
+            and cached.get("graph_hash") == graph_hash
+            and cached.get("zlib_version") == current_zlib_ver
+            and cached.get("jieba_version") == current_jieba_ver
+        ):
+            per_card = [DensityReport(**item) for item in cached.get("per_card", [])]
+            return BaselineReport(
+                deck=cached["deck"],
+                top_guids=cached.get("top_guids", []),
+                mean_density=float(cached.get("mean_density", 0.0)),
+                per_card=per_card,
+                lexicon=set(cached.get("lexicon", [])),
+                zlib_version=cached.get("zlib_version", ""),
+                jieba_version=cached.get("jieba_version", ""),
+                graph_hash=cached.get("graph_hash", ""),
+            )
+    except Exception:
+        pass
+    return None
+
+
+def _save_cached_baseline(cache_path: Path, baseline: BaselineReport) -> None:
+    """Attempt to save baseline report to cache."""
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        serializable = {
+            "deck": baseline.deck,
+            "top_guids": baseline.top_guids,
+            "mean_density": baseline.mean_density,
+            "per_card": [asdict(r) for r in baseline.per_card],
+            "lexicon": sorted(list(baseline.lexicon)),
+            "zlib_version": baseline.zlib_version,
+            "jieba_version": baseline.jieba_version,
+            "graph_hash": baseline.graph_hash,
+        }
+        cache_path.write_text(json.dumps(serializable, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def compute_baseline(
     deck: str = "金融",
     k: int = 10,
@@ -332,29 +385,12 @@ def compute_baseline(
     current_jieba_ver = getattr(jieba, "__version__", "unknown")
 
     # Attempt cache load if not forced
-    if not force_recompute and cache_path.exists():
-        try:
-            cached = json.loads(cache_path.read_text(encoding="utf-8"))
-            if (
-                cached.get("deck") == deck
-                and cached.get("graph_hash") == graph_hash
-                and cached.get("zlib_version") == current_zlib_ver
-                and cached.get("jieba_version") == current_jieba_ver
-            ):
-                per_card = [DensityReport(**item) for item in cached.get("per_card", [])]
-                return BaselineReport(
-                    deck=cached["deck"],
-                    top_guids=cached.get("top_guids", []),
-                    mean_density=float(cached.get("mean_density", 0.0)),
-                    per_card=per_card,
-                    lexicon=set(cached.get("lexicon", [])),
-                    zlib_version=cached.get("zlib_version", ""),
-                    jieba_version=cached.get("jieba_version", ""),
-                    graph_hash=cached.get("graph_hash", ""),
-                )
-        except Exception:
-            # Recompute on corrupted cache
-            pass
+    if not force_recompute:
+        cached_report = _load_cached_baseline(
+            cache_path, deck, graph_hash, current_zlib_ver, current_jieba_ver
+        )
+        if cached_report is not None:
+            return cached_report
 
     # Compute baseline
     guids = top_k_hub_guids(deck=deck, k=k, repo_root=repo_root)
@@ -394,21 +430,6 @@ def compute_baseline(
     )
 
     # Save cache
-    try:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        serializable = {
-            "deck": baseline.deck,
-            "top_guids": baseline.top_guids,
-            "mean_density": baseline.mean_density,
-            "per_card": [asdict(r) for r in baseline.per_card],
-            "lexicon": sorted(list(baseline.lexicon)),
-            "zlib_version": baseline.zlib_version,
-            "jieba_version": baseline.jieba_version,
-            "graph_hash": baseline.graph_hash,
-        }
-        cache_path.write_text(json.dumps(serializable, indent=2, ensure_ascii=False), encoding="utf-8")
-    except Exception as e:
-        # Non-fatal if cache write fails
-        pass
+    _save_cached_baseline(cache_path, baseline)
 
     return baseline
