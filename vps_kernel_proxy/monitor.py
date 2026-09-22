@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import subprocess
 import json
-import time
+
 import os
 import sys
 
@@ -60,7 +60,7 @@ def add_to_blocklist(ip):
     # Convert IP to hex for bpftool (simple version)
     try:
         import socket
-        import struct
+
         packed_ip = socket.inet_aton(ip)
         hex_ip = packed_ip.hex()
         # BPF wants the key in a specific format for bpftool
