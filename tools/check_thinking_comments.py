@@ -234,6 +234,24 @@ def iter_tracked_sources():
         yield path
 
 
+
+def _check_python_violations(path, src):
+    for lineno, text in scan_python_comments(src):
+        yield f"{path}:{lineno}: thinking-out-loud comment: # {text}"
+    for lineno, name in scan_abandoned_tests(src):
+        yield f"{path}:{lineno}: abandoned test body (pass/docstring only): {name}"
+
+def _check_shell_violations(path, src):
+    for lineno, text in scan_shell_comments(src):
+        yield f"{path}:{lineno}: thinking-out-loud comment: # {text}"
+
+def _check_c_style_violations(path, src):
+    for lineno, text in scan_c_style_comments(src):
+        yield f"{path}:{lineno}: thinking-out-loud comment: // {text}"
+    if path.endswith(JS_TEST_EXTENSIONS):
+        for lineno, title in scan_js_empty_tests(src):
+            yield f"{path}:{lineno}: abandoned test body (empty callback): {title!r}"
+
 def find_violations(paths):
     """Yield 'path:lineno: message' strings for every violation in the given files."""
     for path in paths:
@@ -242,19 +260,11 @@ def find_violations(paths):
         except FileNotFoundError:
             continue  # tracked but deleted in the worktree; nothing to scan
         if path.endswith(".py"):
-            for lineno, text in scan_python_comments(src):
-                yield f"{path}:{lineno}: thinking-out-loud comment: # {text}"
-            for lineno, name in scan_abandoned_tests(src):
-                yield f"{path}:{lineno}: abandoned test body (pass/docstring only): {name}"
+            yield from _check_python_violations(path, src)
         elif path.endswith(".sh"):
-            for lineno, text in scan_shell_comments(src):
-                yield f"{path}:{lineno}: thinking-out-loud comment: # {text}"
+            yield from _check_shell_violations(path, src)
         elif path.endswith(C_STYLE_EXTENSIONS):
-            for lineno, text in scan_c_style_comments(src):
-                yield f"{path}:{lineno}: thinking-out-loud comment: // {text}"
-            if path.endswith(JS_TEST_EXTENSIONS):
-                for lineno, title in scan_js_empty_tests(src):
-                    yield f"{path}:{lineno}: abandoned test body (empty callback): {title!r}"
+            yield from _check_c_style_violations(path, src)
 
 
 def main():
