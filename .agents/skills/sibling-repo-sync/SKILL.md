@@ -84,6 +84,14 @@ Delegate one subagent per repo, in parallel. Brief each with:
    counts, resolution proof, files changed, probe exit codes, gate result,
    skip decisions with evidence.
 
+**Verification budget.** Scoped checks while iterating (the touched test
+file, prettier, sync-check); run the full CI-parity gate exactly once, at the
+end — it is the wall-clock pole, and a containerized one (this repo's
+`precommit-docker`) doubly so. Start Docker early so it warms while you work;
+for docs/persona-only changes, decide whether the container run is warranted
+before queueing it. (2026-09 sync: the networking agent's gate run dwarfed
+the rest of its work.)
+
 ## After the sync
 
 Update this skill's repo profiles above with anything the run learned that

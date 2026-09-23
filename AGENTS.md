@@ -87,6 +87,16 @@ eBPF (`vps_kernel_proxy/`, Docker-only).
     `ci.yml`): the gate fails on bot commits that are empty, add zero-content
     files, or delete lines from test files — bot lanes are append-only in
     tests (Testpilot owns `__tests__/` and `tests/`).
+    **Publish as a single commit by default.** Commit the finished change once,
+    run the gate on that exact tree, then push; on any revision, amend or
+    squash (`git reset --soft $(git merge-base origin/main HEAD) && git commit`)
+    and force-push so the branch stays one commit. The hygiene gate is
+    **per-commit, not net-diff** — every intermediate mistake on a multi-commit
+    branch is permanent, while a one-commit branch can only fail on its final
+    content (the sibling fund repo's PR #692: two empty "finalize" pushes and a
+    474-line `verify_output.txt` failed CI despite a clean final tree). Stage
+    by name (`git add <file>`, never `git add -A`) so verification-run scratch
+    (`*_output.txt`, `*.log`) never reaches a commit.
 
 ## Reading the gate output (this repo is noisy on purpose)
 
@@ -251,7 +261,8 @@ detection. Zero-baseline and purely preventive. Detector mechanics:
 `origin/main..HEAD`, enforcing non-negotiable #11: no empty commits, no
 zero-content files, no deleted test lines (`__tests__/`, `tests/`,
 `test_*.py`, `*.test.js` — bot lanes are append-only in tests), no stray
-bot artifacts (`pr_body.txt`, scratch files), and no complexity ratchet
+bot artifacts (`pr_body.txt`, `*.log`, `*_output.txt`, scratch/temp files),
+and no complexity ratchet
 violations (no added suppressions in `eslint-suppressions.json`; only Architect
 may touch it to prune). Human-authored commits are skipped. Full rules and
 history: `docs/gates.md`.

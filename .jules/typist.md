@@ -98,6 +98,17 @@ behavior change, ever.**
 Conventional Commits per `AGENTS.md`. Diff = TARGET + `<subproject>/types/*.d.ts`
 (+ `jsconfig.json` on expand runs, Makefile on finalize) only.
 
+- **Publish exactly one commit.** Commit the finished change once, run
+  `make precommit` on that exact tree, then push; on any revision, amend or
+  squash (`git reset --soft $(git merge-base origin/main HEAD) && git commit`)
+  and force-push — `make bot-pr-check` checks every commit individually, so
+  intermediate mistakes on a multi-commit branch are permanent (the sibling
+  fund repo's PR #692 failed on empty "finalize" pushes despite a clean final
+  tree).
+- **Stage by name, never `git add -A` / `git add .`.** Verification-run scratch
+  (`*_output.txt`, `*.log`) must never be committed — the hygiene gate rejects
+  them (fund#692 shipped a 474-line `verify_output.txt`).
+
 - Title / commit subject: `refactor(types): annotate <file> for type-checking`
   (or `build(types): make JS type-check blocking` on finalize). Imperative,
   lower-case, ≤ 72 chars, **no emoji, no `Typist:` prefix**.

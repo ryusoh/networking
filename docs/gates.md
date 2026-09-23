@@ -66,7 +66,8 @@ gate fails on bot commits that: change no files (empty commit), touch a file wit
 content lines (the placeholder/dummy pattern), delete lines from a test file — test
 paths are `__tests__/` and `tests/` dirs, `test_*.py`, and `*.test.js`; bot lanes are
 append-only in tests (Testpilot owns them), commit stray bot artifacts (e.g.
-`pr_body.txt`, scratch/temp files), or touch `eslint-suppressions.json` from a
+`pr_body.txt`, scratch/temp files, `*.log` or `*_output.txt` verification-run
+dumps — the sibling fund repo's PR #692 shipped a 474-line `verify_output.txt`), or touch `eslint-suppressions.json` from a
 non-refactor lane or increase suppressions (complexity ratchet violation). Human-authored
 commits are skipped: interactive agents may legitimately rewrite tests on request. CI
 runs the same check on every PR (the "Reject bot PR hygiene violations" step in `ci.yml`,

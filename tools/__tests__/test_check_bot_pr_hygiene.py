@@ -136,6 +136,28 @@ def test_bot_stray_artifact_flagged(repo: Path) -> None:
     assert any("stray artifact" in v and "pr_body.txt" in v for v in violations)
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "precommit_output.txt",
+        "output.txt",
+        "coverage/debug.log",
+        "verify_output.txt",
+    ],
+)
+def test_bot_log_and_output_dumps_flagged(repo: Path, path: str) -> None:
+    """fund#692 shipped a 474-line verify_output.txt; logs stay out of git."""
+    _write_and_commit(repo, path, "gate noise\n", "chore: probe artifact")
+    violations = find_violations(repo, "main")
+    assert any("stray artifact" in v and path in v for v in violations)
+
+
+def test_bot_similarly_named_source_files_pass(repo: Path) -> None:
+    _write_and_commit(repo, "retriever/outputs.py", "x = 1\n", "add outputs module")
+    _write_and_commit(repo, "retriever/output_reader.py", "x = 1\n", "add output reader")
+    assert find_violations(repo, "main") == []
+
+
 def test_bot_suppressions_addition_flagged(repo: Path) -> None:
     _write_and_commit(
         repo,
