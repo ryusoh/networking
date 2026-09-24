@@ -152,6 +152,19 @@ def test_bot_log_and_output_dumps_flagged(repo: Path, path: str) -> None:
     assert any("stray artifact" in v and path in v for v in violations)
 
 
+def test_bot_eslint_out_json_scratch_flagged(repo: Path) -> None:
+    """fund#695 shipped ~6 MB of eslint_out.json / eslint_warn_out.json."""
+    _write_and_commit(repo, "eslint_out.json", "[]\n", "chore: probe artifact")
+    violations = find_violations(repo, "main")
+    assert any("stray artifact" in v and "eslint_out.json" in v for v in violations)
+
+
+def test_bot_warn_out_json_scratch_flagged(repo: Path) -> None:
+    _write_and_commit(repo, "eslint_warn_out.json", "[]\n", "chore: probe artifact")
+    violations = find_violations(repo, "main")
+    assert any("stray artifact" in v and "eslint_warn_out.json" in v for v in violations)
+
+
 def test_bot_similarly_named_source_files_pass(repo: Path) -> None:
     _write_and_commit(repo, "retriever/outputs.py", "x = 1\n", "add outputs module")
     _write_and_commit(repo, "retriever/output_reader.py", "x = 1\n", "add output reader")

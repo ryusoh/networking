@@ -13,7 +13,7 @@ This check fails the gate on any bot-authored commit in ``<base>..HEAD`` that:
    (Testpilot owns ``__tests__/`` and ``tests/``; no other bot lane may touch
    tests at all),
 4. commits stray bot artifacts (e.g. ``pr_body.txt``, scratch/temp files,
-   ``*.log`` or ``*_output.txt`` verification-run dumps),
+   ``*.log`` or ``*_output.txt`` / ``*_out.json`` verification-run dumps),
 5. touches ``eslint-suppressions.json`` from a non-refactor lane or increases
    suppressions (complexity ratchet violation).
 
@@ -72,8 +72,11 @@ def _is_stray_artifact(path: str) -> bool:
     if name.endswith((".tmp", ".scratch", ".swp", ".log")):
         return True
     # Verification-run scratch (sibling fund repo's PR #692 shipped a 474-line
-    # verify_output.txt); AGENTS.md "Output logs stay out of git" bans these.
+    # verify_output.txt; fund's PR #695 shipped ~6 MB of eslint_out.json /
+    # eslint_warn_out.json); AGENTS.md "Output logs stay out of git" bans these.
     if name == "output.txt" or name.endswith("_output.txt"):
+        return True
+    if name.endswith(("_out.json", "_output.json")):
         return True
     if name.startswith(("temp_", "dummy_")):
         return True

@@ -86,7 +86,10 @@ eBPF (`vps_kernel_proxy/`, Docker-only).
     `make precommit`, plus the "Reject bot PR hygiene violations" step in
     `ci.yml`): the gate fails on bot commits that are empty, add zero-content
     files, or delete lines from test files — bot lanes are append-only in
-    tests (Testpilot owns `__tests__/` and `tests/`).
+    tests (Testpilot owns `__tests__/` and `tests/`). It also fails on stray
+    bot artifacts (`pr_body.txt`, `*.log`, `*_output.txt` / `*_out.json`
+    verification-run dumps, scratch/temp files) — the sibling fund repo's
+    PR #695 shipped ~6 MB of `eslint_out.json` that the patterns then missed.
     **Publish as a single commit by default.** Commit the finished change once,
     run the gate on that exact tree, then push; on any revision, amend or
     squash (`git reset --soft $(git merge-base origin/main HEAD) && git commit`)

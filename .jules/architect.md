@@ -98,10 +98,17 @@ Conventional Commits per `AGENTS.md`. One subproject per PR.
   tree).
 - **Stage by name, never `git add -A` / `git add .`.** Verification-run scratch
   (`*_output.txt`, `*.log`) must never be committed — the hygiene gate rejects
-  them (fund#692 shipped a 474-line `verify_output.txt`).
+  them (fund#692 shipped a 474-line `verify_output.txt`). And never redirect
+  linter/gate output into a repo file (`npx eslint ... > eslint_out.json`);
+  read it from stdout or write it under `/tmp` (the sibling fund repo's PR
+  #695 committed ~6 MB of `eslint_out.json` / `eslint_warn_out.json` and went
+  red in CI).
 - Title / commit subject: `refactor(<scope>): extract helpers to cut <function>
 complexity` — scope is the subproject. Imperative, lower-case, ≤ 72 chars,
-  **no emoji, no `Architect:` prefix**.
+  **no emoji, no `Architect:` prefix**. Count the assembled subject's
+  characters: for a long function name this template overflows 72 (fund#695's
+  title was 73 chars) — shorten the verb phrase
+  (`cut <function> complexity via helpers`), never the function name.
 - Body: function and file; complexity N → M (decision points counted); helpers
   extracted and why; "behaviour preserved, test expectations unchanged"; pasted
   `make precommit` output.
