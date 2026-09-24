@@ -12,12 +12,20 @@ repos:
   hooks, whose eslint hook uses `--max-warnings=0`); `make verify` is NOT a
   superset of it (adds mypy/bandit/sync-check but skips the pre-commit hooks);
   diff-coverage gate on changed lines; commands sync via
-  `scripts/sync_commands.py` (not `tools/`).
+  `scripts/sync_commands.py` (not `tools/`). Fund has a PR-title gate
+  (`.github/workflows/commit-lint.yml` +
+  `scripts/agents/check_commit_message.py` — ≤72 chars, scope regex
+  lower-case `[a-z0-9._/-]` only) that exists in NO sibling (verified in all
+  three 2026-09): when porting fund persona lessons about commit titles
+  (e.g. fund#695), keep the ≤72-char / lower-case-scope guidance generic and
+  do NOT cite fund's checker command or regex.
 - `~/dev/anki` — monorepo of Anki add-ons (Python) + JS/graph pipeline; **no**
   `.pre-commit-config.yaml`; CI gate = `make precommit SKIP=1` (fmt-check lint
   typecheck-js quality-py check sync-check); aliases via package.json
   `imports` (`#js/*`, `#ui/*`); Python addon dirs are REAL packages
-  (`__init__.py` present) — import-linter works there.
+  (`__init__.py` present) — import-linter works there. Its architect-lane
+  persona is `.jules/refactoring.md` — there is no `architect.md` (verified
+  2026-09).
 - `~/dev/ryusoh.github.io` — JS-only static site; default branch is `master`,
   not `main`; has `.pre-commit-config.yaml`; CI-parity gate = `make
 precommit-fix` (Prettier, ESLint, Stylelint, tsc, Jest + coverage) — it stages
