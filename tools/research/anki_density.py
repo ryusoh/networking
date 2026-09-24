@@ -139,21 +139,37 @@ def mtld(tokens: list[str], threshold: float = 0.72) -> float:
     return (fwd + bwd) / 2.0
 
 
+def _has_digit(token: str) -> bool:
+    return any(c.isdigit() for c in token)
+
+
+def _is_acronym(token: str) -> bool:
+    return len(token) >= 2 and token.isupper()
+
+
+def _is_mixed_case(token: str) -> bool:
+    return len(token) >= 2 and any(c.isupper() for c in token[1:])
+
+
+def _has_math_symbol(token: str) -> bool:
+    return any(sym in token for sym in ("\\", "_", "^", "=", "<", ">", "+", "-", "*", "/"))
+
+
 def _is_technical_token(token: str) -> bool:
     """Check if token matches technical-form criteria."""
     if not token:
         return False
     # Digit presence (e.g. '3g', '2004', '802.11', '100ms')
-    if any(c.isdigit() for c in token):
+    if _has_digit(token):
         return True
     # All-caps acronym (length >= 2, e.g. 'GPS', 'BBR', 'TLB')
-    if len(token) >= 2 and token.isupper():
+    if _is_acronym(token):
         return True
     # Mixed-case identifier (e.g. 'PageRank', 'zkSNARK')
-    if len(token) >= 2 and any(c.isupper() for c in token[1:]):
+    if _is_mixed_case(token):
         return True
     # Mathematical / technical syntax symbols
-    if any(sym in token for sym in ("\\", "_", "^", "=", "<", ">", "+", "-", "*", "/")):
+    if _has_math_symbol(token):
         return True
     return False
 
