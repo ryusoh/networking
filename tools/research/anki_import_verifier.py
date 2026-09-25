@@ -77,6 +77,28 @@ def fetch_existing_fronts(collection_path: Path, deck_name: str) -> set[str]:
     return fronts
 
 
+def _get_pending_imports(visited: dict) -> dict:
+    """Filter and return only pending_import items."""
+    return {
+        cid: info
+        for cid, info in visited.items()
+        if info.get("status") == "pending_import"
+    }
+
+
+def _process_pending_item(cid: str, info: dict, existing: set[str], now: str) -> bool:
+    """Check a single pending item against existing fronts and update if matched."""
+    front = _normalize(info.get("front_html", ""))
+    if not front:
+        front = _normalize(info.get("heading", ""))
+
+    if front and front in existing:
+        info["status"] = "imported"
+        info["imported_at"] = now
+        return True
+    return False
+
+
 def verify_imports(
     coverage_path: Path = DEFAULT_COVERAGE_PATH,
     deck_name: str = DEFAULT_DECK,
@@ -92,11 +114,7 @@ def verify_imports(
     data = json.loads(coverage_path.read_text(encoding="utf-8"))
     visited = data.setdefault("visited_chunk_ids", {})
 
-    pending = {
-        cid: info
-        for cid, info in visited.items()
-        if info.get("status") == "pending_import"
-    }
+    pending = _get_pending_imports(visited)
 
     if not pending:
         print("No pending imports to verify.")
@@ -112,13 +130,7 @@ def verify_imports(
     missing = 0
     now = datetime.now(timezone.utc).isoformat()
     for cid, info in pending.items():
-        front = _normalize(info.get("front_html", ""))
-        if not front:
-            # Fall back to the stored heading/title if front_html is absent
-            front = _normalize(info.get("heading", ""))
-        if front and front in existing:
-            info["status"] = "imported"
-            info["imported_at"] = now
+        if _process_pending_item(cid, info, existing, now):
             verified += 1
         else:
             missing += 1
