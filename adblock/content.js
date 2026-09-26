@@ -565,25 +565,22 @@
       '.fc-dialog-overlay',
       '#__ABoverlay'
     ];
-    const numAdblockSelectors = ADBLOCK_POPUP_SELECTORS.length;
-    for (let i = 0; i < numAdblockSelectors; i++) {
-      const sel = ADBLOCK_POPUP_SELECTORS[i];
-      try {
-        const els = document.querySelectorAll(sel);
-        const numEls = els.length;
-        for (let j = 0; j < numEls; j++) {
-          const el = els[j];
-          if (
-            el instanceof HTMLElement &&
-            (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none')
-          ) {
-            log('Hiding adblock popup by selector:', sel);
-            hideDetector(el);
-          }
+    const ADBLOCK_POPUP_SELECTORS_JOINED = ADBLOCK_POPUP_SELECTORS.join(', ');
+    try {
+      const els = document.querySelectorAll(ADBLOCK_POPUP_SELECTORS_JOINED);
+      const numEls = els.length;
+      for (let j = 0; j < numEls; j++) {
+        const el = els[j];
+        if (
+          el instanceof HTMLElement &&
+          (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none')
+        ) {
+          log('Hiding adblock popup by selector:', el.className || el.id);
+          hideDetector(el);
         }
-      } catch {
-        /* invalid selector */
       }
+    } catch {
+      /* invalid selector */
     }
   }
 
