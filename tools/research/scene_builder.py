@@ -39,70 +39,78 @@ class SceneBuilder:
         self.indexer = BM25Indexer(chunks)
         self.memory_host = memory_host
 
+    def _prepare_memory_context(self) -> tuple[str, int]:
+        if self.memory_host is None:
+            return "", 0
+        report = self.memory_host.get_student_report()
+        if report["total_topics_tracked"] <= 0:
+            return "", 0
+        memory_context = self.memory_host.render_memory_context()
+        memory_section = self._render_memory_section(memory_context)
+        return memory_context, estimate_tokens(memory_section)
+
+    def _try_add_chunk(self, chunk: dict[str, Any], score: float, slot: str, governor: ResourceGovernor, selected_chunks: list[dict[str, Any]]) -> bool:
+        chunk_tokens = chunk.get("token_count", estimate_tokens(chunk.get("content", "")))
+        if not governor.try_allocate(chunk_tokens):
+            if not selected_chunks:
+                truncated, allowed_tokens = governor.truncate_content_to_fit(chunk["content"])
+                truncated_chunk = dict(chunk)
+                truncated_chunk["content"] = truncated
+                truncated_chunk["token_count"] = allowed_tokens
+                truncated_chunk["score"] = score
+                truncated_chunk["slot"] = slot
+                selected_chunks.append(truncated_chunk)
+                governor.used_tokens += allowed_tokens
+            return False
+
+        chunk_copy = dict(chunk)
+        chunk_copy["score"] = score
+        chunk_copy["slot"] = slot
+        selected_chunks.append(chunk_copy)
+        return True
+
+    def _fill_from_pool(self, pool: list[tuple[dict[str, Any], float]], slot: str, governor: ResourceGovernor, selected_chunks: list[dict[str, Any]], top_k: int, limit: int | None = None) -> None:
+        count = 0
+        for chunk, score in pool:
+            if len(selected_chunks) >= top_k or (limit is not None and count >= limit):
+                break
+            self._try_add_chunk(chunk, score, slot, governor, selected_chunks)
+            count += 1
+
+    def _select_chunks(self, ranked: list[tuple[dict[str, Any], float]], governor: ResourceGovernor, top_k: int) -> list[dict[str, Any]]:
+        selected_chunks: list[dict[str, Any]] = []
+        if not ranked:
+            return selected_chunks
+
+        primary_chunk, primary_score = ranked[0]
+        code_pool = [
+            (c, s) for c, s in ranked[1:]
+            if Path(c["file_path"]).suffix.lower() in CODE_EXTS
+        ]
+        code_ids = {c["chunk_id"] for c, _ in code_pool}
+        prereq_pool = [
+            (c, s) for c, s in ranked[1:]
+            if c["chunk_id"] not in code_ids
+        ]
+
+        self._try_add_chunk(primary_chunk, primary_score, "primary", governor, selected_chunks)
+        self._fill_from_pool(prereq_pool, "prereq", governor, selected_chunks, top_k)
+        self._fill_from_pool(code_pool, "code", governor, selected_chunks, top_k, limit=1)
+
+        return selected_chunks
+
     def build_scene(self, query: str, max_tokens: int = 8192, top_k: int = 5) -> dict[str, Any]:
         """Query indexer and assemble a token-bounded Study Scene dictionary."""
         ranked = self.indexer.score(query)
-        selected_chunks: list[dict[str, Any]] = []
 
         system_instruction_tokens = 200
-        memory_context = ""
-        memory_tokens = 0
-        if self.memory_host is not None:
-            report = self.memory_host.get_student_report()
-            if report["total_topics_tracked"] > 0:
-                memory_context = self.memory_host.render_memory_context()
-                memory_section = self._render_memory_section(memory_context)
-                memory_tokens = estimate_tokens(memory_section)
+        memory_context, memory_tokens = self._prepare_memory_context()
 
         governor = ResourceGovernor(
             max_tokens=max_tokens, base_tokens=system_instruction_tokens + memory_tokens
         )
 
-        def try_add(chunk: dict[str, Any], score: float, slot: str) -> bool:
-            """Append a chunk to the scene if it fits the token budget."""
-            chunk_tokens = chunk.get("token_count", estimate_tokens(chunk.get("content", "")))
-            if not governor.try_allocate(chunk_tokens):
-                if not selected_chunks:
-                    # Truncate content to fit if the first chunk exceeds max_tokens.
-                    truncated, allowed_tokens = governor.truncate_content_to_fit(chunk["content"])
-                    truncated_chunk = dict(chunk)
-                    truncated_chunk["content"] = truncated
-                    truncated_chunk["token_count"] = allowed_tokens
-                    truncated_chunk["score"] = score
-                    truncated_chunk["slot"] = slot
-                    selected_chunks.append(truncated_chunk)
-                    governor.used_tokens += allowed_tokens
-                return False
-
-            chunk_copy = dict(chunk)
-            chunk_copy["score"] = score
-            chunk_copy["slot"] = slot
-            selected_chunks.append(chunk_copy)
-            return True
-
-        if ranked:
-            primary_chunk, primary_score = ranked[0]
-            code_pool = [
-                (c, s)
-                for c, s in ranked[1:]
-                if Path(c["file_path"]).suffix.lower() in CODE_EXTS
-            ]
-            code_ids = {c["chunk_id"] for c, _ in code_pool}
-            prereq_pool = [
-                (c, s)
-                for c, s in ranked[1:]
-                if c["chunk_id"] not in code_ids
-            ]
-
-            try_add(primary_chunk, primary_score, "primary")
-            for chunk, score in prereq_pool:
-                if len(selected_chunks) >= top_k:
-                    break
-                try_add(chunk, score, "prereq")
-            for chunk, score in code_pool[:1]:
-                if len(selected_chunks) >= top_k:
-                    break
-                try_add(chunk, score, "code")
+        selected_chunks = self._select_chunks(ranked, governor, top_k)
 
         current_tokens = governor.used_tokens
         formatted_payload = self._render_markdown_scene(
