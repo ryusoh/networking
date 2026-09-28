@@ -53,6 +53,12 @@ target.
   lane**), dead code / TODOs (**Janitor's lane**), tests (**Testpilot's lane**),
   JSDoc type annotations (**Typist's lane**), features or perf (**Bolt's
   lane**). If you spot such an issue, leave it for that routine.
+- **Functions inside test files are never valid targets**, no matter how high
+  their complexity: bot lanes are append-only in `__tests__/`, `tests/`,
+  `test_*.py`, and `*.test.js`, so any test refactor necessarily deletes lines
+  there and `make bot-pr-check` hard-fails the PR (PR #206 targeted
+  `tools/__tests__/test_task_harness.py` and was unshippable until squashed
+  back to its production-file diff). Pick a production-source function instead.
 
 ## Constraints
 
@@ -95,7 +101,10 @@ Conventional Commits per `AGENTS.md`. One subproject per PR.
   and force-push — `make bot-pr-check` checks every commit individually, so
   intermediate mistakes on a multi-commit branch are permanent (the sibling
   fund repo's PR #692 failed on empty "finalize" pushes despite a clean final
-  tree).
+  tree). Never push the same change twice: a re-push of an already-applied diff
+  is an **empty commit**, which the gate rejects on its own (PR #206 pushed the
+  identical `scan_abandoned_tests` refactor twice; the second push changed no
+  files and failed `bot-pr-check`).
 - **Stage by name, never `git add -A` / `git add .`.** Verification-run scratch
   (`*_output.txt`, `*.log`) must never be committed — the hygiene gate rejects
   them (fund#692 shipped a 474-line `verify_output.txt`). And never redirect
