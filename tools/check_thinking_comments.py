@@ -147,6 +147,22 @@ def _abandoned_body(node):
     return not body or all(_is_trivial_stmt(s) for s in body)
 
 
+def _is_test_function(node):
+    return isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith(
+        "test_"
+    )
+
+
+def _collect_test_functions(body):
+    for node in body:
+        if _is_test_function(node):
+            yield node
+        elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+            for item in node.body:
+                if _is_test_function(item):
+                    yield item
+
+
 def scan_abandoned_tests(src):
     """Yield (lineno, name) for pytest-collectable tests with an empty body.
 
@@ -158,20 +174,7 @@ def scan_abandoned_tests(src):
         tree = ast.parse(src)
     except SyntaxError:
         return
-    candidates = []
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith(
-            "test_"
-        ):
-            candidates.append(node)
-        elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
-            candidates.extend(
-                item
-                for item in node.body
-                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
-                and item.name.startswith("test_")
-            )
-    for node in candidates:
+    for node in _collect_test_functions(tree.body):
         if _abandoned_body(node):
             yield node.lineno, node.name
 
