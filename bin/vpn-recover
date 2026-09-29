@@ -10,7 +10,11 @@
 #      list — DNS for the proxy server times out for minutes.
 #   3. Zombie proxy tunnels: the utun interface answers ping but the backing
 #      process (MacPacketTunnel, neagent, etc.) has zero upstream connections,
-#      so all HTTPS traffic silently fails (SSL_ERROR_SYSCALL).
+#      so all HTTPS traffic silently fails (SSL_ERROR_SYSCALL). --fix kills the
+#      user-owned tunnel-provider process; macOS then tears down the utun and
+#      every route through it on its own, no sudo route surgery needed.
+#
+# Test hook: VR_KILL overrides the kill command (used by bin/__tests__).
 #   4. Poisoned DNS/ARP caches that keep the failures alive long after the
 #      routes/DNS are fixed.
 #
@@ -54,19 +58,42 @@ external_connections() {
     lsof -i -n -P 2>/dev/null | grep "$pname" | grep ESTABLISHED | grep -v '127\.0\.0\.1' | grep -vE '192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|10\.' | wc -l | tr -d ' '
 }
 
+# Processes that back a utun packet tunnel. Detection checks all of them for
+# upstream connectivity; only the user-owned providers are killed on --fix.
+# nesessionmanager is launchd-managed and killing it resets every network
+# extension session, so it is detection-only.
+TUNNEL_PROCS="MacPacketTunnel neagent nesessionmanager packettunnel"
+TUNNEL_KILL_PROCS="MacPacketTunnel neagent packettunnel"
+
+KILL_CMD="${VR_KILL:-kill}"
+
 # Detect whether a utun interface is backed by a proxy/VPN process that
 # actually has upstream connectivity.  A tunnel that answers ping but has
 # zero external connections is a "zombie" — the local TUN endpoint is up
 # but the upstream node is dead (common with Shadowrocket, Clash, etc.).
 utun_has_upstream() {
-    local procs="MacPacketTunnel neagent nesessionmanager packettunnel"
-    local total=0
-    for p in $procs; do
-        local n
+    local total=0 p n
+    for p in $TUNNEL_PROCS; do
         n=$(external_connections "$p")
         total=$((total + n))
     done
     [[ $total -gt 0 ]]
+}
+
+# Kill the user-owned tunnel providers that have zero upstream connections.
+# The provider owns the utun: once it dies, macOS removes the interface and
+# all of its routes itself.
+kill_zombie_providers() {
+    local p pid
+    for p in $TUNNEL_KILL_PROCS; do
+        [[ $(external_connections "$p") -eq 0 ]] || continue
+        while read -r pid; do
+            [[ -n "$pid" ]] || continue
+            say "  killing $p (pid $pid) so macOS tears down its utun + routes"
+            "$KILL_CMD" "$pid" 2>/dev/null || $SUDO "$KILL_CMD" "$pid" 2>/dev/null || true
+        done < <(pgrep -x "$p" 2>/dev/null || true)
+    done
+    sleep 2
 }
 
 # ---------------------------------------------------------------------------
@@ -78,6 +105,7 @@ say "default route interface(s): $(echo $DEFAULT_IFS | tr '\n' ' ')"
 say "connected VPN service(s): $(scutil --nc list | awk '/^\*.*Connected/ {found=1} END {print found ? "yes" : "none"}')"
 
 stale_ifs=()
+zombie_ifs=()
 for ifn in $DEFAULT_IFS; do
     case "$ifn" in
         utun*)
@@ -86,7 +114,7 @@ for ifn in $DEFAULT_IFS; do
                     say "  $ifn: tunnel answers ping and has upstream connections, keeping"
                 else
                     say "  $ifn: ZOMBIE — tunnel answers ping but has zero upstream connections (dead proxy node)"
-                    stale_ifs+=("$ifn")
+                    zombie_ifs+=("$ifn")
                     problems=1
                 fi
             else
@@ -101,6 +129,8 @@ for ifn in $DEFAULT_IFS; do
     esac
 done
 
+# Zombie interfaces are intentionally excluded here: their routes are owned
+# by the tunnel provider and are removed by killing it after verification.
 if [[ $FIX -eq 1 && ${#stale_ifs[@]} -gt 0 ]]; then
     for ifn in "${stale_ifs[@]}"; do
         say "  removing default route via $ifn"
@@ -175,10 +205,28 @@ check() {
     fi
 }
 
+verify() {
+    local failed=0
+    check "default-route ping 223.5.5.5" ping -c 1 -t 3 223.5.5.5 || failed=1
+    check "DNS resolve apple.com" dscacheutil -q host -a name apple.com || failed=1
+    check "HTTPS probe ipinfo.io" curl -sS --max-time 8 -o /dev/null https://ipinfo.io || failed=1
+    return $failed
+}
+
 verify_failed=0
-check "default-route ping 223.5.5.5" ping -c 1 -t 3 223.5.5.5 || verify_failed=1
-check "DNS resolve apple.com" dscacheutil -q host -a name apple.com || verify_failed=1
-check "HTTPS probe ipinfo.io" curl -sS --max-time 8 -o /dev/null https://ipinfo.io || verify_failed=1
+verify || verify_failed=1
+
+# Only kill the tunnel provider once verification has proven the zombie is
+# actually breaking connectivity — an idle-but-healthy tunnel also shows zero
+# upstream connections at any given instant.
+if [[ $FIX -eq 1 && $verify_failed -eq 1 && ${#zombie_ifs[@]} -gt 0 ]]; then
+    say
+    say "== 4b. zombie tunnel provider teardown =="
+    kill_zombie_providers
+    say "  re-running verification"
+    verify_failed=0
+    verify || verify_failed=1
+fi
 
 # ---------------------------------------------------------------------------
 say
