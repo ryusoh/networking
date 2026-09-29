@@ -132,6 +132,13 @@ CANONICAL_TAGS = frozenset(
         "caching",
         "replication",
         "fault_tolerance",
+        # finance
+        "finance",
+        "valuation",
+        "moat",
+        "earnings",
+        "industry",
+        "macro",
     }
 )
 # Known synonym spellings observed in authored cards, mapped to the canonical
