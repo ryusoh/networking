@@ -91,7 +91,8 @@
 
     /** @type {HTMLElement | null} */
     let targetTab = null;
-    tabs.forEach((tab) => {
+    for (let i = 0; i < tabs.length; i++) {
+      const tab = tabs[i];
       if (tab instanceof HTMLElement) {
         const text = (tab.innerText || '').trim().toLowerCase();
         // Hide "For you" tab on home page only
@@ -105,7 +106,7 @@
           targetTab = tab;
         }
       }
-    });
+    }
 
     const finalTab = /** @type {HTMLElement | null} */ (targetTab);
     if (finalTab && finalTab.getAttribute('aria-selected') !== 'true') {

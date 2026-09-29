@@ -60,11 +60,13 @@
       '#simplemodal-container'
     ];
     for (const sel of selectors) {
-      document.querySelectorAll(sel).forEach((el) => {
+      const els = document.querySelectorAll(sel);
+      for (let i = 0; i < els.length; i++) {
+        const el = els[i];
         if (el instanceof HTMLElement) {
           el.style.setProperty('display', 'none', 'important');
         }
-      });
+      }
     }
 
     // Restore scroll if modal locked it
