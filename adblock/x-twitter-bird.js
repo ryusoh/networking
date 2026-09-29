@@ -23,7 +23,8 @@
     ];
 
     let css = '';
-    xPaths.forEach((xPath) => {
+    for (let i = 0; i < xPaths.length; i++) {
+      const xPath = xPaths[i];
       // We use :has to target the SVG containing the X path.
       // We hide the inner path.
       css += `
@@ -42,7 +43,7 @@
           -webkit-mask-position: center !important;
         }
       `;
-    });
+    }
 
     style.textContent = css;
     (document.head || document.documentElement).appendChild(style);
@@ -58,12 +59,13 @@
     );
     let replaced = false;
 
-    iconLinks.forEach((link) => {
+    for (let i = 0; i < iconLinks.length; i++) {
+      const link = iconLinks[i];
       if (link instanceof window.HTMLLinkElement && !link.href.includes('twitter.png')) {
         link.href = chrome.runtime.getURL('assets/twitter.png');
         replaced = true;
       }
-    });
+    }
 
     if (!replaced && iconLinks.length === 0) {
       const target = document.head || document.documentElement;
