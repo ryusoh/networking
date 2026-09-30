@@ -276,8 +276,15 @@
   const observer = new MutationObserver((mutations) => {
     let shouldCheck = false;
     for (let i = 0; i < mutations.length; i++) {
-      if (mutations[i].addedNodes.length > 0) {
-        shouldCheck = true;
+      const addedNodes = mutations[i].addedNodes;
+      for (let j = 0; j < addedNodes.length; j++) {
+        if (addedNodes[j].nodeType === 1) {
+          // Node.ELEMENT_NODE
+          shouldCheck = true;
+          break;
+        }
+      }
+      if (shouldCheck) {
         break;
       }
     }
