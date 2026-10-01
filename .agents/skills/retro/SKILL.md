@@ -31,5 +31,11 @@ Work through these steps:
 
 7. **Report.** Summarize what you changed, where the knowledge now lives, and what you deliberately left for the user to decide.
 
+8. **Distill the session into a skill delta (ACE step).** Ask: "what did this
+   session teach about _how_ to do X?" If it generalizes, delta-edit the
+   existing `.agents/skills/<name>/SKILL.md` or `AGENTS.md` — tighten a line,
+   never rewrite, never create a near-duplicate skill. Skill bloat is the
+   failure mode; editing beats adding.
+
 Guiding test: a correction you had to give today should be impossible to need next month.
 Nothing is committed by these edits — leave committing to the user.
