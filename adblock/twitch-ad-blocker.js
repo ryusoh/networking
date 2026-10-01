@@ -227,7 +227,6 @@
   }
 
   // Watch for dynamically loaded ads
-  let observerThrottled = false;
   const observer = new MutationObserver((mutations) => {
     let shouldCheck = false;
     for (const mutation of mutations) {
@@ -240,12 +239,8 @@
         shouldCheck = true;
       }
     }
-    if (shouldCheck && !observerThrottled) {
-      observerThrottled = true;
-      Promise.resolve().then(() => {
-        observerThrottled = false;
-        blockTwitchAds();
-      });
+    if (shouldCheck) {
+      blockTwitchAds();
     }
   });
 
