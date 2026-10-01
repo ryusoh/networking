@@ -75,12 +75,37 @@
     true
   );
 
-  function tryTabSwitch() {
-    const path = window.location.pathname;
-    if (path !== '/home' && path !== '/') {
-      return;
+  /**
+   * @param {string} path
+   * @returns {boolean}
+   */
+  function _isHomePath(path) {
+    return path === '/home' || path === '/';
+  }
+
+  /**
+   * @param {HTMLElement} tab
+   * @param {string} preferredTab
+   * @returns {HTMLElement | null}
+   */
+  function _processTab(tab, preferredTab) {
+    if (!(tab instanceof HTMLElement)) {
+      return null;
     }
-    if (tabSwitched) {
+    const text = (tab.innerText || '').trim().toLowerCase();
+
+    if (text.includes('for you') || text.includes('おすすめ')) {
+      tab.style.setProperty('display', 'none', 'important');
+      if (tab.parentElement && tab.parentElement.getAttribute('role') === 'presentation') {
+        tab.parentElement.style.setProperty('display', 'none', 'important');
+      }
+    }
+
+    return text.includes(preferredTab) ? tab : null;
+  }
+
+  function tryTabSwitch() {
+    if (!_isHomePath(window.location.pathname) || tabSwitched) {
       return;
     }
 
@@ -92,19 +117,9 @@
     /** @type {HTMLElement | null} */
     let targetTab = null;
     for (let i = 0; i < tabs.length; i++) {
-      const tab = tabs[i];
-      if (tab instanceof HTMLElement) {
-        const text = (tab.innerText || '').trim().toLowerCase();
-        // Hide "For you" tab on home page only
-        if (text.includes('for you') || text.includes('おすすめ')) {
-          tab.style.setProperty('display', 'none', 'important');
-          if (tab.parentElement && tab.parentElement.getAttribute('role') === 'presentation') {
-            tab.parentElement.style.setProperty('display', 'none', 'important');
-          }
-        }
-        if (text.includes(preferredTab)) {
-          targetTab = tab;
-        }
+      const match = _processTab(/** @type {HTMLElement} */ (tabs[i]), preferredTab);
+      if (match) {
+        targetTab = match;
       }
     }
 
