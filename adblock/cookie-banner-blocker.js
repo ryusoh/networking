@@ -430,7 +430,6 @@
 
     const target = document.body || document.documentElement;
     if (target) {
-      let observerThrottled = false;
       const observer = new MutationObserver((mutations) => {
         let shouldCheck = false;
         for (let i = 0; i < mutations.length; i++) {
@@ -445,12 +444,8 @@
             break;
           }
         }
-        if (shouldCheck && !observerThrottled) {
-          observerThrottled = true;
-          Promise.resolve().then(() => {
-            observerThrottled = false;
-            blockCookieBanner();
-          });
+        if (shouldCheck) {
+          blockCookieBanner();
         }
       });
       observer.observe(target, { childList: true, subtree: true });
