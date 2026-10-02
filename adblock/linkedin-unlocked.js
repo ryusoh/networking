@@ -136,30 +136,37 @@
 
   // --- Layer 1: Proactive DOM Rewrite ---
 
+  const COMBINED_PREMIUM_SELECTOR = [
+    '#browsemap_recommendation a[href*="premium"]',
+    '.browsemap-profile a[href*="premium"]',
+    '.pv-browsemap-section__member-container a[href*="premium"]',
+    'li.artdeco-list__item a[href*="premium"]',
+    '.discover-entity-type-card a[href*="premium"]',
+    '.mn-discovery-card a[href*="premium"]'
+  ].join(', ');
+
   function proactivelyCleanLinks() {
     // The MutationObserver can fire asynchronously during page teardown/bfcache
     // (or test environment teardown), when `document` is no longer available.
     if (typeof document === 'undefined' || !document) {
       return;
     }
-    const cards = document.querySelectorAll(CARD_SELECTORS);
-    for (let i = 0; i < cards.length; i++) {
-      const card = cards[i];
-      const premiumLinks = card.querySelectorAll('a[href*="premium"]');
-      if (premiumLinks.length === 0) {
-        continue;
-      }
 
-      const safeUrl = getDestinationForCard(card);
-      if (safeUrl) {
-        for (let j = 0; j < premiumLinks.length; j++) {
-          const link = premiumLinks[j];
-          if (link instanceof HTMLAnchorElement) {
-            link.href = safeUrl;
-            link.setAttribute('data-cleaned', 'true');
-            link.removeAttribute('data-tracking-control-name');
-            link.removeAttribute('data-tracking-will-navigate');
-          }
+    const premiumLinks = document.querySelectorAll(COMBINED_PREMIUM_SELECTOR);
+    for (let i = 0; i < premiumLinks.length; i++) {
+      const link = premiumLinks[i];
+      if (link instanceof HTMLAnchorElement) {
+        const card = link.closest(CARD_SELECTORS);
+        if (!card) {
+          continue;
+        }
+
+        const safeUrl = getDestinationForCard(card);
+        if (safeUrl) {
+          link.href = safeUrl;
+          link.setAttribute('data-cleaned', 'true');
+          link.removeAttribute('data-tracking-control-name');
+          link.removeAttribute('data-tracking-will-navigate');
         }
       }
     }
