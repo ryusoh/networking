@@ -125,10 +125,12 @@ Conventional Commits per `AGENTS.md`. One subproject per PR.
   and force-push — `make bot-pr-check` checks every commit individually, so
   intermediate mistakes on a multi-commit branch are permanent (the sibling
   fund repo's PR #692 failed on empty "finalize" pushes despite a clean final
-  tree).
+  tree; PR #212 failed when an abandoned first attempt was committed before
+  switching targets in a second commit).
 - **Stage by name, never `git add -A` / `git add .`.** Verification-run scratch
-  (`*_output.txt`, `*.log`) must never be committed — the hygiene gate rejects
-  them (fund#692 shipped a 474-line `verify_output.txt`).
+  (`*_output.txt`, `*.log`, `*.diff`, `*.patch`) must never be committed — the
+  hygiene gate rejects them (fund#692 shipped a 474-line `verify_output.txt`;
+  PR #212 shipped a 158-line `patch.diff`).
 - Title / commit subject: `perf(<scope>): <summary>` — scope is the subproject.
   Imperative, lower-case, ≤ 72 chars, **no emoji, no `Bolt:` prefix**.
 - Body: what was optimized and the file; the bottleneck removed; the

@@ -165,6 +165,25 @@ def test_bot_warn_out_json_scratch_flagged(repo: Path) -> None:
     assert any("stray artifact" in v and "eslint_warn_out.json" in v for v in violations)
 
 
+@pytest.mark.parametrize("path", ["patch.diff", "scratch.patch", "adblock/temp.diff"])
+def test_bot_stray_diff_patch_flagged(repo: Path, path: str) -> None:
+    """PR #212 shipped a 158-line patch.diff; stray patches stay out of git."""
+    _write_and_commit(repo, path, "diff --git a/foo b/foo\n", "chore: probe artifact")
+    violations = find_violations(repo, "main")
+    assert any("stray artifact" in v and path in v for v in violations)
+
+
+def test_bot_vendor_research_patch_allowed(repo: Path) -> None:
+    """Vendor patches in research/ (e.g. gpac/xvidcore) are valid repo assets."""
+    _write_and_commit(
+        repo,
+        "research/cs234-advanced-networks/vendor.patch",
+        "diff --git a/foo b/foo\n",
+        "chore: add vendor patch",
+    )
+    assert find_violations(repo, "main") == []
+
+
 def test_bot_similarly_named_source_files_pass(repo: Path) -> None:
     _write_and_commit(repo, "retriever/outputs.py", "x = 1\n", "add outputs module")
     _write_and_commit(repo, "retriever/output_reader.py", "x = 1\n", "add output reader")

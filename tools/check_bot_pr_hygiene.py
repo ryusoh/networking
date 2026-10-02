@@ -80,6 +80,11 @@ def _is_stray_artifact(path: str) -> bool:
         return True
     if name.startswith(("temp_", "dummy_")):
         return True
+    # Stray patch/diff files (e.g. net-tools PR #212 shipped a 158-line patch.diff)
+    if name in {"patch.diff", "diff.patch"} or (
+        name.endswith((".diff", ".patch")) and not path.startswith("research/")
+    ):
+        return True
     return False
 
 
