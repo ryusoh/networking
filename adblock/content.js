@@ -604,19 +604,38 @@
    */
   function processCustomSelectors(selectors) {
     const numSelectors = selectors.length;
-    for (let i = 0; i < numSelectors; i++) {
-      const selector = selectors[i];
-      try {
-        const els = document.querySelectorAll(selector);
-        const numEls = els.length;
-        for (let j = 0; j < numEls; j++) {
-          const el = els[j];
-          if (el instanceof HTMLElement) {
-            el.style.setProperty('display', 'none', 'important');
-          }
+    if (numSelectors === 0) {
+      return;
+    }
+
+    // Join all selectors into a single string to minimize JS-to-C++ DOM boundary crossings
+    const combinedSelector = selectors.join(',');
+    try {
+      const els = document.querySelectorAll(combinedSelector);
+      const numEls = els.length;
+      for (let j = 0; j < numEls; j++) {
+        const el = els[j];
+        if (el instanceof HTMLElement) {
+          el.style.setProperty('display', 'none', 'important');
         }
-      } catch {
-        log('Invalid custom selector:', selector);
+      }
+    } catch {
+      // Fallback: If one of the selectors is invalid, querySelectorAll on the combined
+      // string will throw an error. Fall back to evaluating them one by one.
+      for (let i = 0; i < numSelectors; i++) {
+        const selector = selectors[i];
+        try {
+          const els = document.querySelectorAll(selector);
+          const numEls = els.length;
+          for (let j = 0; j < numEls; j++) {
+            const el = els[j];
+            if (el instanceof HTMLElement) {
+              el.style.setProperty('display', 'none', 'important');
+            }
+          }
+        } catch {
+          log('Invalid custom selector:', selector);
+        }
       }
     }
   }
