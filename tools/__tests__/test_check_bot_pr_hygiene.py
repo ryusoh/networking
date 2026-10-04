@@ -138,6 +138,17 @@ def test_bot_stray_artifact_flagged(repo: Path) -> None:
 
 @pytest.mark.parametrize(
     "path",
+    ["commit_message.txt", "commit-message.txt", "commit_msg.txt"],
+)
+def test_bot_commit_message_draft_flagged(repo: Path, path: str) -> None:
+    """PR #214 shipped commit_message.txt; commit-message drafts stay out of git."""
+    _write_and_commit(repo, path, "refactor(tools): draft\n", "chore: probe artifact")
+    violations = find_violations(repo, "main")
+    assert any("stray artifact" in v and path in v for v in violations)
+
+
+@pytest.mark.parametrize(
+    "path",
     [
         "precommit_output.txt",
         "output.txt",

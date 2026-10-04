@@ -58,7 +58,9 @@ target.
   `test_*.py`, and `*.test.js`, so any test refactor necessarily deletes lines
   there and `make bot-pr-check` hard-fails the PR (PR #206 targeted
   `tools/__tests__/test_task_harness.py` and was unshippable until squashed
-  back to its production-file diff). Pick a production-source function instead.
+  back to its production-file diff; PR #214 targeted **the same file again**
+  and was closed unmerged — the deletion lives in the final tree, so squashing
+  cannot recover it). Pick a production-source function instead.
 
 ## Constraints
 
@@ -107,7 +109,10 @@ Conventional Commits per `AGENTS.md`. One subproject per PR.
   files and failed `bot-pr-check`).
 - **Stage by name, never `git add -A` / `git add .`.** Verification-run scratch
   (`*_output.txt`, `*.log`) must never be committed — the hygiene gate rejects
-  them (fund#692 shipped a 474-line `verify_output.txt`). And never redirect
+  them (fund#692 shipped a 474-line `verify_output.txt`). The same goes for
+  commit-message drafts: write the message inline (`git commit -m`) or under
+  `/tmp`, never in a repo file (PR #214 shipped `commit_message.txt`; the owner
+  had to push a deletion commit to remove it). And never redirect
   linter/gate output into a repo file (`npx eslint ... > eslint_out.json`);
   read it from stdout or write it under `/tmp` (the sibling fund repo's PR
   #695 committed ~6 MB of `eslint_out.json` / `eslint_warn_out.json` and went

@@ -12,8 +12,9 @@ This check fails the gate on any bot-authored commit in ``<base>..HEAD`` that:
 3. deletes lines from a test file — bot lanes are append-only in tests
    (Testpilot owns ``__tests__/`` and ``tests/``; no other bot lane may touch
    tests at all),
-4. commits stray bot artifacts (e.g. ``pr_body.txt``, scratch/temp files,
-   ``*.log`` or ``*_output.txt`` / ``*_out.json`` verification-run dumps),
+4. commits stray bot artifacts (e.g. ``pr_body.txt`` / ``commit_message.txt``
+   draft files, scratch/temp files, ``*.log`` or ``*_output.txt`` /
+   ``*_out.json`` verification-run dumps),
 5. touches ``eslint-suppressions.json`` from a non-refactor lane or increases
    suppressions (complexity ratchet violation).
 
@@ -68,6 +69,10 @@ def _is_stray_artifact(path: str) -> bool:
     parts = path.split("/")
     name = parts[-1].lower()
     if name in {"pr_body.txt", "pr_description.txt"}:
+        return True
+    # Commit-message drafts (PR #214 shipped commit_message.txt; the owner had
+    # to push a manual deletion commit to remove it).
+    if name in {"commit_message.txt", "commit-message.txt", "commit_msg.txt"}:
         return True
     if name.endswith((".tmp", ".scratch", ".swp", ".log")):
         return True
