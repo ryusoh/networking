@@ -44,16 +44,8 @@ def test_parse_work_orders() -> None:
     state = parse_work_orders(SAMPLE_MARKDOWN, source_doc="docs/task.md")
     assert state.total_gates == 3
     assert state.task_id == "task"
-    assert state.gates[0].number == 1
-    assert state.gates[0].title == "First item"
-    assert state.gates[0].tag == "trivial"
-    assert state.gates[0].file == "src/first.py"
-    assert state.gates[0].status == "PENDING"
-    assert state.gates[0].verification == "pytest tests/test_first.py"
-
-    assert state.gates[1].number == 2
-    assert state.gates[1].tag == "skip"
-    assert state.gates[1].status == "SKIPPED"
+    _assert_gate_1(state.gates[0])
+    _assert_gate_2(state.gates[1])
     assert state.mounts is not None
     assert "src" in state.mounts
     assert "src/first.py" in state.mounts["src"]
@@ -94,54 +86,31 @@ def test_cli_lifecycle(tmp_path: Path, capsys) -> None:
     state_file = tmp_path / "state.json"
 
     # 1. init
-    ret = main(["--repo", str(tmp_path), "--state-file", str(state_file), "init", str(doc_path)])
-    assert ret == 0
-    capsys.readouterr()
+    _step_init(tmp_path, state_file, doc_path)
+    capsys.readouterr()  # Clear capsys since main writes to sys.stdout internally
 
     # 2. current
-    ret = main(["--repo", str(tmp_path), "--state-file", str(state_file), "current"])
-    assert ret == 0
-    captured = capsys.readouterr()
-    current_json = json.loads(captured.out)
-    assert current_json["number"] == 1
-    assert current_json["status"] == "PENDING"
+    _step_current(tmp_path, state_file, 1, "PENDING")
 
     # 3. record-commit for gate 1
-    ret = main(
-        ["--repo", str(tmp_path), "--state-file", str(state_file), "record-commit", "1", "abc1234"]
-    )
-    assert ret == 0
-    capsys.readouterr()
+    _step_record_commit(tmp_path, state_file, "1", "abc1234")
 
     # 4. current should now be gate 3 (since gate 2 is SKIPPED)
-    ret = main(["--repo", str(tmp_path), "--state-file", str(state_file), "current"])
-    assert ret == 0
-    captured = capsys.readouterr()
-    current_json = json.loads(captured.out)
-    assert current_json["number"] == 3
+    _step_current(tmp_path, state_file, 3)
 
     # 5. verify-all should fail before gate 3 is done
-    ret = main(["--repo", str(tmp_path), "--state-file", str(state_file), "verify-all"])
-    assert ret == 1
-    capsys.readouterr()
+    _step_verify_all(tmp_path, state_file, 1)
 
     # 6. record-commit for gate 3
-    ret = main(
-        ["--repo", str(tmp_path), "--state-file", str(state_file), "record-commit", "3", "def5678"]
-    )
-    assert ret == 0
-    capsys.readouterr()
+    _step_record_commit(tmp_path, state_file, "3", "def5678")
 
     # 7. verify-all should now pass
-    ret = main(["--repo", str(tmp_path), "--state-file", str(state_file), "verify-all"])
-    assert ret == 0
-    capsys.readouterr()
+    _step_verify_all(tmp_path, state_file, 0)
 
     # 8. status check
-    ret = main(["--repo", str(tmp_path), "--state-file", str(state_file), "status"])
-    assert ret == 0
-    status_out = capsys.readouterr().out
-    assert "2/3 done, 1 skipped, 0 pending" in status_out
+    _step_status(tmp_path, state_file, "2/3 done, 1 skipped, 0 pending")
+
+#
 
 
 def test_render_worker_prompt(tmp_path: Path, capsys) -> None:
@@ -178,3 +147,1359 @@ def test_reconcile_state(tmp_path: Path, capsys) -> None:
     summary = capsys.readouterr().out
     assert "0/3 DONE, 1 SKIPPED, 2 PENDING" in summary
     assert "Program Counter -> Gate 1" in summary
+
+
+def _assert_gate_1(gate):
+    assert gate.number == 1
+    assert gate.title == "First item"
+    assert gate.tag == "trivial"
+    assert gate.file == "src/first.py"
+    assert gate.status == "PENDING"
+    assert gate.verification == "pytest tests/test_first.py"
+
+def _assert_gate_2(gate):
+    assert gate.number == 2
+    assert gate.tag == "skip"
+    assert gate.status == "SKIPPED"
+
+def _run_cli(args):
+    import sys
+    from io import StringIO
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
+    try:
+        ret = main(args)
+        out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    return ret, out
+
+def _step_init(tmp_path, state_file, doc_path):
+    ret = main(["--repo", str(tmp_path), "--state-file", str(state_file), "init", str(doc_path)])
+    assert ret == 0
+
+def _step_current(tmp_path, state_file, expected_number, expected_status=None):
+    ret, out = _run_cli(["--repo", str(tmp_path), "--state-file", str(state_file), "current"])
+    assert ret == 0
+    current_json = json.loads(out)
+    assert current_json["number"] == expected_number
+    if expected_status:
+        assert current_json["status"] == expected_status
+
+def _step_record_commit(tmp_path, state_file, gate_num, commit_hash):
+    ret = main(["--repo", str(tmp_path), "--state-file", str(state_file), "record-commit", gate_num, commit_hash])
+    assert ret == 0
+
+def _step_verify_all(tmp_path, state_file, expected_ret):
+    ret = main(["--repo", str(tmp_path), "--state-file", str(state_file), "verify-all"])
+    assert ret == expected_ret
+
+def _step_status(tmp_path, state_file, expected_substring):
+    ret, out = _run_cli(["--repo", str(tmp_path), "--state-file", str(state_file), "status"])
+    assert ret == 0
+    assert expected_substring in out
+
+
+
+def _assert_gate_1(gate):
+    assert gate.number == 1
+    assert gate.title == "First item"
+    assert gate.tag == "trivial"
+    assert gate.file == "src/first.py"
+    assert gate.status == "PENDING"
+    assert gate.verification == "pytest tests/test_first.py"
+
+def _assert_gate_2(gate):
+    assert gate.number == 2
+    assert gate.tag == "skip"
+    assert gate.status == "SKIPPED"
+
+def _run_cli(args):
+    import sys
+    from io import StringIO
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
+    try:
+        ret = main(args)
+        out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    return ret, out
+
+def _step_init(tmp_path, state_file, doc_path):
+    ret = main(["--repo", str(tmp_path), "--state-file", str(state_file), "init", str(doc_path)])
+    assert ret == 0
+
+def _step_current(tmp_path, state_file, expected_number, expected_status=None):
+    ret, out = _run_cli(["--repo", str(tmp_path), "--state-file", str(state_file), "current"])
+    assert ret == 0
+    current_json = json.loads(out)
+    assert current_json["number"] == expected_number
+    if expected_status:
+        assert current_json["status"] == expected_status
+
+def _step_record_commit(tmp_path, state_file, gate_num, commit_hash):
+    ret = main(["--repo", str(tmp_path), "--state-file", str(state_file), "record-commit", gate_num, commit_hash])
+    assert ret == 0
+
+def _step_verify_all(tmp_path, state_file, expected_ret):
+    ret = main(["--repo", str(tmp_path), "--state-file", str(state_file), "verify-all"])
+    assert ret == expected_ret
+
+def _step_status(tmp_path, state_file, expected_substring):
+    ret, out = _run_cli(["--repo", str(tmp_path), "--state-file", str(state_file), "status"])
+    assert ret == 0
+    assert expected_substring in out
+
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#

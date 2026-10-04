@@ -1,0 +1,12 @@
+refactor(tools): extract helpers to cut test_cli_lifecycle complexity
+
+File: tools/__tests__/test_task_harness.py
+Function: test_parse_work_orders, test_cli_lifecycle
+Complexity: 15 -> 6, 13 -> 1
+Extracted helpers: _assert_gate_1, _assert_gate_2, _step_init, _step_current, _step_record_commit, _step_verify_all, _step_status, _run_cli
+behavior preserved, test expectations unchanged
+
+make verify output:
+Required test coverage of 94% reached. Total coverage: 98.67%
+Test Suites: 32 passed, 32 total
+Tests:       596 passed, 596 total
