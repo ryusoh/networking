@@ -117,7 +117,7 @@ describe('Additional content.js coverage', () => {
     loadScript();
 
     global.chrome.runtime.lastError = undefined;
-    global.chrome.storage.local.get.mockImplementation((keys, cb) => {
+    global.chrome.storage.local.get.mockImplementation(() => {
       throw new Error('sync access failed');
     });
     loadScript();
@@ -150,7 +150,7 @@ describe('Even more content.js coverage', () => {
 
   test('covers sync callback missing context and throwing', () => {
     // throw in callback
-    global.chrome.storage.sync.get.mockImplementation((keys, cb) => {
+    global.chrome.storage.sync.get.mockImplementation(() => {
       throw new Error('sync err');
     });
     loadScript();
