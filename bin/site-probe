@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# site-probe — profile a site's reachability and speed from the current
+# network exit. Answers "is this site slow or blocked for visitors on this
+# network" (e.g. mainland China without VPN) with numbers instead of vibes.
+#
+# Usage: site-probe [proxy-spec] <url> [url...]
+#   proxy-spec: 7897, http://127.0.0.1:7897, socks5h://..., empty = direct
+#   url:        pages, images, or API hosts to time
+#
+# Output sections:
+#   1. exit identity   — ipinfo.io geolocation of the current egress IP
+#   2. canary          — google.com, a reference for "is this exit behind
+#                        the GFW": timeout = yes, fast 200 = no
+#   3. per-URL timing  — N runs of TTFB / total / throughput / size
+#   4. parallel batch  — all URLs fetched concurrently, like a browser
+#                        loading a page; per-connection and aggregate speed
+#
+# Reading the numbers:
+#   - http=000 or curl exit 28 = blocked, reset, or throttled to death
+#   - high TTFB + OK sustained speed = latency-bound origin (many small
+#     assets will feel slow even though big downloads are fine)
+#   - parallel aggregate far below single-stream speed = congested path
+#
+# Tunables: SITE_PROBE_RUNS (3), SITE_PROBE_PARALLEL (6),
+#           SITE_PROBE_TIMEOUT (30, per request, seconds)
+
+set -uo pipefail
+
+SPEC=""
+if [[ $# -ge 1 && "$1" != http://* && "$1" != https://* ]]; then
+    SPEC="$1"
+    shift
+fi
+[[ "$SPEC" =~ ^[0-9]+$ ]] && SPEC="http://127.0.0.1:$SPEC"
+PROXY_ARGS=()
+[[ -n "$SPEC" ]] && PROXY_ARGS=(-x "$SPEC")
+
+if [[ $# -lt 1 ]]; then
+    echo "usage: site-probe [proxy-spec] <url> [url...]" >&2
+    exit 2
+fi
+
+RUNS="${SITE_PROBE_RUNS:-3}"
+PAR="${SITE_PROBE_PARALLEL:-6}"
+TIMEOUT="${SITE_PROBE_TIMEOUT:-30}"
+FMT='%{http_code} %{time_starttransfer} %{time_total} %{speed_download} %{size_download}'
+
+echo "=== exit identity ==="
+curl -sS -m 8 ${PROXY_ARGS[@]+"${PROXY_ARGS[@]}"} https://ipinfo.io/json 2>&1 \
+    | grep -E '"(ip|city|region|country|org)"' || echo "(ipinfo unreachable)"
+
+echo
+echo "=== canary: google.com (GFW reference) ==="
+curl -sS -o /dev/null -m 10 ${PROXY_ARGS[@]+"${PROXY_ARGS[@]}"} \
+    -w "http=%{http_code} total=%{time_total}s\n" https://www.google.com 2>&1
+
+echo
+echo "=== per-URL timing ($RUNS runs each) ==="
+for url in "$@"; do
+    echo "--- $url"
+    curl -sS -o /dev/null -m "$TIMEOUT" ${PROXY_ARGS[@]+"${PROXY_ARGS[@]}"} \
+        -w "$FMT\n" "$url" 2>&1 \
+        | awk '{ code=$1; ttfb=$2; total=$3; speed=$4; size=$5 }
+            { if (NR==1 || ttfb+0 < min_ttfb) min_ttfb = ttfb+0
+              sum_total += total; sum_speed += speed; last_size = size }
+            END {
+              printf "  http=%s size=%.1fKB min_ttfb=%.2fs avg_total=%.2fs avg_speed=%.0fB/s\n", \
+                     code, last_size/1024, min_ttfb, sum_total/NR, sum_speed/NR
+            }'
+done
+
+echo
+echo "=== parallel batch (x$PAR, all URLs at once) ==="
+printf '%s\n' "$@" | xargs -P "$PAR" -I{} \
+    curl -sS -o /dev/null -m "$TIMEOUT" ${PROXY_ARGS[@]+"${PROXY_ARGS[@]}"} \
+    -w "%{speed_download} %{size_download}\n" {} 2>/dev/null \
+    | awk '{ sum_speed += $1; sum_size += $2; n++ }
+        END {
+          if (n > 0)
+            printf "  files=%d total=%.1fKB avg_per_conn=%.0fB/s aggregate~=%.0fB/s\n", \
+                   n, sum_size/1024, sum_speed/n, sum_speed
+        }'
