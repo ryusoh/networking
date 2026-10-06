@@ -33,6 +33,11 @@ The repo has an automated complexity gate (the "Complexity ratchet" bullet in
   nas_tools bin -s -n B` lists every block rated B or worse (complexity ≥ 6);
   `make lint` freezes the xenon ceilings (`--max-average A --max-modules C
   --max-absolute C`). Never let a refactor push any rank past those ceilings.
+  **Filter test paths out of the metric output before picking a target**
+  (pipe through `grep -v -E '__tests__|/tests/|test_'`) — test files show up
+  in radon/xenon output just like production source, and every entry in one
+  is an invalid target no matter its rank (see Lane; PR #215 came from an
+  unfiltered scan of `tools/`).
 - **C / eBPF:** no gate exists — judge by hand: count decision points
   (`if`/`else if`/`switch case`/`for`/`while`/`&&`/`||`/`? :`/`catch`) in a
   function body, +1 for the base path.
@@ -60,7 +65,10 @@ target.
   `tools/__tests__/test_task_harness.py` and was unshippable until squashed
   back to its production-file diff; PR #214 targeted **the same file again**
   and was closed unmerged — the deletion lives in the final tree, so squashing
-  cannot recover it). Pick a production-source function instead.
+  cannot recover it; PR #215 refactored
+  `tools/research/__tests__/test_research_agent_e2e.py` and went red on the
+  same check — third strike, recovered only by human re-authorship). Pick a
+  production-source function instead.
 
 ## Constraints
 
@@ -83,10 +91,11 @@ target.
 - If you removed a JS violation from the suppressions backlog, run
   `npx eslint --prune-suppressions` and include the shrunk
   `eslint-suppressions.json` in the PR — the baseline only ratchets down.
-- `make precommit` green — for C changes, this includes the relevant `make -C
-  <dir> test` smoke/assert suite; a "didn't crash" pass is not sufficient on its
-  own if the touched function has a real `assert(...)` path (see nas_proxy
-  gotchas in `AGENTS.md`) — verify it still exercises the refactored code.
+- `make precommit` green — for C changes, this includes the relevant
+  `make -C <dir> test` smoke/assert suite; a "didn't crash" pass is not
+  sufficient on its own if the touched function has a real `assert(...)` path
+  (see nas_proxy gotchas in `AGENTS.md`) — verify it still exercises the
+  refactored code.
 - Don't rerun a failed gate on an unchanged tree — a red `make precommit` (or
   `make precommit-docker` on macOS) over an untouched worktree cannot go green.
   `python3 tools/gate_guard.py` (`snapshot` before the run, `check <hash>`
@@ -117,8 +126,9 @@ Conventional Commits per `AGENTS.md`. One subproject per PR.
   read it from stdout or write it under `/tmp` (the sibling fund repo's PR
   #695 committed ~6 MB of `eslint_out.json` / `eslint_warn_out.json` and went
   red in CI).
-- Title / commit subject: `refactor(<scope>): extract helpers to cut <function>
-complexity` — scope is the subproject. Imperative, lower-case, ≤ 72 chars,
+- Title / commit subject:
+  `refactor(<scope>): extract helpers to cut <function> complexity` — scope is
+  the subproject. Imperative, lower-case, ≤ 72 chars,
   **no emoji, no `Architect:` prefix**. Count the assembled subject's
   characters: for a long function name this template overflows 72 (fund#695's
   title was 73 chars) — shorten the verb phrase
