@@ -64,10 +64,8 @@ def _is_test_path(path: str) -> bool:
     )
 
 
-def _is_stray_artifact(path: str) -> bool:
-    """Detect stray PR draft files, scratch logs, or temporary artifacts."""
-    parts = path.split("/")
-    name = parts[-1].lower()
+
+def _is_draft_or_temp_file(name: str) -> bool:
     if name in {"pr_body.txt", "pr_description.txt"}:
         return True
     # Commit-message drafts (PR #214 shipped commit_message.txt; the owner had
@@ -76,6 +74,10 @@ def _is_stray_artifact(path: str) -> bool:
         return True
     if name.endswith((".tmp", ".scratch", ".swp", ".log")):
         return True
+    return False
+
+
+def _is_verification_output(name: str) -> bool:
     # Verification-run scratch (sibling fund repo's PR #692 shipped a 474-line
     # verify_output.txt; fund's PR #695 shipped ~6 MB of eslint_out.json /
     # eslint_warn_out.json); AGENTS.md "Output logs stay out of git" bans these.
@@ -83,12 +85,29 @@ def _is_stray_artifact(path: str) -> bool:
         return True
     if name.endswith(("_out.json", "_output.json")):
         return True
-    if name.startswith(("temp_", "dummy_")):
-        return True
+    return False
+
+
+def _is_patch_file(name: str, path: str) -> bool:
     # Stray patch/diff files (e.g. net-tools PR #212 shipped a 158-line patch.diff)
     if name in {"patch.diff", "diff.patch"} or (
         name.endswith((".diff", ".patch")) and not path.startswith("research/")
     ):
+        return True
+    return False
+
+
+def _is_stray_artifact(path: str) -> bool:
+    """Detect stray PR draft files, scratch logs, or temporary artifacts."""
+    parts = path.split("/")
+    name = parts[-1].lower()
+    if _is_draft_or_temp_file(name):
+        return True
+    if _is_verification_output(name):
+        return True
+    if name.startswith(("temp_", "dummy_")):
+        return True
+    if _is_patch_file(name, path):
         return True
     return False
 
