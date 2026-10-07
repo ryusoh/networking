@@ -151,7 +151,13 @@
 
   const processedBanners = new Set();
 
+  const KNOWN_CMPS_SELECTOR = KNOWN_CMPS.map((c) => c.banner).join(',');
+
   function dismissKnownCMP() {
+    if (!document.querySelector(KNOWN_CMPS_SELECTOR)) {
+      return false;
+    }
+
     for (const cmp of KNOWN_CMPS) {
       const banner = document.querySelector(cmp.banner);
       if (!(banner instanceof HTMLElement)) {
