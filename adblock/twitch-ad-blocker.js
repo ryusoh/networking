@@ -229,14 +229,16 @@
   // Watch for dynamically loaded ads
   const observer = new MutationObserver((mutations) => {
     let shouldCheck = false;
-    for (const mutation of mutations) {
-      if (mutation.addedNodes.length > 0) {
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType === 1 && node instanceof HTMLElement && isAdElement(node)) {
+    for (let i = 0; i < mutations.length; i++) {
+      const addedNodes = mutations[i].addedNodes;
+      for (let j = 0; j < addedNodes.length; j++) {
+        const node = addedNodes[j];
+        if (node.nodeType === 1) {
+          shouldCheck = true;
+          if (node instanceof HTMLElement && isAdElement(node)) {
             hideAd(node);
           }
         }
-        shouldCheck = true;
       }
     }
     if (shouldCheck) {
