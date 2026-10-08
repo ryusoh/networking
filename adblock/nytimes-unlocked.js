@@ -368,8 +368,14 @@
       }
       let hasAdded = false;
       for (let i = 0; i < mutations.length; i++) {
-        if (mutations[i].addedNodes.length > 0) {
-          hasAdded = true;
+        const addedNodes = mutations[i].addedNodes;
+        for (let j = 0; j < addedNodes.length; j++) {
+          if (addedNodes[j].nodeType === 1) {
+            hasAdded = true;
+            break;
+          }
+        }
+        if (hasAdded) {
           break;
         }
       }
