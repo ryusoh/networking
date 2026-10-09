@@ -101,6 +101,14 @@ eBPF (`vps_kernel_proxy/`, Docker-only).
     474-line `verify_output.txt` failed CI despite a clean final tree). Stage
     by name (`git add <file>`, never `git add -A`) so verification-run scratch
     (`*_output.txt`, `*.log`) never reaches a commit.
+12. **Absolute ban on destructive git commands.** Never run `git checkout -- <file>`,
+    `git restore <file>`, `git reset --hard`, or `git clean` without explicit user
+    confirmation. Multiple agents, background routines, and the human share this
+    repository concurrently. Uncommitted modifications in the working tree or index
+    often belong to a concurrent agent or user session in another window. Discarding
+    changes or assuming diffs outside your immediate task scope are "stray debris"
+    destroys active work. Stage only files you own (`git add <file>`), never revert
+    foreign files, and never assume exclusive ownership of the working tree.
 
 ## Reading the gate output (this repo is noisy on purpose)
 
@@ -465,10 +473,12 @@ continue from HEAD.
 
 When you run parallel subagents (swarms, background agents) in this checkout:
 stage only files you changed (`git add <specific-files>`, never `git add -A`),
-never `git stash`, `git reset --hard`, or `git commit --no-verify` — a sibling
-agent's work may be sitting in the same tree. Keep concurrent agents on
-disjoint file sets; if a rebase/conflict lands mid-run, resolve only files
-your task owns.
+never `git stash`, `git reset --hard`, `git checkout -- <file>`, `git restore <file>`,
+or `git commit --no-verify` — a sibling agent's work may be sitting in the same
+tree. Never discard changes on files outside your assigned task scope;
+uncommitted edits in other directories belong to concurrent work streams or
+the user in another window. Keep concurrent agents on disjoint file sets; if a
+rebase/conflict lands mid-run, resolve only files your task owns.
 
 ### Externalized state & transaction boundaries (State-Oriented Architecture & SDN Control Plane)
 
