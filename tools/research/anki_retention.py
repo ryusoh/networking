@@ -19,6 +19,50 @@ from tools.research.anki_generator import AnkiConnectChecker
 from tools.research.anki_graph_bridge import ANKI_REPO_ROOT, AnkiGraphBridge
 
 
+def _fetch_notes_info(checker: AnkiConnectChecker, deck: str) -> list[Any]:
+    query = f'deck:"{deck}"'
+    nids = checker._invoke("findNotes", {"query": query})
+    if not nids:
+        return []
+    return checker._invoke("notesInfo", {"notes": nids}) or []
+
+
+def _fetch_cards_info(checker: AnkiConnectChecker, notes_info: list[Any]) -> list[Any]:
+    all_cids = [
+        cid
+        for note in notes_info
+        if isinstance(note, dict)
+        for cid in note.get("cards", [])
+    ]
+    if not all_cids:
+        return []
+    return checker._invoke("cardsInfo", {"cards": all_cids}) or []
+
+
+def _build_card_map(cards_info: list[Any]) -> dict[int, dict[str, Any]]:
+    return {
+        c["cardId"]: c
+        for c in cards_info
+        if isinstance(c, dict) and "cardId" in c
+    }
+
+
+def _map_fronts_to_cards(notes_info: list[Any], card_map: dict[int, dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    front_to_cards: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for note in notes_info:
+        if not isinstance(note, dict):
+            continue
+        fields = note.get("fields", {})
+        raw_front = _extract_front(fields)
+        norm_front = _normalize_text(raw_front)
+        if not norm_front:
+            continue
+        for cid in note.get("cards", []):
+            if cid in card_map:
+                front_to_cards[norm_front].append(card_map[cid])
+    return front_to_cards
+
+
 def _normalize_text(text: str) -> str:
     """Strip HTML tags and collapse whitespace."""
     no_html = re.sub(r"<[^>]+>", "", text)
@@ -75,39 +119,12 @@ class AnkiRetentionBridge:
         """Fetch notes and cards from AnkiConnect, joined by normalized front text."""
         try:
             checker = AnkiConnectChecker(url=self.url)
-            query = f'deck:"{self.deck}"'
-            nids = checker._invoke("findNotes", {"query": query})
-            if not nids:
+            notes_info = _fetch_notes_info(checker, self.deck)
+            if not notes_info:
                 return {}
-            notes_info = checker._invoke("notesInfo", {"notes": nids}) or []
-            all_cids = [
-                cid
-                for note in notes_info
-                if isinstance(note, dict)
-                for cid in note.get("cards", [])
-            ]
-            cards_info = (
-                checker._invoke("cardsInfo", {"cards": all_cids}) if all_cids else []
-            ) or []
-            card_map = {
-                c["cardId"]: c
-                for c in cards_info
-                if isinstance(c, dict) and "cardId" in c
-            }
-
-            front_to_cards: dict[str, list[dict[str, Any]]] = defaultdict(list)
-            for note in notes_info:
-                if not isinstance(note, dict):
-                    continue
-                fields = note.get("fields", {})
-                raw_front = _extract_front(fields)
-                norm_front = _normalize_text(raw_front)
-                if not norm_front:
-                    continue
-                for cid in note.get("cards", []):
-                    if cid in card_map:
-                        front_to_cards[norm_front].append(card_map[cid])
-            return front_to_cards
+            cards_info = _fetch_cards_info(checker, notes_info)
+            card_map = _build_card_map(cards_info)
+            return _map_fronts_to_cards(notes_info, card_map)
         except Exception as e:
             sys.stderr.write(f"Warning: AnkiRetentionBridge could not query AnkiConnect: {e}\n")
             return None
