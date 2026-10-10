@@ -98,6 +98,13 @@ def _compute_quantile(values: list[float], q: float) -> float:
     return sorted_vals[low] * (1.0 - weight) + sorted_vals[high] * weight
 
 
+def _compute_card_stats(cards: list[dict[str, Any]]) -> tuple[int, int, int]:
+    reps = sum(int(c.get("reps", 0)) for c in cards)
+    lapses = sum(int(c.get("lapses", 0)) for c in cards)
+    max_ivl_days = max((int(c.get("ivl", 0)) for c in cards), default=0)
+    return reps, lapses, max_ivl_days
+
+
 class AnkiRetentionBridge:
     def __init__(
         self,
@@ -143,9 +150,7 @@ class AnkiRetentionBridge:
             cards = front_to_cards.get(norm_label, [])
             if not cards:
                 continue
-            reps = sum(int(c.get("reps", 0)) for c in cards)
-            lapses = sum(int(c.get("lapses", 0)) for c in cards)
-            max_ivl_days = max((int(c.get("ivl", 0)) for c in cards), default=0)
+            reps, lapses, max_ivl_days = _compute_card_stats(cards)
             results.append(
                 {
                     "label": label,
