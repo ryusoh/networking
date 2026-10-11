@@ -81,7 +81,7 @@
   // --- Phase 2: Remove paywall elements after DOM loads ---
   function removePaywall() {
     // Remove Piano snippet overlay and paywall elements
-    const paywallSelectors = [
+    const paywallSelectorsJoined = [
       '#cx-snippet-overlay-container',
       '#cx-snippet-overlay',
       '[id*="cx-snippet"]',
@@ -94,12 +94,11 @@
       '.tp-container-inner',
       '.tp-modal',
       '.tp-backdrop'
-    ];
-    for (const sel of paywallSelectors) {
-      const els = document.querySelectorAll(sel);
-      for (let i = 0; i < els.length; i++) {
-        els[i].remove();
-      }
+    ].join(',');
+
+    const els = document.querySelectorAll(paywallSelectorsJoined);
+    for (let i = 0; i < els.length; i++) {
+      els[i].remove();
     }
 
     // The doorslam container wraps everything — find it by its child structure
