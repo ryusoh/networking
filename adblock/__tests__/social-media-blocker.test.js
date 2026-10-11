@@ -346,4 +346,56 @@ describe('social-media-blocker.js', () => {
 
     Object.defineProperty(document, 'body', { value: originalBody, configurable: true });
   });
+
+  it('extractDirectText concatenates text nodes with space when first string is non-empty', () => {
+    window.location.hostname = 'instagram.com';
+    evalScript();
+
+    Object.defineProperty(window, 'getComputedStyle', {
+      value: () => ({
+        display: 'block',
+        visibility: 'visible',
+        opacity: '1'
+      }),
+      configurable: true
+    });
+
+    const article = document.createElement('article');
+    const label = document.createElement('div');
+
+    // Create multiple text nodes to cover line 71-82
+    label.appendChild(document.createTextNode(' Sponsored '));
+    label.appendChild(document.createTextNode(' Post '));
+
+    article.appendChild(label);
+    document.body.appendChild(article);
+
+    const found = SocialMediaBlocker.findSponsoredContent();
+    expect(found.length).toBe(1);
+    expect(found[0]).toBe(article);
+  });
+
+  it('findSponsoredContent early return if config textPatterns is empty', () => {
+    window.location.hostname = 'facebook.com';
+    evalScript();
+
+    Object.defineProperty(window, 'getComputedStyle', {
+      value: () => ({
+        display: 'block',
+        visibility: 'visible',
+        opacity: '1'
+      }),
+      configurable: true
+    });
+
+    const article = document.createElement('article');
+    const label = document.createElement('div');
+    // Ensure the tree walker would match it if it wasn't returning early
+    label.textContent = 'Sponsored';
+    article.appendChild(label);
+    document.body.appendChild(article);
+
+    const found = SocialMediaBlocker.findSponsoredContent();
+    expect(found.length).toBe(0);
+  });
 });
