@@ -300,60 +300,64 @@ def _decode_chunked(data):
 # --- HTTP Server ---
 
 class TileCacheHandler(BaseHTTPRequestHandler):
+    def _send_error_response(self, code, message):
+        self.send_response(code)
+        self.end_headers()
+        if message:
+            self.wfile.write(message)
+
+    def _send_cached_response(self, cached, content_type):
+        self.send_response(200)
+        self.send_header('Content-Type', content_type)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Cache-Control', 'public, max-age=604800')
+        self.send_header('X-Cache', 'HIT')
+        self.end_headers()
+        self.wfile.write(cached)
+
+    def _send_miss_response(self, status_code, body, content_type, target_url):
+        if status_code == 200 and body:
+            storage_put(target_url, body)
+            self.send_response(200)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Cache-Control', 'public, max-age=604800')
+            self.send_header('X-Cache', 'MISS')
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            self.send_response(status_code)
+            self.send_header('X-Cache', 'MISS')
+            self.end_headers()
+            if body:
+                self.wfile.write(body)
+
     def do_GET(self):
         query = parse_qs(urlparse(self.path).query)
         target_url = query.get('url', [None])[0]
 
         if not target_url:
-            self.send_response(400)
-            self.end_headers()
-            self.wfile.write(b"Missing 'url' parameter")
+            self._send_error_response(400, b"Missing 'url' parameter")
             return
 
-        # Determine content type
         is_json = ".json" in target_url
         content_type = "application/json" if is_json else "image/png"
 
-        # Try cache first (mmap -> disk)
         cached = storage_get(target_url)
         if cached:
-            self.send_response(200)
-            self.send_header('Content-Type', content_type)
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Cache-Control', 'public, max-age=604800')
-            self.send_header('X-Cache', 'HIT')
-            self.end_headers()
-            self.wfile.write(cached)
+            self._send_cached_response(cached, content_type)
             return
 
-        # Cache miss - fetch through connection pool (fast) or raw SOCKS5 (fallback)
         try:
             try:
                 status_code, body = fetch_via_pool(target_url)
             except Exception:
                 status_code, body = fetch_via_socks5(target_url)
 
-            if status_code == 200 and body:
-                # Cache it
-                storage_put(target_url, body)
-
-                self.send_response(200)
-                self.send_header('Content-Type', content_type)
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.send_header('Cache-Control', 'public, max-age=604800')
-                self.send_header('X-Cache', 'MISS')
-                self.end_headers()
-                self.wfile.write(body)
-            else:
-                self.send_response(status_code)
-                self.send_header('X-Cache', 'MISS')
-                self.end_headers()
-                if body:
-                    self.wfile.write(body)
+            self._send_miss_response(status_code, body, content_type, target_url)
         except Exception as e:
             print(f"[tile_cache] Fetch failed: {target_url}: {e}")
-            self.send_response(502)
-            self.end_headers()
+            self._send_error_response(502, None)
 
     def log_message(self, _fmt, *args):
         pass  # Quiet
