@@ -82,7 +82,7 @@
   const COOKIE_BANNER_SELECTORS_JOINED = COOKIE_BANNER_SELECTORS.join(', ');
 
   // Button selectors for auto-dismiss
-  const ACCEPT_BUTTONS = [
+  const ACCEPT_BUTTONS_JOINED = [
     '[class*="accept"]',
     '[class*="agree"]',
     '[class*="allow"]',
@@ -95,9 +95,9 @@
     'button[aria-label*="agree"]',
     '[data-action*="accept"]',
     '[data-action*="agree"]'
-  ];
+  ].join(', ');
 
-  const REJECT_BUTTONS = [
+  const REJECT_BUTTONS_JOINED = [
     '[class*="reject"]',
     '[class*="decline"]',
     '[class*="deny"]',
@@ -108,7 +108,7 @@
     'button[aria-label*="decline"]',
     '[data-action*="reject"]',
     '[data-action*="deny"]'
-  ];
+  ].join(', ');
 
   // window.open() popup blocking for cookie/privacy popups is handled by
   // cookie-popup-blocker-main.js running in the MAIN world (bypasses CSP)
@@ -338,25 +338,21 @@
 
   /**
    * @param {HTMLElement} container
-   * @param {string[]} buttonSelectors
+   * @param {string} buttonSelectorsJoined
    * @returns {HTMLElement | null}
    */
-  function findButton(container, buttonSelectors) {
-    const numSelectors = buttonSelectors.length;
-    for (let i = 0; i < numSelectors; i++) {
-      const selector = buttonSelectors[i];
-      try {
-        const buttons = container.querySelectorAll(selector);
-        const numButtons = buttons.length;
-        for (let j = 0; j < numButtons; j++) {
-          const btn = buttons[j];
-          if (btn instanceof HTMLElement && isVisible(btn)) {
-            return btn;
-          }
+  function findButton(container, buttonSelectorsJoined) {
+    try {
+      const buttons = container.querySelectorAll(buttonSelectorsJoined);
+      const numButtons = buttons.length;
+      for (let i = 0; i < numButtons; i++) {
+        const btn = buttons[i];
+        if (btn instanceof HTMLElement && isVisible(btn)) {
+          return btn;
         }
-      } catch {
-        // Invalid selector, skip
       }
+    } catch {
+      // Invalid selector, skip
     }
     return null;
   }
@@ -388,15 +384,14 @@
     }
 
     // Try to click accept button first, then reject, then just hide
-    const acceptBtn = findButton(banner, ACCEPT_BUTTONS);
-    const rejectBtn = findButton(banner, REJECT_BUTTONS);
-
+    const acceptBtn = findButton(banner, ACCEPT_BUTTONS_JOINED);
     if (acceptBtn) {
       acceptBtn.click();
       processedBanners.add(bannerId);
       return true;
     }
 
+    const rejectBtn = findButton(banner, REJECT_BUTTONS_JOINED);
     if (rejectBtn) {
       rejectBtn.click();
       processedBanners.add(bannerId);
