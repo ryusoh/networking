@@ -24,9 +24,10 @@ from tools.research.anki_density_baseline import (
     compute_baseline,
 )
 
-DEFAULT_CARDS_PATH = Path("research/anki_cards.jsonl")
-DEFAULT_CANDIDATES_PATH = Path("research/anki_candidates.jsonl")
-DEFAULT_VERDICTS_PATH = Path("research/anki_density_verdicts.jsonl")
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+DEFAULT_CARDS_PATH = REPO_ROOT / "research" / "anki_cards.jsonl"
+DEFAULT_CANDIDATES_PATH = REPO_ROOT / "research" / "anki_candidates.jsonl"
+DEFAULT_VERDICTS_PATH = REPO_ROOT / "research" / "anki_density_verdicts.jsonl"
 
 
 @dataclass(frozen=True)

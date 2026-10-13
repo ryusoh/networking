@@ -11,6 +11,9 @@ from tools.research.anki_density_baseline import (
     compute_graph_hash,
 )
 from tools.research.anki_density_gate import (
+    DEFAULT_CANDIDATES_PATH,
+    DEFAULT_CARDS_PATH,
+    DEFAULT_VERDICTS_PATH,
     Verdict,
     evaluate_cards,
     main,
@@ -197,3 +200,14 @@ def test_cli_execution_with_temp_files(tmp_path: Path):
         "--threshold-scale", "2.0",
     ])
     assert ret_blocking == 1
+
+
+def test_default_paths_anchor_to_repo_root():
+    """Default state paths resolve under this repo, not the caller's cwd."""
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    research_dir = repo_root / "research"
+    assert DEFAULT_CARDS_PATH == research_dir / "anki_cards.jsonl"
+    assert DEFAULT_CANDIDATES_PATH == research_dir / "anki_candidates.jsonl"
+    assert DEFAULT_VERDICTS_PATH == research_dir / "anki_density_verdicts.jsonl"
+    for path in (DEFAULT_CARDS_PATH, DEFAULT_CANDIDATES_PATH, DEFAULT_VERDICTS_PATH):
+        assert path.is_absolute()
