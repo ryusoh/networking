@@ -343,13 +343,42 @@ def _acronym_is_explained(acronym: str, text: str) -> bool:
     return False
 
 
+DEFAULT_DECK_ACRONYMS_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "research" / ".anki_deck_acronyms.json"
+)
+_DECK_EXEMPT_MEMO: dict[str, set[str]] = {}
+
+
+def _deck_exempt_acronyms(path: Path | None = None) -> set[str]:
+    """Acronyms the deck itself already teaches (ubiquitous or expanded before).
+
+    Read from the cache built by `tools/research/anki_deck_acronyms.py`
+    (scoped to the target deck); a missing or unreadable cache exempts
+    nothing (static list only).
+    """
+    cache_path = path or DEFAULT_DECK_ACRONYMS_PATH
+    key = str(cache_path)
+    if key not in _DECK_EXEMPT_MEMO:
+        try:
+            data = json.loads(cache_path.read_text(encoding="utf-8"))
+            exempt = set(data.get("exempt", []))
+        except Exception:
+            exempt = set()
+        _DECK_EXEMPT_MEMO[key] = exempt
+    return _DECK_EXEMPT_MEMO[key]
+
+
 def _unexplained_acronyms(front: str, back: str) -> list[str]:
     """Non-common acronyms anywhere in the card must be expanded somewhere in it."""
     front_plain = re.sub(r"<[^>]+>", "", front)
     back_plain = re.sub(r"<[^>]+>", "", back)
     back_plain = LATEX_RE.sub("", MARKDOWN_LINK_RE.sub("", back_plain))
     combined = f"{front_plain} {back_plain}"
-    acronyms = set(re.findall(r"\b[A-Z]{2,}(?:-[A-Z]+)*\b", combined)) - COMMON_ACRONYMS
+    acronyms = (
+        set(re.findall(r"\b[A-Z]{2,}(?:-[A-Z]+)*\b", combined))
+        - COMMON_ACRONYMS
+        - _deck_exempt_acronyms()
+    )
     return [
         acronym
         for acronym in acronyms
