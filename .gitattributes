@@ -28,3 +28,10 @@
 *.eps binary
 *.zip binary
 *.tar.gz binary
+
+# GitHub Linguist: keep courseware out of language stats
+# research/ is study material, not project code; exclude it from the language bar.
+research/** linguist-detectable=false
+# gpac-temp is a vendored third-party tree (gpac, freetype, SDL, PlatinumSDK) —
+# also collapse it in PR diffs.
+research/cs234-advanced-networks/03-homework/hw01/gpac-temp/** linguist-vendored=true
