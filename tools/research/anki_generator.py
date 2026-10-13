@@ -121,6 +121,11 @@ def _front_hash(front_html: str) -> str:
     return hashlib.sha1(plain.encode("utf-8")).hexdigest()
 
 
+def _back_hash(back_html: str) -> str:
+    """Stable hash of card back for update change-detection."""
+    return _front_hash(back_html)
+
+
 def _load_reject_rates(review_path: Path) -> dict[str, float]:
     """Return reject rate per top-level course directory from the review log."""
     rates: dict[str, dict[str, int]] = {}
@@ -892,6 +897,25 @@ class AnkiConnectChecker:
                 raise RuntimeError(f"AnkiConnect error: {res['error']}")
             return res.get("result", [])
 
+    def notes_info(self, note_ids: list[int]) -> list[dict[str, Any]]:
+        """Return notesInfo for the given ids; empty when every note is gone."""
+        return self._invoke("notesInfo", {"notes": note_ids}) or []
+
+    def update_note_fields(
+        self, note_id: int, front_html: str, back_html: str, tags: list[str]
+    ) -> None:
+        """Replace an existing note's Front/Back fields and tags in place."""
+        self._invoke(
+            "updateNoteFields",
+            {
+                "note": {
+                    "id": note_id,
+                    "fields": {"Front": front_html, "Back": back_html},
+                    "tags": tags,
+                }
+            },
+        )
+
 
 def _is_duplicate_chunk(chunk: dict[str, Any], all_existing: set[str], seen_headings: set[str]) -> bool:
     heading = chunk.get("heading", "").lower()
@@ -1251,6 +1275,128 @@ def import_reviewed_cards(
     return 0
 
 
+def update_reviewed_cards(
+    deck_name: str,
+    coverage_path: Path,
+    cards_path: Path = DEFAULT_CARDS_PATH,
+    tsv_path: Path = DEFAULT_TSV_PATH,
+    review_path: Path = DEFAULT_REVIEW_PATH,
+    verdicts_path: Path = DEFAULT_VERDICTS_PATH,
+    force: bool = False,
+) -> int:
+    """Update previously imported notes in place from a revised cards JSONL.
+
+    Each card is matched to its coverage-ledger entry by chunk_id. A recorded
+    note_id is updated via updateNoteFields (cards whose note was deleted in
+    Anki fall through to a fresh add); cards with no ledger note are added as
+    new. Validator and density gates apply exactly as in --import; revision
+    history is preserved because the note itself is edited, not replaced.
+    """
+    cards, source_path, err_code = _load_cards_from_path(cards_path, tsv_path)
+    if err_code != 0:
+        return err_code
+
+    err_code = _validate_cards_for_import(cards, source_path, force)
+    if err_code != 0:
+        return err_code
+
+    cards = _apply_density_gate_verdicts(cards, verdicts_path, review_path)
+    if not cards:
+        print("No cards accepted by density gate for update.")
+        return 0
+
+    checker = AnkiConnectChecker()
+    if not checker.is_available():
+        print("AnkiConnect is not reachable. Open Anki (with AnkiConnect installed) and retry.")
+        return 1
+
+    tracker = CoverageTracker(coverage_path=coverage_path)
+    visited = tracker.data.setdefault("visited_chunk_ids", {})
+    seen_hashes = _existing_front_hashes(coverage_path)
+    now_str = datetime.now(timezone.utc).isoformat()
+
+    updated = added = unchanged = 0
+    note_ids: list[int | None] = []
+    for card in cards:
+        cid = card["chunk_id"]
+        tags = canonicalize_tags(card["tags"])
+        entry = visited.get(cid) or {}
+        note_id = entry.get("note_id")
+        front_h = _front_hash(card["front"])
+        back_h = _back_hash(card["back"])
+
+        if note_id is not None and checker.notes_info([note_id]):
+            if entry.get("front_hash") == front_h and entry.get("back_hash") == back_h:
+                print(f"  unchanged {cid} (note {note_id}); skipped")
+                unchanged += 1
+                note_ids.append(note_id)
+                continue
+            checker.update_note_fields(note_id, card["front"], card["back"], tags)
+            entry.update(
+                {
+                    "status": "imported",
+                    "updated_at": now_str,
+                    "deck": deck_name,
+                    "front_html": card["front"],
+                    "front_hash": front_h,
+                    "back_hash": back_h,
+                }
+            )
+            _append_review_log(review_path, cid, "update", note_id=note_id)
+            print(f"  updated {cid} (note {note_id})")
+            updated += 1
+            note_ids.append(note_id)
+            continue
+        if note_id is not None:
+            print(f"  note {note_id} for {cid} no longer exists in Anki; re-adding")
+            entry.pop("note_id", None)
+            seen_hashes.discard(entry.get("front_hash"))
+
+        if front_h in seen_hashes:
+            print(f"  skipping duplicate front (content hash match): {cid}")
+            continue
+        seen_hashes.add(front_h)
+        anki_card = AnkiCard(
+            chunk_id=cid,
+            file_path=cid.split(":")[0],
+            heading=card["front"][:60],
+            front_html=card["front"],
+            back_html=card["back"],
+            tags=tags,
+        )
+        try:
+            ids = checker.add_notes([anki_card], deck_name=deck_name)
+        except Exception as err:
+            print(f"  skipped {cid}: {err}")
+            continue
+        nid = ids[0] if ids else None
+        if nid is None:
+            continue
+        new_entry = visited.setdefault(cid, {})
+        new_entry.update(
+            {
+                "status": "imported",
+                "imported_at": now_str,
+                "deck": deck_name,
+                "front_html": card["front"],
+                "front_hash": front_h,
+                "back_hash": back_h,
+                "note_id": nid,
+            }
+        )
+        _append_review_log(review_path, cid, "accept", note_id=nid)
+        print(f"  added {cid} (note {nid})")
+        added += 1
+        note_ids.append(nid)
+
+    tracker.save()
+    print(
+        f"Update pass on deck '{deck_name}': "
+        f"{updated} updated, {added} added, {unchanged} unchanged."
+    )
+    return 0
+
+
 def emit_candidates(
     count: int,
     deck_name: str,
@@ -1496,6 +1642,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Import the reviewed cards JSONL via AnkiConnect (validator-gated).",
     )
     parser.add_argument(
+        "--update",
+        dest="update_reviewed",
+        action="store_true",
+        help="Update previously imported notes in place from the cards JSONL (validator-gated).",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Import even when the validator reports issues (not recommended).",
@@ -1552,6 +1704,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.import_reviewed:
         return import_reviewed_cards(
+            deck_name=args.deck,
+            coverage_path=Path(args.coverage).resolve(),
+            cards_path=Path(args.cards).resolve(),
+            tsv_path=Path(args.tsv_path).resolve(),
+            review_path=Path(args.review_path).resolve(),
+            verdicts_path=Path(args.verdicts).resolve(),
+            force=args.force,
+        )
+
+    if args.update_reviewed:
+        return update_reviewed_cards(
             deck_name=args.deck,
             coverage_path=Path(args.coverage).resolve(),
             cards_path=Path(args.cards).resolve(),

@@ -1322,3 +1322,185 @@ def test_import_writes_batch_marker(monkeypatch, tmp_path: Path):
     assert "closed_at" in marker
 
 
+
+
+_UPDATE_FRONT = "<strong>老化测试</strong>: 为什么良率提升会压缩老化测试需求？"
+_UPDATE_BACK = (
+    "<b>机制:</b> 良率提升后客户转向抽样。<br><br>"
+    "<b>定量锚点:</b> 强度 \\(100\\%\\) 下降。<br><br>"
+    "<b>源码与文档引用 (Source Citation):</b> "
+    "[research/x.md#L1-L5](file:///tmp/x.md#L1-L5)"
+)
+
+
+def _update_card(chunk_id: str = "research/x.md:chunk-1") -> dict[str, Any]:
+    return {
+        "chunk_id": chunk_id,
+        "front": _UPDATE_FRONT,
+        "back": _UPDATE_BACK,
+        "tags": ["research"],
+    }
+
+
+def _write_update_cards(tmp_path: Path, cards: list[dict[str, Any]]) -> Path:
+    import json
+
+    cards_file = tmp_path / "anki_cards.jsonl"
+    with open(cards_file, "w", encoding="utf-8") as f:
+        for card in cards:
+            f.write(json.dumps(card, ensure_ascii=False) + "\n")
+    return cards_file
+
+
+def _write_update_coverage(tmp_path: Path, entry: dict[str, Any]) -> Path:
+    import json
+
+    coverage = tmp_path / "cov.json"
+    coverage.write_text(
+        json.dumps({"visited_chunk_ids": {"research/x.md:chunk-1": entry}}),
+        encoding="utf-8",
+    )
+    return coverage
+
+
+def _run_update(coverage: Path, cards_file: Path, tmp_path: Path) -> int:
+    from tools.research.anki_generator import update_reviewed_cards
+
+    return update_reviewed_cards(
+        "金融",
+        coverage,
+        cards_path=cards_file,
+        tsv_path=tmp_path / "missing.txt",
+        review_path=tmp_path / "review.jsonl",
+        verdicts_path=tmp_path / "missing_verdicts.jsonl",
+    )
+
+
+def test_update_replaces_note_fields_in_place(monkeypatch, tmp_path: Path):
+    """A revised card updates its ledger-matched note via updateNoteFields."""
+    import json
+
+    from tools.research.anki_generator import _back_hash, _front_hash
+
+    calls: list[tuple[int, str, str, list[str]]] = []
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(
+        AnkiConnectChecker, "notes_info", lambda self, ids: [{"noteId": i} for i in ids]
+    )
+    monkeypatch.setattr(
+        AnkiConnectChecker,
+        "update_note_fields",
+        lambda self, nid, front, back, tags: calls.append((nid, front, back, tags)),
+    )
+
+    coverage = _write_update_coverage(
+        tmp_path,
+        {
+            "status": "imported",
+            "note_id": 424242,
+            "front_hash": _front_hash("old front"),
+            "back_hash": _back_hash("old back"),
+        },
+    )
+    cards_file = _write_update_cards(tmp_path, [_update_card()])
+
+    assert _run_update(coverage, cards_file, tmp_path) == 0
+    assert calls == [(424242, _UPDATE_FRONT, _UPDATE_BACK, ["research"])]
+
+    entry = json.loads(coverage.read_text(encoding="utf-8"))["visited_chunk_ids"][
+        "research/x.md:chunk-1"
+    ]
+    assert entry["front_html"] == _UPDATE_FRONT
+    assert entry["front_hash"] == _front_hash(_UPDATE_FRONT)
+    assert entry["back_hash"] == _back_hash(_UPDATE_BACK)
+    assert entry["note_id"] == 424242
+    assert "updated_at" in entry
+
+    review_lines = (tmp_path / "review.jsonl").read_text(encoding="utf-8").splitlines()
+    assert json.loads(review_lines[-1])["verdict"] == "update"
+
+
+def test_update_skips_unchanged_card(monkeypatch, tmp_path: Path, capsys):
+    """A card whose front and back hashes match the ledger is a no-op."""
+    from tools.research.anki_generator import _back_hash, _front_hash
+
+    def _boom(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("update_note_fields must not run for unchanged cards")
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(
+        AnkiConnectChecker, "notes_info", lambda self, ids: [{"noteId": i} for i in ids]
+    )
+    monkeypatch.setattr(AnkiConnectChecker, "update_note_fields", _boom)
+
+    coverage = _write_update_coverage(
+        tmp_path,
+        {
+            "status": "imported",
+            "note_id": 424242,
+            "front_hash": _front_hash(_UPDATE_FRONT),
+            "back_hash": _back_hash(_UPDATE_BACK),
+        },
+    )
+    cards_file = _write_update_cards(tmp_path, [_update_card()])
+
+    assert _run_update(coverage, cards_file, tmp_path) == 0
+    assert "unchanged" in capsys.readouterr().out
+
+
+def test_update_readds_when_note_deleted_in_anki(monkeypatch, tmp_path: Path):
+    """A ledger note_id missing from Anki falls through to a fresh add."""
+    import json
+
+    from tools.research.anki_generator import _back_hash, _front_hash
+
+    added: list[list[Any]] = []
+
+    def _boom(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("updateNoteFields must not run for deleted notes")
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", lambda self: True)
+    monkeypatch.setattr(AnkiConnectChecker, "notes_info", lambda self, ids: [])
+    monkeypatch.setattr(AnkiConnectChecker, "update_note_fields", _boom)
+    monkeypatch.setattr(
+        AnkiConnectChecker,
+        "add_notes",
+        lambda self, cards, deck_name: added.append(cards) or [777],
+    )
+
+    coverage = _write_update_coverage(
+        tmp_path,
+        {
+            "status": "imported",
+            "note_id": 424242,
+            "front_hash": _front_hash(_UPDATE_FRONT),
+            "back_hash": _back_hash(_UPDATE_BACK),
+        },
+    )
+    cards_file = _write_update_cards(tmp_path, [_update_card()])
+
+    assert _run_update(coverage, cards_file, tmp_path) == 0
+    assert len(added) == 1
+
+    entry = json.loads(coverage.read_text(encoding="utf-8"))["visited_chunk_ids"][
+        "research/x.md:chunk-1"
+    ]
+    assert entry["note_id"] == 777
+
+
+def test_update_refuses_validator_flagged_card(monkeypatch, tmp_path: Path):
+    """Validator issues block the update before any AnkiConnect call."""
+
+    def _boom(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("no AnkiConnect call allowed when validation fails")
+
+    monkeypatch.setattr(AnkiConnectChecker, "is_available", _boom)
+    monkeypatch.setattr(AnkiConnectChecker, "notes_info", _boom)
+    monkeypatch.setattr(AnkiConnectChecker, "update_note_fields", _boom)
+
+    bad_card = _update_card()
+    bad_card["front"] = "<strong>测试</strong>: ZQXV 是什么？"
+    cards_file = _write_update_cards(tmp_path, [bad_card])
+    coverage = _write_update_coverage(tmp_path, {"status": "imported", "note_id": 1})
+
+    assert _run_update(coverage, cards_file, tmp_path) == 2
