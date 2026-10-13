@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from tools.research.parse_chunks import estimate_tokens
+
 
 
 class BudgetExceededError(Exception):
@@ -91,7 +91,7 @@ class ResourceGovernor:
             yield
             return
 
-        def _handler(signum: int, frame: Any) -> None:  # noqa: ARG001
+        def _handler(_signum: int, _frame: Any) -> None:  # noqa: ARG001
             raise TimeoutError(f"Operation exceeded {seconds} second timeout")
 
         old_handler = signal.signal(signal.SIGALRM, _handler)
