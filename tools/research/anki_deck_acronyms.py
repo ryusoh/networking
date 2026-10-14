@@ -48,6 +48,34 @@ def _load_notes(notes_path: Path) -> list[dict[str, Any]]:
         return json.load(f)
 
 
+def _get_note_texts(notes: list[dict[str, Any]], deck: str | None) -> list[str]:
+    return [
+        _TAG_RE.sub(" ", n.get("flds", ""))
+        for n in notes
+        if deck is None or n.get("deck") == deck
+    ]
+
+
+def _count_acronyms(texts: list[str]) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for text in texts:
+        for acronym in set(_ACRONYM_RE.findall(text)):
+            counts[acronym] += 1
+    return counts
+
+
+def _find_explained_acronyms(texts: list[str]) -> set[str]:
+    explained: set[str] = set()
+    for text in texts:
+        for match in _ACR_PAREN_RE.finditer(text):
+            start = max(0, match.start() - _CONTEXT_BACK_CHARS)
+            context = text[start : match.end()]
+            for acronym in set(_ACRONYM_RE.findall(match.group(0))) - explained:
+                if _acronym_is_explained(acronym, context):
+                    explained.add(acronym)
+    return explained
+
+
 def scan_acronyms(
     notes: list[dict[str, Any]], deck: str | None = None
 ) -> dict[str, dict[str, Any]]:
@@ -60,24 +88,9 @@ def scan_acronyms(
     Returns:
         `{acronym: {"notes": int, "expanded": bool}}` for every acronym seen.
     """
-    texts = [
-        _TAG_RE.sub(" ", n.get("flds", ""))
-        for n in notes
-        if deck is None or n.get("deck") == deck
-    ]
-    counts: Counter[str] = Counter()
-    for text in texts:
-        for acronym in set(_ACRONYM_RE.findall(text)):
-            counts[acronym] += 1
-
-    explained: set[str] = set()
-    for text in texts:
-        for match in _ACR_PAREN_RE.finditer(text):
-            start = max(0, match.start() - _CONTEXT_BACK_CHARS)
-            context = text[start : match.end()]
-            for acronym in set(_ACRONYM_RE.findall(match.group(0))) - explained:
-                if _acronym_is_explained(acronym, context):
-                    explained.add(acronym)
+    texts = _get_note_texts(notes, deck)
+    counts = _count_acronyms(texts)
+    explained = _find_explained_acronyms(texts)
 
     return {
         acronym: {"notes": note_count, "expanded": acronym in explained}
