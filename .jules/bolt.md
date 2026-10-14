@@ -126,11 +126,12 @@ Conventional Commits per `AGENTS.md`. One subproject per PR.
   intermediate mistakes on a multi-commit branch are permanent (the sibling
   fund repo's PR #692 failed on empty "finalize" pushes despite a clean final
   tree; PR #212 failed when an abandoned first attempt was committed before
-  switching targets in a second commit).
+  switching targets in a second commit; PR #227 failed with a committed
+  `precommit.log`, a follow-up deletion commit, and an empty finalize commit).
 - **Stage by name, never `git add -A` / `git add .`.** Verification-run scratch
   (`*_output.txt`, `*.log`, `*.diff`, `*.patch`) must never be committed — the
   hygiene gate rejects them (fund#692 shipped a 474-line `verify_output.txt`;
-  PR #212 shipped a 158-line `patch.diff`).
+  PR #212 shipped a 158-line `patch.diff`; PR #227 shipped a 196-line `precommit.log`).
 - Title / commit subject: `perf(<scope>): <summary>` — scope is the subproject.
   Imperative, lower-case, ≤ 72 chars, **no emoji, no `Bolt:` prefix**.
 - Body: what was optimized and the file; the bottleneck removed; the
