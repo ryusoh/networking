@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+
+# modellink-gateway: Keep the ModelLink local inference gateway (127.0.0.1:5678)
+# alive via a user LaunchAgent. The Claude-3p desktop app routes inference
+# through this gateway (inferenceGatewayBaseUrl in its managed config), so a
+# dead gateway surfaces in the app as ERR_CONNECTION_REFUSED.
+# Usage: bin/modellink-gateway             -- health-check the gateway (read-only)
+#        bin/modellink-gateway --install   -- install/load the KeepAlive LaunchAgent
+#        bin/modellink-gateway --uninstall -- unload and remove the LaunchAgent
+
+set -u
+
+APP_PATH="/Applications/ModelLink.app"
+APP_BIN="${APP_PATH}/Contents/MacOS/modellink"
+PLIST_LABEL="com.modellink.gateway"
+PLIST_PATH="${HOME}/Library/LaunchAgents/${PLIST_LABEL}.plist"
+PORT=5678
+LOG_PATH="/tmp/modellink-gateway.log"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+usage() {
+    echo "Usage: $0 [--install|--uninstall]"
+    echo "  (no args)     health-check the gateway (read-only)"
+    echo "  --install     install/load the KeepAlive LaunchAgent"
+    echo "  --uninstall   unload and remove the LaunchAgent"
+}
+
+require_macos() {
+    if [[ "$(uname -s)" != "Darwin" ]]; then
+        log "This tool only supports macOS."
+        exit 1
+    fi
+}
+
+gateway_listening() {
+    lsof -nP -iTCP:"${PORT}" -sTCP:LISTEN >/dev/null 2>&1
+}
+
+check_gateway() {
+    local healthy=0
+
+    if [[ -x "$APP_BIN" ]]; then
+        log "OK: ModelLink.app present at ${APP_PATH}."
+    else
+        log "FAIL: ModelLink.app not found at ${APP_PATH}."
+        healthy=1
+    fi
+
+    if launchctl list 2>/dev/null | grep -q "$PLIST_LABEL"; then
+        log "OK: LaunchAgent ${PLIST_LABEL} is loaded."
+    elif [[ -f "$PLIST_PATH" ]]; then
+        log "WARN: plist exists at ${PLIST_PATH} but the agent is not loaded."
+        healthy=1
+    else
+        log "WARN: no LaunchAgent installed; the gateway will not restart on crash/reboot."
+    fi
+
+    if gateway_listening; then
+        log "OK: gateway is listening on 127.0.0.1:${PORT}."
+    else
+        log "FAIL: nothing is listening on 127.0.0.1:${PORT}."
+        log "Hint: run '$0 --install' (or 'open -a ModelLink' for a one-off start)."
+        healthy=1
+    fi
+
+    return $healthy
+}
+
+install_agent() {
+    if [[ ! -x "$APP_BIN" ]]; then
+        log "Error: ModelLink.app not found at ${APP_PATH}. Install the app first."
+        exit 1
+    fi
+
+    log "Installing LaunchAgent ${PLIST_LABEL}..."
+    mkdir -p "$(dirname "$PLIST_PATH")"
+
+    cat > "$PLIST_PATH" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${PLIST_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${APP_BIN}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>${LOG_PATH}</string>
+    <key>StandardErrorPath</key>
+    <string>${LOG_PATH}</string>
+</dict>
+</plist>
+EOF
+
+    launchctl unload "$PLIST_PATH" 2>/dev/null
+    if ! launchctl load -w "$PLIST_PATH"; then
+        log "Error: failed to load ${PLIST_PATH}."
+        exit 1
+    fi
+
+    local tries=0
+    while ! gateway_listening && [[ $tries -lt 10 ]]; do
+        sleep 1
+        tries=$((tries + 1))
+    done
+
+    if gateway_listening; then
+        log "LaunchAgent installed; gateway is listening on 127.0.0.1:${PORT}."
+        log "It will start at login and relaunch on crash. Log file: ${LOG_PATH}"
+        log "Note: KeepAlive means 'Quit' will not stick; use '$0 --uninstall' to stop it for real."
+    else
+        log "Error: agent loaded but nothing is listening on 127.0.0.1:${PORT} after 10s. See ${LOG_PATH}."
+        exit 1
+    fi
+}
+
+uninstall_agent() {
+    log "Uninstalling LaunchAgent ${PLIST_LABEL}..."
+    if [[ -f "$PLIST_PATH" ]]; then
+        launchctl unload "$PLIST_PATH" 2>/dev/null
+        rm -f "$PLIST_PATH"
+        log "LaunchAgent removed."
+    else
+        log "No LaunchAgent found at ${PLIST_PATH}."
+    fi
+}
+
+require_macos
+
+case "${1:-}" in
+    "")
+        check_gateway
+        ;;
+    --install)
+        install_agent
+        ;;
+    --uninstall)
+        uninstall_agent
+        ;;
+    *)
+        usage
+        exit 2
+        ;;
+esac
