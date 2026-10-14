@@ -231,6 +231,9 @@
     let shouldCheck = false;
     for (let i = 0; i < mutations.length; i++) {
       const addedNodes = mutations[i].addedNodes;
+      if (addedNodes.length === 0) {
+        continue;
+      }
       for (let j = 0; j < addedNodes.length; j++) {
         const node = addedNodes[j];
         if (node.nodeType === 1) {
