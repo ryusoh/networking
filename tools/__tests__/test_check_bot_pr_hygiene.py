@@ -338,3 +338,35 @@ def test_bot_commit_mentioning_typist_in_body_not_flagged(repo: Path) -> None:
     violations = find_violations(repo, "main")
     assert not any("lane violation: Typist" in v for v in violations)
 
+
+def test_all_stray_artifact_patterns_are_gitignored() -> None:
+    """Ensure every artifact pattern rejected by check_bot_pr_hygiene is covered by .gitignore.
+
+    This prevents drift between the hygiene gate and git's staging layer, ensuring
+    agents mechanically cannot stage forbidden scratch or verification files.
+    """
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    sample_artifacts = [
+        "pr_body.txt",
+        "pr_description.txt",
+        "commit_message.txt",
+        "commit-message.txt",
+        "commit_msg.txt",
+        "precommit.log",
+        "verify.log",
+        "temp_notes.tmp",
+        "scratch.scratch",
+        "test.swp",
+        "output.txt",
+        "verify_output.txt",
+        "eslint_out.json",
+        "test_output.json",
+        "patch.diff",
+        "diff.patch",
+    ]
+    for path in sample_artifacts:
+        assert check_bot_pr_hygiene._is_stray_artifact(path), f"{path} should be detected as stray"
+        res = subprocess.run(["git", "check-ignore", "-q", path], cwd=repo_root)
+        assert res.returncode == 0, f"{path} is a stray artifact but not covered by .gitignore"
+
+
