@@ -106,39 +106,48 @@
   window.scroll = window.scrollTo;
 
   function removeInert() {
-    document.querySelectorAll('[inert]').forEach((el) => {
-      el.removeAttribute('inert');
-      el.removeAttribute('aria-hidden');
-    });
+    const els = document.querySelectorAll('[inert]');
+    for (let i = 0; i < els.length; i++) {
+      els[i].removeAttribute('inert');
+      els[i].removeAttribute('aria-hidden');
+    }
   }
 
   function hideOverlays() {
     // Gateway overlays
-    document
-      .querySelectorAll('#gateway-content, [data-testid="onsite-messaging-unit-gateway"]')
-      .forEach((el) => {
-        if (el instanceof HTMLElement) {
-          el.style.setProperty('display', 'none', 'important');
-        }
-      });
+    const gateways = document.querySelectorAll(
+      '#gateway-content, [data-testid="onsite-messaging-unit-gateway"]'
+    );
+    for (let i = 0; i < gateways.length; i++) {
+      const el = gateways[i];
+      if (el instanceof HTMLElement) {
+        el.style.setProperty('display', 'none', 'important');
+      }
+    }
     // vi-gateway-container: wraps the page as position:fixed — unfix to allow scroll
-    document.querySelectorAll('.vi-gateway-container').forEach((el) => {
+    const containers = document.querySelectorAll('.vi-gateway-container');
+    for (let i = 0; i < containers.length; i++) {
+      const el = containers[i];
       if (el instanceof HTMLElement) {
         el.style.setProperty('position', 'static', 'important');
         el.style.setProperty('overflow', 'visible', 'important');
         el.style.setProperty('width', 'auto', 'important');
         el.style.setProperty('height', 'auto', 'important');
       }
-    });
+    }
     // Scrim div
-    document.querySelectorAll('.css-gx5sib').forEach((el) => {
+    const scrims = document.querySelectorAll('.css-gx5sib');
+    for (let i = 0; i < scrims.length; i++) {
+      const el = scrims[i];
       if (el instanceof HTMLElement) {
         el.style.setProperty('display', 'none', 'important');
       }
-    });
+    }
 
     // Regiwall iframes — hide and disable
-    document.querySelectorAll('iframe').forEach((iframe) => {
+    const iframes = document.querySelectorAll('iframe');
+    for (let i = 0; i < iframes.length; i++) {
+      const iframe = iframes[i];
       const src = iframe.src || iframe.getAttribute('src') || '';
       if (src.includes('regiwall') || src.includes('RegiWall') || src.includes('gateway')) {
         iframe.style.setProperty('display', 'none', 'important');
@@ -146,7 +155,7 @@
         iframe.style.setProperty('width', '0', 'important');
         iframe.style.setProperty('height', '0', 'important');
       }
-    });
+    }
 
     // Also hide any container wrapping a regiwall iframe
     document
