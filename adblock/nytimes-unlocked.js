@@ -113,7 +113,7 @@
     }
   }
 
-  function hideOverlays() {
+  function hideGatewayAndScrims() {
     // Gateway overlays
     const gateways = document.querySelectorAll(
       '#gateway-content, [data-testid="onsite-messaging-unit-gateway"]'
@@ -143,7 +143,9 @@
         el.style.setProperty('display', 'none', 'important');
       }
     }
+  }
 
+  function hideRegiwallIframes() {
     // Regiwall iframes — hide and disable
     const iframes = document.querySelectorAll('iframe');
     for (let i = 0; i < iframes.length; i++) {
@@ -173,7 +175,9 @@
           el = el.parentElement;
         }
       });
+  }
 
+  function restoreScrollAndHideCTA() {
     // Subscribe CTA
     document
       .querySelectorAll(
@@ -200,6 +204,11 @@
     }
   }
 
+  function hideOverlays() {
+    hideGatewayAndScrims();
+    hideRegiwallIframes();
+    restoreScrollAndHideCTA();
+  }
   /**
    * Extract NYT data from window
    * @returns {{ sprinkledBody?: { content?: import("./types/nytimes").NYTBlock[] } } | null}
