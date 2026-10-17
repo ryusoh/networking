@@ -1275,6 +1275,119 @@ def import_reviewed_cards(
     return 0
 
 
+
+def _handle_existing_note(
+    card: dict,
+    note_id: int,
+    front_h: str,
+    back_h: str,
+    checker: AnkiConnectChecker,
+    deck_name: str,
+    entry: dict,
+    tags: list[str],
+    now_str: str,
+    review_path: Path,
+) -> tuple[str, int]:
+    cid = card["chunk_id"]
+    if entry.get("front_hash") == front_h and entry.get("back_hash") == back_h:
+        print(f"  unchanged {cid} (note {note_id}); skipped")
+        return "unchanged", note_id
+    checker.update_note_fields(note_id, card["front"], card["back"], tags)
+    entry.update(
+        {
+            "status": "imported",
+            "updated_at": now_str,
+            "deck": deck_name,
+            "front_html": card["front"],
+            "front_hash": front_h,
+            "back_hash": back_h,
+        }
+    )
+    _append_review_log(review_path, cid, "update", note_id=note_id)
+    print(f"  updated {cid} (note {note_id})")
+    return "updated", note_id
+
+
+def _add_new_note(
+    card: dict,
+    front_h: str,
+    back_h: str,
+    checker: AnkiConnectChecker,
+    deck_name: str,
+    visited: dict,
+    seen_hashes: set,
+    tags: list[str],
+    now_str: str,
+    review_path: Path,
+) -> tuple[str, int | None]:
+    cid = card["chunk_id"]
+    if front_h in seen_hashes:
+        print(f"  skipping duplicate front (content hash match): {cid}")
+        return "skipped", None
+    seen_hashes.add(front_h)
+    anki_card = AnkiCard(
+        chunk_id=cid,
+        file_path=cid.split(":")[0],
+        heading=card["front"][:60],
+        front_html=card["front"],
+        back_html=card["back"],
+        tags=tags,
+    )
+    try:
+        ids = checker.add_notes([anki_card], deck_name=deck_name)
+    except Exception as err:
+        print(f"  skipped {cid}: {err}")
+        return "error", None
+    nid = ids[0] if ids else None
+    if nid is None:
+        return "error", None
+    new_entry = visited.setdefault(cid, {})
+    new_entry.update(
+        {
+            "status": "imported",
+            "imported_at": now_str,
+            "deck": deck_name,
+            "front_html": card["front"],
+            "front_hash": front_h,
+            "back_hash": back_h,
+            "note_id": nid,
+        }
+    )
+    _append_review_log(review_path, cid, "accept", note_id=nid)
+    print(f"  added {cid} (note {nid})")
+    return "added", nid
+
+
+def _update_single_card(
+    card: dict,
+    checker: AnkiConnectChecker,
+    deck_name: str,
+    visited: dict,
+    seen_hashes: set,
+    now_str: str,
+    review_path: Path,
+) -> tuple[str, int | None]:
+    cid = card["chunk_id"]
+    tags = canonicalize_tags(card["tags"])
+    entry = visited.get(cid) or {}
+    note_id = entry.get("note_id")
+    front_h = _front_hash(card["front"])
+    back_h = _back_hash(card["back"])
+
+    if note_id is not None and checker.notes_info([note_id]):
+        return _handle_existing_note(
+            card, note_id, front_h, back_h, checker, deck_name, entry, tags, now_str, review_path
+        )
+    if note_id is not None:
+        print(f"  note {note_id} for {cid} no longer exists in Anki; re-adding")
+        entry.pop("note_id", None)
+        seen_hashes.discard(entry.get("front_hash"))
+
+    return _add_new_note(
+        card, front_h, back_h, checker, deck_name, visited, seen_hashes, tags, now_str, review_path
+    )
+
+
 def update_reviewed_cards(
     deck_name: str,
     coverage_path: Path,
@@ -1318,76 +1431,18 @@ def update_reviewed_cards(
     updated = added = unchanged = 0
     note_ids: list[int | None] = []
     for card in cards:
-        cid = card["chunk_id"]
-        tags = canonicalize_tags(card["tags"])
-        entry = visited.get(cid) or {}
-        note_id = entry.get("note_id")
-        front_h = _front_hash(card["front"])
-        back_h = _back_hash(card["back"])
-
-        if note_id is not None and checker.notes_info([note_id]):
-            if entry.get("front_hash") == front_h and entry.get("back_hash") == back_h:
-                print(f"  unchanged {cid} (note {note_id}); skipped")
-                unchanged += 1
-                note_ids.append(note_id)
-                continue
-            checker.update_note_fields(note_id, card["front"], card["back"], tags)
-            entry.update(
-                {
-                    "status": "imported",
-                    "updated_at": now_str,
-                    "deck": deck_name,
-                    "front_html": card["front"],
-                    "front_hash": front_h,
-                    "back_hash": back_h,
-                }
-            )
-            _append_review_log(review_path, cid, "update", note_id=note_id)
-            print(f"  updated {cid} (note {note_id})")
+        action, nid = _update_single_card(
+            card, checker, deck_name, visited, seen_hashes, now_str, review_path
+        )
+        if action == "unchanged":
+            unchanged += 1
+            note_ids.append(nid)
+        elif action == "updated":
             updated += 1
-            note_ids.append(note_id)
-            continue
-        if note_id is not None:
-            print(f"  note {note_id} for {cid} no longer exists in Anki; re-adding")
-            entry.pop("note_id", None)
-            seen_hashes.discard(entry.get("front_hash"))
-
-        if front_h in seen_hashes:
-            print(f"  skipping duplicate front (content hash match): {cid}")
-            continue
-        seen_hashes.add(front_h)
-        anki_card = AnkiCard(
-            chunk_id=cid,
-            file_path=cid.split(":")[0],
-            heading=card["front"][:60],
-            front_html=card["front"],
-            back_html=card["back"],
-            tags=tags,
-        )
-        try:
-            ids = checker.add_notes([anki_card], deck_name=deck_name)
-        except Exception as err:
-            print(f"  skipped {cid}: {err}")
-            continue
-        nid = ids[0] if ids else None
-        if nid is None:
-            continue
-        new_entry = visited.setdefault(cid, {})
-        new_entry.update(
-            {
-                "status": "imported",
-                "imported_at": now_str,
-                "deck": deck_name,
-                "front_html": card["front"],
-                "front_hash": front_h,
-                "back_hash": back_h,
-                "note_id": nid,
-            }
-        )
-        _append_review_log(review_path, cid, "accept", note_id=nid)
-        print(f"  added {cid} (note {nid})")
-        added += 1
-        note_ids.append(nid)
+            note_ids.append(nid)
+        elif action == "added":
+            added += 1
+            note_ids.append(nid)
 
     tracker.save()
     print(
