@@ -243,6 +243,53 @@ static int scrape_geonode(const char *url, const char *label) {
     return added;
 }
 
+
+static int is_ip_char(char c) {
+    return (c >= '0' && c <= '9') || c == '.';
+}
+
+static int is_whitespace(char c) {
+    return c == ' ' || c == '\n' || c == '\r' || c == '\t';
+}
+
+static void extract_ip(char **p_ptr, char *ip, int max_len) {
+    char *p = *p_ptr;
+    int ip_len = 0;
+    while (*p && *p != '<' && ip_len < max_len - 1) {
+        char c = *p;
+        if (is_ip_char(c)) {
+            ip[ip_len++] = c;
+        } else if (!is_whitespace(c)) {
+            break;
+        }
+        p++;
+    }
+    ip[ip_len] = '\0';
+    *p_ptr = p;
+}
+
+static int extract_port(char *p) {
+    char *td = strstr(p, "<td");
+    if (!td) return -1;
+    char *gt = strchr(td, '>');
+    if (!gt) return -1;
+    gt++;
+    if (*gt == '<') {
+        gt = strchr(gt, '>');
+        if (!gt) return -1;
+        gt++;
+    }
+    return atoi(gt);
+}
+
+static int is_valid_proxy_ip(const char *ip) {
+    if (strlen(ip) < 7) return 0;
+    if (strncmp(ip, "10.", 3) == 0) return 0;
+    if (strncmp(ip, "192.168.", 8) == 0) return 0;
+    if (strncmp(ip, "127.", 4) == 0) return 0;
+    return 1;
+}
+
 static int scrape_freeproxy_world(const char *url, const char *label) {
     CURL *c = curl_easy_init();
     if (!c) return 0;
@@ -282,38 +329,13 @@ static int scrape_freeproxy_world(const char *url, const char *label) {
 
             /* Extract IP address */
             char ip[64] = {0};
-            int ip_len = 0;
-            while (*p && *p != '<' && ip_len < 63) {
-                if ((*p >= '0' && *p <= '9') || *p == '.') {
-                    ip[ip_len++] = *p;
-                } else if (*p != ' ' && *p != '\n' && *p != '\r' && *p != '\t') {
-                    break;
-                }
-                p++;
-            }
-            ip[ip_len] = '\0';
+            extract_ip(&p, ip, sizeof(ip));
 
-            if (ip_len < 7) continue; /* not a valid IP */
+            if (!is_valid_proxy_ip(ip)) continue; /* not a valid IP */
 
             /* Find port in the next <td> or <a> */
-            char *td = strstr(p, "<td");
-            if (!td) break;
-            /* Look for digits after '>' */
-            char *gt = strchr(td, '>');
-            if (!gt) break;
-            gt++;
-            /* Port might be inside an <a> tag */
-            if (*gt == '<') {
-                gt = strchr(gt, '>');
-                if (!gt) break;
-                gt++;
-            }
-
-            int port = atoi(gt);
-            if (port > 0 && port <= 65535 &&
-                strncmp(ip, "10.", 3) != 0 &&
-                strncmp(ip, "192.168.", 8) != 0 &&
-                strncmp(ip, "127.", 4) != 0) {
+            int port = extract_port(p);
+            if (port > 0 && port <= 65535) {
                 if (add_proxy(ip, port) == 1) added++;
             }
         }
