@@ -398,4 +398,40 @@ describe('social-media-blocker.js', () => {
     const found = SocialMediaBlocker.findSponsoredContent();
     expect(found.length).toBe(0);
   });
+
+  it('extractDirectText skips whitespace-only text nodes', () => {
+    window.location.hostname = 'instagram.com';
+    evalScript();
+
+    Object.defineProperty(window, 'getComputedStyle', {
+      value: () => ({ display: 'block', visibility: 'visible', opacity: '1' }),
+      configurable: true
+    });
+
+    const article = document.createElement('article');
+    const label = document.createElement('div');
+
+    label.appendChild(document.createTextNode('  '));
+    label.appendChild(document.createTextNode('Sponsored'));
+    label.appendChild(document.createTextNode('   \n '));
+
+    article.appendChild(label);
+    document.body.appendChild(article);
+
+    const found = SocialMediaBlocker.findSponsoredContent();
+    expect(found.length).toBe(1);
+    expect(found[0]).toBe(article);
+  });
+
+  it('findSponsoredBySelectors ignores invalid selectors gracefully', () => {
+    window.location.hostname = 'facebook.com';
+    evalScript();
+
+    // Add a custom platform config entry with an invalid selector
+    SocialMediaBlocker.PLATFORM_CONFIG['facebook'].selectors.push(':invalid-selector');
+
+    const found = SocialMediaBlocker.findSponsoredContent();
+    expect(found.length).toBe(0);
+    expect(found).toEqual([]);
+  });
 });

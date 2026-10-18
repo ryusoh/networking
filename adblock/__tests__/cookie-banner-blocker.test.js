@@ -511,4 +511,96 @@ describe('Cookie Banner Blocker - Extension configuration', () => {
     event.initEvent('DOMContentLoaded', true, true);
     document.dispatchEvent(event);
   });
+
+  test('dismissBanner returns early if banner is already processed', () => {
+    document.body.innerHTML = `
+      <div class="cookie-notice" id="banner-1" style="height: 150px;">
+        <p>cookie consent required for privacy</p>
+        <button>Accept</button>
+      </div>
+    `;
+    const banner = document.querySelector('.cookie-notice');
+    window.CookieBannerBlocker.processedBanners.add('banner-1');
+
+    window.CookieBannerBlocker.dismissBanner(banner);
+
+    // It should not click the button or hide it because it's processed
+    expect(banner.style.display).not.toBe('none');
+    window.CookieBannerBlocker.processedBanners.delete('banner-1');
+  });
+
+  test('isVisible returns false for 0 width or height', () => {
+    document.body.innerHTML = `
+      <div class="cookie-notice" id="banner-1" style="height: 150px;">
+        <p>cookie consent</p>
+      </div>
+    `;
+    const banner = document.querySelector('.cookie-notice');
+    // Force dimensions
+    Object.defineProperty(banner, 'offsetWidth', { value: 0, configurable: true });
+    Object.defineProperty(banner, 'offsetHeight', { value: 0, configurable: true });
+
+    // We can test this indirectly. findButton checks isVisible
+    // So if we have a button but its dimensions are 0, findButton won't see it.
+    document.body.innerHTML = `
+      <div id="wrapper">
+        <button id="acc">Accept all</button>
+      </div>
+    `;
+    const wrapper = document.getElementById('wrapper');
+    const btn = document.getElementById('acc');
+
+    // Default mock is block, visible, opacity 1, offsetWidth 100, offsetHeight 20
+    Object.defineProperty(btn, 'offsetWidth', { value: 0, configurable: true });
+
+    const acceptBtn = window.CookieBannerBlocker.dismissBanner(wrapper);
+    // Because btn is invisible, dismissBanner will fall back to hiding the wrapper
+    expect(wrapper.style.display).toBe('none');
+  });
+
+  test('findCookieBanner catches fallback selector error gracefully', () => {
+    const origQuerySelectorAll = document.querySelectorAll;
+    document.querySelectorAll = jest.fn((sel) => {
+      if (sel.includes(',')) {
+        throw new Error('Joined selector error');
+      } else {
+        throw new Error('Single selector error');
+      }
+    });
+
+    const banner = window.CookieBannerBlocker.findCookieBanner();
+    expect(banner).toBeNull();
+
+    document.querySelectorAll = origQuerySelectorAll;
+  });
+
+  test('registers DOMContentLoaded if readyState is loading in start()', () => {
+    const originalReadyState = document.readyState;
+    Object.defineProperty(document, 'readyState', { value: 'loading', configurable: true });
+
+    const addEventListenerSpy = jest.spyOn(document, 'addEventListener');
+
+    global.chrome.storage.sync.get.mockImplementation((keys, cb) => {
+      cb({});
+    });
+
+    // Save existing global if present
+    const prevBlocker = window.CookieBannerBlocker;
+
+    const contentScriptPath = require('path').resolve(__dirname, '../cookie-banner-blocker.js');
+    const { instrumentFile } = require('./helpers/instrument');
+    const code = instrumentFile(contentScriptPath);
+    eval(code);
+
+    expect(addEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
+
+    Object.defineProperty(document, 'readyState', {
+      value: originalReadyState,
+      configurable: true
+    });
+    addEventListenerSpy.mockRestore();
+
+    // Cleanup global state pollution
+    window.CookieBannerBlocker = prevBlocker;
+  });
 });
