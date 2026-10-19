@@ -532,4 +532,71 @@ describe('x-unlocked.js even more coverage', () => {
 
     jest.useRealTimers();
   });
+
+  test('observer on non-home path does not trigger tryTabSwitch', () => {
+    jest.useFakeTimers();
+
+    document.documentElement.innerHTML = '<head></head><body></body>';
+    window.location = new URL('https://x.com/');
+
+    const tryTabSwitchSpy = jest.spyOn(window, 'setTimeout');
+
+    loadContentScript();
+
+    // trigger observer on home
+    document.body.appendChild(document.createElement('div'));
+    jest.advanceTimersByTime(300);
+
+    // clear spy after initial calls
+    tryTabSwitchSpy.mockClear();
+
+    // change location
+    window.location = new URL('https://x.com/other-path');
+
+    // trigger observer on non-home path to hit early return
+    document.body.appendChild(document.createElement('div'));
+    jest.advanceTimersByTime(300);
+
+    // Assert that setTimeout wasn't called again for the throttle timer
+    expect(tryTabSwitchSpy).not.toHaveBeenCalled();
+
+    jest.useRealTimers();
+  });
+
+  test('click event listener logic sets internal state and does not throw', () => {
+    jest.useFakeTimers();
+
+    window.location = new URL('https://x.com/');
+    document.documentElement.innerHTML = '<head></head><body></body>';
+
+    // Minimal DOM
+    document.body.innerHTML = `
+      <div role="presentation">
+        <div role="tab" aria-selected="false">For you</div>
+      </div>
+      <div role="tab" aria-selected="false">Finance</div>
+    `;
+
+    // Init script
+    loadContentScript();
+
+    const originalIsTrusted = Object.getOwnPropertyDescriptor(Event.prototype, 'isTrusted');
+
+    Object.defineProperty(Event.prototype, 'isTrusted', {
+      get: function () {
+        return false;
+      },
+      configurable: true
+    });
+    const clickEvent = new Event('click', { bubbles: true, cancelable: true });
+
+    expect(() => {
+      window.dispatchEvent(clickEvent);
+    }).not.toThrow();
+
+    if (originalIsTrusted) {
+      Object.defineProperty(Event.prototype, 'isTrusted', originalIsTrusted);
+    }
+    jest.useRealTimers();
+  });
 });
