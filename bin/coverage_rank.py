@@ -44,24 +44,34 @@ def is_coverage_py(summary: dict[str, Any]) -> bool:
     return isinstance(summary.get("files"), dict)
 
 
+def _rank_coverage_py(summary: dict[str, Any]) -> list[tuple[str, float]]:
+    rows: list[tuple[str, float]] = []
+    # coverage.py: {"files": {path: {"summary": {"percent_covered": N}}}}.
+    for path, entry in summary["files"].items():
+        section = entry.get("summary", {}) if isinstance(entry, dict) else {}
+        value = section.get("percent_covered")
+        rows.append((path, float(value) if isinstance(value, (int, float)) else 0.0))
+    return rows
+
+
+def _rank_jest(summary: dict[str, Any], metric: str) -> list[tuple[str, float]]:
+    rows: list[tuple[str, float]] = []
+    # Jest json-summary: {path: {metric: {"pct": N}}, "total": {...}}.
+    for path, entry in summary.items():
+        if path == "total" or not isinstance(entry, dict):
+            continue
+        section = entry.get(metric)
+        value = section.get("pct") if isinstance(section, dict) else None
+        rows.append((path, float(value) if isinstance(value, (int, float)) else 0.0))
+    return rows
+
+
 def rank(summary: dict[str, Any], metric: str = "lines") -> list[tuple[str, float]]:
     """Return ``(file, pct)`` pairs sorted ascending, lowest coverage first."""
-    rows: list[tuple[str, float]] = []
     if is_coverage_py(summary):
-        # coverage.py: {"files": {path: {"summary": {"percent_covered": N}}}}.
-        # The metric argument does not apply; coverage.py reports one percent.
-        for path, entry in summary["files"].items():
-            section = entry.get("summary", {}) if isinstance(entry, dict) else {}
-            value = section.get("percent_covered")
-            rows.append((path, float(value) if isinstance(value, (int, float)) else 0.0))
+        rows = _rank_coverage_py(summary)
     else:
-        # Jest json-summary: {path: {metric: {"pct": N}}, "total": {...}}.
-        for path, entry in summary.items():
-            if path == "total" or not isinstance(entry, dict):
-                continue
-            section = entry.get(metric)
-            value = section.get("pct") if isinstance(section, dict) else None
-            rows.append((path, float(value) if isinstance(value, (int, float)) else 0.0))
+        rows = _rank_jest(summary, metric)
     rows.sort(key=lambda row: row[1])
     return rows
 
