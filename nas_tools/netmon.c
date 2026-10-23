@@ -107,6 +107,49 @@ static void sparkline(const double *vals, int count, double max_val) {
     }
 }
 
+
+static void resolve_target(const char **target, const char **display_name, Device *devs, int max_devices) {
+    int dev_count = devices_load(devs, max_devices);
+    const Device *d = devices_find(devs, dev_count, *target);
+    if (d) {
+        *target = d->ip;
+        *display_name = d->name;
+        printf("[netmon] Resolved '%s' -> %s\n", d->name, d->ip);
+    }
+}
+
+static void parse_cli_args(int argc, char *argv[], int *max_count, double *interval) {
+    for (int i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "-c") == 0 && i + 1 < argc)
+            *max_count = atoi(argv[++i]);
+        else if (strcmp(argv[i], "-i") == 0 && i + 1 < argc)
+            *interval = atof(argv[++i]);
+    }
+}
+
+static void update_stats(double rtt, double *rtt_min, double *rtt_max, double *rtt_sum, double *jitter_sum, double *prev_rtt, int *received) {
+    if (rtt >= 0) {
+        (*received)++;
+        if (rtt < *rtt_min) *rtt_min = rtt;
+        if (rtt > *rtt_max) *rtt_max = rtt;
+        *rtt_sum += rtt;
+
+        if (*prev_rtt >= 0)
+            *jitter_sum += fabs(rtt - *prev_rtt);
+        *prev_rtt = rtt;
+    }
+}
+
+static void build_spark_history(const double *history, int hist_pos, int hist_count, int *spark_count, double *spark_vals, double *spark_max) {
+    *spark_count = hist_count < 30 ? hist_count : 30;
+    *spark_max = 0;
+    for (int i = 0; i < *spark_count; i++) {
+        int idx = (hist_pos - *spark_count + i + HISTORY_LEN) % HISTORY_LEN;
+        spark_vals[i] = history[idx];
+        if (history[idx] > *spark_max) *spark_max = history[idx];
+    }
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         printf("Usage: %s <device|IP> [-c count] [-i interval_sec]\n", argv[0]);
@@ -125,20 +168,9 @@ int main(int argc, char *argv[]) {
 
     /* Resolve device name to IP */
     Device devs[MAX_DEVICES];
-    int dev_count = devices_load(devs, MAX_DEVICES);
-    const Device *d = devices_find(devs, dev_count, target);
-    if (d) {
-        target = d->ip;
-        display_name = d->name;
-        printf("[netmon] Resolved '%s' -> %s\n", d->name, d->ip);
-    }
+    resolve_target(&target, &display_name, devs, MAX_DEVICES);
 
-    for (int i = 2; i < argc; i++) {
-        if (strcmp(argv[i], "-c") == 0 && i + 1 < argc)
-            max_count = atoi(argv[++i]);
-        else if (strcmp(argv[i], "-i") == 0 && i + 1 < argc)
-            interval = atof(argv[++i]);
-    }
+    parse_cli_args(argc, argv, &max_count, &interval);
 
     printf("[netmon] Monitoring %s (%s, interval %.1fs", display_name, target, interval);
     if (max_count > 0) printf(", count %d", max_count);
@@ -162,30 +194,17 @@ int main(int argc, char *argv[]) {
         hist_pos = (hist_pos + 1) % HISTORY_LEN;
         if (hist_count < HISTORY_LEN) hist_count++;
 
-        if (rtt >= 0) {
-            received++;
-            if (rtt < rtt_min) rtt_min = rtt;
-            if (rtt > rtt_max) rtt_max = rtt;
-            rtt_sum += rtt;
-
-            if (prev_rtt >= 0)
-                jitter_sum += fabs(rtt - prev_rtt);
-            prev_rtt = rtt;
-        }
+        update_stats(rtt, &rtt_min, &rtt_max, &rtt_sum, &jitter_sum, &prev_rtt, &received);
 
         double loss = (sent - received) * 100.0 / sent;
         double avg = received > 0 ? rtt_sum / received : 0;
         double jitter = received > 1 ? jitter_sum / (received - 1) : 0;
 
         /* Build ordered history for sparkline display */
-        int spark_count = hist_count < 30 ? hist_count : 30;
+        int spark_count = 0;
         double spark_vals[30];
         double spark_max = 0;
-        for (int i = 0; i < spark_count; i++) {
-            int idx = (hist_pos - spark_count + i + HISTORY_LEN) % HISTORY_LEN;
-            spark_vals[i] = history[idx];
-            if (history[idx] > spark_max) spark_max = history[idx];
-        }
+        build_spark_history(history, hist_pos, hist_count, &spark_count, spark_vals, &spark_max);
 
         /* Print live line */
         printf("\r\033[K");  /* clear line */
