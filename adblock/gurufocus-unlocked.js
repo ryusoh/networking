@@ -33,11 +33,15 @@
       els[i].remove();
     }
     // Remove blur overlay images
-    document.querySelectorAll('img[src*="blur"]').forEach(function (img) {
-      img.remove();
-    });
+    const blurImgs = document.querySelectorAll('img[src*="blur"]');
+    for (let i = 0; i < blurImgs.length; i++) {
+      blurImgs[i].remove();
+    }
     // Remove .blur class and inline blur styles from elements
-    document.querySelectorAll('.blur, [style*="blur"]').forEach(unblur);
+    const blurEls = document.querySelectorAll('.blur, [style*="blur"]');
+    for (let i = 0; i < blurEls.length; i++) {
+      unblur(blurEls[i]);
+    }
   }
 
   /** @param {Element} el */
