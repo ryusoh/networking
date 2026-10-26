@@ -145,6 +145,19 @@ def parse_source_code_file(file_path: Path, repo_root: Path) -> list[dict[str, A
     ]
 
 
+def _process_file(file_path: Path, repo_root: Path) -> list[dict[str, Any]]:
+    """Process a single file and return its chunks."""
+    if file_path.name.startswith(".") or ".git" in file_path.parts:
+        return []
+
+    ext = file_path.suffix.lower()
+    if ext == ".md":
+        return parse_markdown_file(file_path, repo_root)
+    if ext in CODE_EXTENSIONS:
+        return parse_source_code_file(file_path, repo_root)
+    return []
+
+
 def build_chunks_manifest(research_dir: Path, repo_root: Path) -> dict[str, Any]:
     """Scan research directory and build structural chunk manifest."""
     all_chunks: list[dict[str, Any]] = []
@@ -153,21 +166,10 @@ def build_chunks_manifest(research_dir: Path, repo_root: Path) -> dict[str, Any]
     for root, _, files in os.walk(research_dir):
         for file_name in sorted(files):
             file_path = Path(root) / file_name
-            # Skip hidden files or git objects
-            if file_name.startswith(".") or ".git" in file_path.parts:
-                continue
-
-            ext = file_path.suffix.lower()
-            if ext == ".md":
-                chunks = parse_markdown_file(file_path, repo_root)
-                if chunks:
-                    all_chunks.extend(chunks)
-                    file_count += 1
-            elif ext in CODE_EXTENSIONS:
-                chunks = parse_source_code_file(file_path, repo_root)
-                if chunks:
-                    all_chunks.extend(chunks)
-                    file_count += 1
+            chunks = _process_file(file_path, repo_root)
+            if chunks:
+                all_chunks.extend(chunks)
+                file_count += 1
 
     total_tokens = sum(chunk["token_count"] for chunk in all_chunks)
     manifest = {
