@@ -156,7 +156,18 @@ def test_zombie_fix_still_failing_reports_verdict(tmp_path):
     assert res.returncode == 1
     assert "killing MacPacketTunnel (pid 4321)" in res.stdout
     assert "repairs applied but connectivity still failing" in res.stdout
+    assert "JustMySocks: compare the client's server/port" in res.stdout
     assert (tmp_path / "kill.log").exists()
+
+
+def test_failed_verification_reports_possible_jms_port_change(tmp_path):
+    env = _make_env(tmp_path, curl_mode="fail", lsof_out=LSOF_UPSTREAM)
+    res = _run(env)
+    assert res.returncode == 1
+    assert "connectivity verification also failed" in res.stdout
+    assert "JustMySocks: compare the client's server/port" in res.stdout
+    assert "update/re-add the subscription" in res.stdout
+    assert "no stale-route/DNS leftovers detected" not in res.stdout
 
 
 def test_zombie_diagnose_only_does_not_kill(tmp_path):

@@ -231,8 +231,12 @@ fi
 # ---------------------------------------------------------------------------
 say
 if [[ $FIX -eq 0 ]]; then
-    if [[ $problems -eq 1 ]]; then
-        say "verdict: problems found — run 'vpn-recover --fix' to repair."
+    if [[ $problems -eq 1 || $verify_failed -eq 1 ]]; then
+        say "verdict: problems found — run 'vpn-recover --fix' to repair local issues."
+        if [[ $verify_failed -eq 1 ]]; then
+            say "  connectivity verification also failed; this may be a dead remote node rather than a local route/DNS problem."
+            say "  - JustMySocks: compare the client's server/port with the service page; if it changed, update/re-add the subscription."
+        fi
         exit 1
     fi
     say "verdict: no stale-route/DNS leftovers detected."
@@ -247,7 +251,7 @@ fi
 say "verdict: repairs applied but connectivity still failing."
 say "next steps:"
 say "  - quit and relaunch the SS/vmess client (Clash Verge, Shadowrocket), or toggle its TUN mode"
-say "  - if Shadowrocket: check that your JMS/subscription node is actually online (not expired)"
+say "  - JustMySocks: compare the client's server/port with the service page; if it changed, update/re-add the subscription."
 say "  - if only direct-routed (domestic) domains time out while proxied sites work:"
 say "    run 'bin/shadowrocket-dns-fix' — Shadowrocket's dns-server=system loops into fake-ip DNS"
 say "  - if Astrill is fully quit but utun interfaces keep accumulating, reboot once"
