@@ -182,11 +182,13 @@
       if (addedNodes.length > 0) {
         for (let j = 0; j < addedNodes.length; j++) {
           const node = addedNodes[j];
-          if (node.nodeType === 1 && isAdElement(/** @type {HTMLElement} */ (node))) {
-            hideAd(/** @type {HTMLElement} */ (node));
+          if (node.nodeType === 1) {
+            shouldCheck = true;
+            if (isAdElement(/** @type {HTMLElement} */ (node))) {
+              hideAd(/** @type {HTMLElement} */ (node));
+            }
           }
         }
-        shouldCheck = true;
       }
     }
     if (shouldCheck) {
