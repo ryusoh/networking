@@ -540,28 +540,27 @@
     }
   }
 
-  function hideAdmaruAds() {
-    // Hide Admaru ad label and its parent container (text says "Admaru")
-    // Optimized: use TreeWalker to find text nodes containing 'Admaru' instead of querying all <div>s
-    if (!document.body) {
-      return;
-    }
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    let node;
-    const elementsToHide = [];
-    while ((node = walker.nextNode())) {
-      const txt = node.nodeValue || '';
-      if (txt.includes('Admaru')) {
-        const el = node.parentElement ? node.parentElement.closest('div') : null;
-        if (el) {
-          const elTxt = el.textContent || '';
-          if (elTxt.length < 50) {
-            elementsToHide.push(el);
-          }
+  /**
+   * @param {Node} node
+   * @param {Element[]} elementsToHide
+   */
+  function processAdmaruNode(node, elementsToHide) {
+    const txt = node.nodeValue || '';
+    if (txt.includes('Admaru')) {
+      const el = node.parentElement ? node.parentElement.closest('div') : null;
+      if (el) {
+        const elTxt = el.textContent || '';
+        if (elTxt.length < 50) {
+          elementsToHide.push(el);
         }
       }
     }
+  }
 
+  /**
+   * @param {Element[]} elementsToHide
+   */
+  function hideAdmaruContainers(elementsToHide) {
     for (let i = 0; i < elementsToHide.length; i++) {
       const el = elementsToHide[i];
       if (el instanceof HTMLElement) {
@@ -571,6 +570,22 @@
         hideAd(el.parentElement);
       }
     }
+  }
+
+  function hideAdmaruAds() {
+    // Hide Admaru ad label and its parent container (text says "Admaru")
+    // Optimized: use TreeWalker to find text nodes containing 'Admaru' instead of querying all <div>s
+    if (!document.body) {
+      return;
+    }
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let node;
+    /** @type {Element[]} */
+    const elementsToHide = [];
+    while ((node = walker.nextNode())) {
+      processAdmaruNode(node, elementsToHide);
+    }
+    hideAdmaruContainers(elementsToHide);
   }
 
   /**
