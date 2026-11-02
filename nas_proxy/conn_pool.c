@@ -257,10 +257,17 @@ static int open_socks5(int proxy_idx, const char *dest_host, int dest_port) {
  * If none available, open a new one through the best proxy.
  * Returns fd or -1.
  */
-static int pool_acquire(const char *dest_host, int dest_port) {
-    time_t now = time(NULL);
 
-    /* First: look for an existing FREE connection to the same destination */
+static int is_connection_alive(int fd) {
+    char buf;
+    int ret = recv(fd, &buf, 1, MSG_PEEK | MSG_DONTWAIT);
+    if (ret == 0 || (ret < 0 && errno != EAGAIN && errno != EWOULDBLOCK)) {
+        return 0;
+    }
+    return 1;
+}
+
+static int try_acquire_existing(const char *dest_host, int dest_port, time_t now) {
     pthread_mutex_lock(&g_pool_lock);
     for (int i = 0; i < g_pool_count; i++) {
         PoolEntry *e = &g_pool[i];
@@ -268,15 +275,13 @@ static int pool_acquire(const char *dest_host, int dest_port) {
             e->dest_port == dest_port &&
             strcmp(e->dest_host, dest_host) == 0 &&
             (now - e->created) < CONN_MAX_AGE) {
-            /* Quick liveness check */
-            char buf;
-            int ret = recv(e->fd, &buf, 1, MSG_PEEK | MSG_DONTWAIT);
-            if (ret == 0 || (ret < 0 && errno != EAGAIN && errno != EWOULDBLOCK)) {
-                /* Dead connection */
+
+            if (!is_connection_alive(e->fd)) {
                 close(e->fd);
                 e->state = POOL_DEAD;
                 continue;
             }
+
             e->state = POOL_BUSY;
             int fd = e->fd;
             pthread_mutex_unlock(&g_pool_lock);
@@ -284,8 +289,10 @@ static int pool_acquire(const char *dest_host, int dest_port) {
         }
     }
     pthread_mutex_unlock(&g_pool_lock);
+    return -1;
+}
 
-    /* No cached connection — open a new one, trying each proxy */
+static int try_acquire_new(const char *dest_host, int dest_port) {
     pthread_mutex_lock(&g_proxy_lock);
     int nproxies = g_proxy_count;
     pthread_mutex_unlock(&g_proxy_lock);
@@ -293,9 +300,7 @@ static int pool_acquire(const char *dest_host, int dest_port) {
     for (int pi = 0; pi < nproxies; pi++) {
         int fd = open_socks5(pi, dest_host, dest_port);
         if (fd >= 0) {
-            /* Add to pool as BUSY */
             pthread_mutex_lock(&g_pool_lock);
-            /* Find a slot (reuse DEAD entries) */
             int slot = -1;
             for (int i = 0; i < g_pool_count; i++) {
                 if (g_pool[i].state == POOL_DEAD) { slot = i; break; }
@@ -316,6 +321,17 @@ static int pool_acquire(const char *dest_host, int dest_port) {
         }
     }
     return -1;
+}
+
+static int pool_acquire(const char *dest_host, int dest_port) {
+    time_t now = time(NULL);
+
+    int fd = try_acquire_existing(dest_host, dest_port, now);
+    if (fd >= 0) {
+        return fd;
+    }
+
+    return try_acquire_new(dest_host, dest_port);
 }
 
 /**
