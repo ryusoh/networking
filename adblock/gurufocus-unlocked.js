@@ -73,20 +73,25 @@
   /** @param {HTMLElement} node */
   function unblurDescendants(node) {
     /** @type {NodeListOf<HTMLElement>} */
-    const blurred = node.querySelectorAll('.blur, [style*="blur"]');
-    for (let k = 0; k < blurred.length; k++) {
-      unblur(blurred[k]);
-    }
-    /** @type {NodeListOf<HTMLImageElement>} */
-    const blurImgs = node.querySelectorAll('img[src*="blur"]');
-    for (let l = 0; l < blurImgs.length; l++) {
-      blurImgs[l].remove();
+    const elements = node.querySelectorAll('.blur, [style*="blur"], img[src*="blur"]');
+    const numEls = elements.length;
+    for (let k = 0; k < numEls; k++) {
+      const el = elements[k];
+      if (el instanceof window.HTMLImageElement && el.src && el.src.indexOf('blur') !== -1) {
+        el.remove();
+      } else {
+        unblur(el);
+      }
     }
   }
 
   /** @param {HTMLElement} node */
   function handleAddedNode(node) {
-    if (node instanceof HTMLImageElement && node.src && node.src.indexOf('blur') !== -1) {
+    if (
+      node.tagName === 'IMG' &&
+      /** @type {HTMLImageElement} */ (node).src &&
+      /** @type {HTMLImageElement} */ (node).src.indexOf('blur') !== -1
+    ) {
       node.remove();
       return;
     }
