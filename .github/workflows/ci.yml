@@ -31,7 +31,7 @@ jobs:
       - name: Reject empty pull request
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          git fetch origin ${{ github.base_ref }} --depth=1
+          git fetch origin ${{ github.base_ref }}
           if git diff --quiet origin/${{ github.base_ref }}; then
             echo "::error::PR contains no changes. Do not push dummy commits or placeholder trigger comments to bypass this check — close the PR instead."
             exit 1
