@@ -27,7 +27,7 @@ assignees: ''
 ## Environment
 
 - OS:
-- Component: <!-- e.g. adblock, gov_bypass, vps_kernel_proxy, nas_proxy -->
+- Component: <!-- e.g. adblock, vps_kernel_proxy, nas_proxy -->
 - Browser/Version (if applicable):
 
 ## Additional Context

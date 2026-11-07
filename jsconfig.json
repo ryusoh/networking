@@ -10,6 +10,6 @@
     "types": ["chrome"],
     "skipLibCheck": true
   },
-  "include": ["adblock/*.js", "gov_bypass/*.js", "stall_guard/*.js"],
-  "exclude": ["node_modules", "adblock/__tests__", "stall_guard/dist", "gov_bypass/__tests__"]
+  "include": ["adblock/*.js"],
+  "exclude": ["node_modules", "adblock/__tests__"]
 }

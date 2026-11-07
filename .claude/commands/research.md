@@ -24,7 +24,7 @@ primary sources to prefer, and the output location decided below.
   claim to its authoritative origin.
 - For questions about this repo's own subsystems, the primary source is the code
   under the relevant subproject (`adblock/`, `nas_proxy/`, `nas_tools/`,
-  `retriever/`, `vps_kernel_proxy/`, `vps_user_proxy/`, `gov_bypass/`, etc.)
+  `retriever/`, `vps_kernel_proxy/`, `vps_user_proxy/`, etc.)
   plus the governing doc under `docs/` (`ebpf-research.md`, `nas-strategy.md`) —
   see `AGENTS.md` for the full layout and conventions.
 - For anything about Claude / the Anthropic API, the `claude-api` skill is the

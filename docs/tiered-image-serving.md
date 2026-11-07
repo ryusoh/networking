@@ -8,15 +8,15 @@ control.**
 
 ## Evidence (measured 2026-08-20, `git ls-files` + `stat -f%z`)
 
-| Candidate surface                                                         | Verdict                                                                                                                                    |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| GitHub Pages / docs site                                                  | None: no `CNAME`, no `_config.yml`, no `mkdocs.yml`, no Pages deploy in `.github/workflows/`.                                              |
-| Tracked HTML (794 files)                                                  | 792 are vendored Doxygen docs under `research/cs234-advanced-networks/03-homework/hw01/gpac-temp/` (third-party fixture — do not touch).   |
-| First-party HTML                                                          | `adblock/popup.html` (no `<img>`, packaged UI) and `gov_bypass/offscreen.html` (script-only) — loaded via `chrome-extension://`, not HTTP. |
-| Extension icons (`adblock/assets/`, `stall_guard/assets/`, `gov_bypass/`) | Packaged into the extension and loaded locally (16/48/128 px PNGs; largest 313,384 B); never HTTP-served.                                  |
-| `assets/background.jpg` (1,675,559 B)                                     | Referenced only by `README.md:1`; rendered by GitHub's markdown viewer via camo — markup and serving are GitHub's, not ours.               |
-| `research/cs23*-*/**` figures (~5.2 MB total)                             | Coursework artifacts (e.g. `markov.png` 86,870 B, `ui.png` 55,137 B) viewed through GitHub's file browser; not a serving surface we own.   |
-| `nas_proxy/cache_proxy.py`, `nas_proxy/tile_cache.py` (`http.server`)     | CONNECT proxy / upstream map-tile cache — they relay upstream bytes, serve no repo images, and render no HTML UI.                          |
+| Candidate surface                                                     | Verdict                                                                                                                                  |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub Pages / docs site                                              | None: no `CNAME`, no `_config.yml`, no `mkdocs.yml`, no Pages deploy in `.github/workflows/`.                                            |
+| Tracked HTML (794 files)                                              | 792 are vendored Doxygen docs under `research/cs234-advanced-networks/03-homework/hw01/gpac-temp/` (third-party fixture — do not touch). |
+| First-party HTML                                                      | `adblock/popup.html` (no `<img>`, packaged UI) — loaded via `chrome-extension://`, not HTTP.                                             |
+| Extension icons (`adblock/assets/`)                                   | Packaged into the extension and loaded locally (16/48/128 px PNGs); never HTTP-served.                                                   |
+| `assets/background.jpg` (1,675,559 B)                                 | Referenced only by `README.md:1`; rendered by GitHub's markdown viewer via camo — markup and serving are GitHub's, not ours.             |
+| `research/cs23*-*/**` figures (~5.2 MB total)                         | Coursework artifacts (e.g. `markov.png` 86,870 B, `ui.png` 55,137 B) viewed through GitHub's file browser; not a serving surface we own. |
+| `nas_proxy/cache_proxy.py`, `nas_proxy/tile_cache.py` (`http.server`) | CONNECT proxy / upstream map-tile cache — they relay upstream bytes, serve no repo images, and render no HTML UI.                        |
 
 ## Why the pattern does not adapt
 

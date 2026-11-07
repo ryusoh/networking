@@ -211,13 +211,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   has Python wrappers with privileged, self-skipping tests.
 - `retriever/` — the `pull` script. `vps_kernel_proxy/` — kernel/user proxy +
   eBPF. `vps_user_proxy/` — userspace proxy variant.
-- `gov_bypass/`, `vmware/`, `bin/` — misc tools and C build accelerators.
-- `stall_guard/` — Chrome MV3 extension that auto-recovers HTML5 video stalls:
-  seek-back-and-resume, escalating to a page reload (via postMessage from the
-  player iframe to the top frame) when repeated recoveries make no progress.
-  Tests in `stall_guard/tests/` — **not** `__tests__/`,
-  because Chrome refuses to load extensions containing `_`-prefixed dirs. See
-  the `add-extension` skill for the full new-extension checklist.
+- `vmware/`, `bin/` — misc tools and C build accelerators.
 - `docs/` — subsystem specs and research notes: `gates.md` (gate internals),
   `ci-gotchas.md` (gate-output field guide), `ebpf-research.md`,
   `nas-strategy.md`, `docs/research/anki-card-pipeline-spec.md`,
@@ -251,9 +245,8 @@ macOS ships `/bin/bash` 3.2, and the `bin/*.sh` tools run on it:
 ### Dependency-structure gate (`make depcheck`)
 
 `make depcheck` (wired into `make lint`, hence into `make precommit`) runs
-dependency-cruiser over `adblock gov_bypass jest.setup.js` with the
-rules in `.dependency-cruiser.cjs`: no circular deps, no cross-subproject
-imports (mirrors non-negotiable #2), production source never imports
+dependency-cruiser over `adblock jest.setup.js` with the rules in
+`.dependency-cruiser.cjs`: no circular deps, and production source never imports
 `__tests__`. Zero-baseline and purely preventive. Alias/import-linter/grimp
 rationale and gotchas: `docs/gates.md`.
 
@@ -301,9 +294,8 @@ hand-computed expectations.
 ### Coverage reports and the fmt-check gotcha
 
 Both `make precommit` and `precommit-fix` print a coverage table after the tests:
-Jest (all three JS extensions — `adblock`, `stall_guard`,
-`gov_bypass` — scoped via `collectCoverageFrom` in `package.json`)
-and pytest (source modules only; test files/`__init__.py` omitted via the
+Jest (`adblock`, scoped via `collectCoverageFrom` in `package.json`) and pytest
+(source modules only; test files/`__init__.py` omitted via the
 `[tool.coverage.run]` section in `pyproject.toml`).
 
 **Whole-suite coverage floor (blocking):** Jest enforces a global
@@ -444,8 +436,8 @@ hygiene notes live in `docs/ci-gotchas.md`.
   (auto-detects Jest `coverage-summary.json` vs coverage.py JSON; tested in
   `bin/__tests__/test_coverage_rank.py`, run by `make test-py`).
 - **Typist** drove `make type` toward zero errors via JSDoc on
-  first-party JS (`adblock/*.js`, `gov_bypass/*.js`, `stall_guard/*.js`). The
-  harness — `typescript` + `@types/chrome` dev-deps and `jsconfig.json` — is
+  first-party JS (`adblock/*.js`). The harness — `typescript` +
+  `@types/chrome` dev-deps and `jsconfig.json` — is
   complete and strictly blocking in `make type` and `make precommit` (see `.jules/typist.md`).
 
 ### Shipping multiple open PRs

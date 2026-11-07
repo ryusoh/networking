@@ -107,9 +107,8 @@ is outside local control, and the browser's own receiving stack does not send pr
 A Chrome extension sits even further away: the MV3 extension API surface
 ([Chrome extension API reference](https://developer.chrome.com/docs/extensions/reference/api))
 exposes DOM, declarativeNetRequest, storage, and similar page-level APIs — nothing
-that tunes TCP retransmission behavior for media connections. So the stall-recovery
-extension built here (`stall_guard/`) works at the only layer it can: the
-HTMLMediaElement.
+that tunes TCP retransmission behavior for media connections. A stall-recovery
+extension can work only at the HTMLMediaElement layer.
 
 ### 4. QUIC's PTO is the same idea, but both endpoints are in userspace — and replaceable
 
@@ -231,7 +230,7 @@ distinct mechanisms produce "buffered but stuck":
 
 ## What was built in this repo
 
-Three tools came out of the investigation:
+Two tools came out of the investigation:
 
 - **`bin/stream-check`** — single-stream throughput probe with a freeze-detection
   mode. `stream-check 7897` runs 3 single-connection downloads through the local
@@ -246,15 +245,6 @@ Three tools came out of the investigation:
   interfaces, dead tunnel-DNS servers (e.g., leftover 198.18.x.x fake-ip resolvers),
   and poisoned DNS/ARP caches (`bin/vpn-recover`, header comment). Diagnose-only by
   default; macOS-only.
-- **`stall_guard/`** — a Chrome MV3 content script that detects HTML5 video stalls
-  (playing, `readyState < HAVE_FUTURE_DATA`, `currentTime` not advancing for 4s) and
-  seeks back to re-anchor playback at a contiguous buffered point. The rewind is
-  hole-aware: when the playhead sits just past the end of a buffered range (a failed
-  or timed-out segment), it rewinds only enough to land just inside that range —
-  the seek itself re-triggers the missing fetch — instead of the full default 8s
-  rewind (`stall_guard/content.js`, `computeResumeTime`). The header is explicit
-  about the limit: "it cannot fix the network" — it shortens each stall from
-  "until you notice and seek" to about 4 seconds.
 
 ## Remedies, ranked
 
@@ -277,7 +267,7 @@ Three tools came out of the investigation:
    treat the empirical result as decisive.)
 4. **Lock quality — as mitigation, not fix.** Pinning 540p reduces how often the
    buffer drains between freezes, but measurement #5 shows it cannot survive a 14s
-   hole. Expect fewer, not zero, stalls; `stall_guard/` covers the remainder.
+   hole. Expect fewer, not zero, stalls.
 5. **QUIC-based protocols on your own VPS (Hysteria2 or TUIC).** The structural fix:
    move the tunnel's loss recovery into a userspace QUIC stack whose PTO probes
    replace multi-second TCP freezes ([RFC 9002, Section 6.2](https://www.rfc-editor.org/rfc/rfc9002.html#section-6.2)).

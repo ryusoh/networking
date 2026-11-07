@@ -8,7 +8,7 @@ This document outlines how to use a home NAS (Network Attached Storage) to centr
 
 - **Goal:** Move the logic of finding and maintaining Chinese proxies from the MacBook to the NAS.
 - **Implementation:** Run a SOCKS5/HTTP proxy (e.g., Squid or v2ray) in Docker on the NAS.
-- **Benefit:** The NAS stays connected 24/7. Your Chrome extension simply points to the NAS IP, ensuring instant map loads without the "search for working proxy" delay.
+- **Benefit:** The NAS stays connected 24/7. Clients point directly to the NAS IP, ensuring instant map loads without the "search for working proxy" delay.
 
 ### 2. Local Map Tile Cache
 
@@ -30,5 +30,4 @@ This document outlines how to use a home NAS (Network Attached Storage) to centr
 ## Workflow
 
 1. Deploy the `nas_proxy` container using the provided `docker-compose.yml`.
-2. Configure the `gov_bypass` extension to use your NAS IP as the primary proxy.
-3. (Optional) Set the NAS as your primary DNS server for house-wide ad blocking.
+2. (Optional) Set the NAS as your primary DNS server for house-wide ad blocking.

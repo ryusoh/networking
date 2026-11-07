@@ -7,13 +7,12 @@ this doc is the reference for how each gate works and why it was wired.
 ## Dependency-structure gate (`make depcheck`)
 
 `make depcheck` (wired into `make lint`, hence into `make precommit`) runs
-dependency-cruiser over `adblock gov_bypass jest.setup.js` with the
-rules in `.dependency-cruiser.cjs`: no circular deps, no cross-subproject
-imports (mirrors non-negotiable #2), production source never imports
+dependency-cruiser over `adblock jest.setup.js` with the rules in
+`.dependency-cruiser.cjs`: no circular deps and production source never imports
 `__tests__`. Measured **zero violations** on day one (56 modules, 51
 dependencies, fully resolved — no `couldNotResolve`), so no baseline was
-needed; the gate is purely preventive. Probe-tested: a cross-subproject import
-and a prod→test import each fail the gate; `git restore` returns green. This
+needed; the gate is purely preventive. Probe-tested: a prod→test import fails
+the gate; `git restore` returns green. This
 wiring was done by an interactive agent explicitly directed to change
 build/lint config (non-negotiable #6 binds Jules routines, not interactive
 agents).

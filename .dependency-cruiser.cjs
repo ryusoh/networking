@@ -9,15 +9,6 @@ module.exports = {
       to: { circular: true }
     },
     {
-      name: 'no-cross-subproject-imports',
-      comment:
-        'AGENTS.md non-negotiable #2: subprojects are independent — ' +
-        'adblock and gov_bypass must not import each other',
-      severity: 'error',
-      from: { path: '^(adblock|gov_bypass)/' },
-      to: { path: '^(adblock|gov_bypass)/', pathNot: '^$1/' }
-    },
-    {
       name: 'prod-not-to-tests',
       comment:
         'production source must not import test code (helpers/ is test ' +

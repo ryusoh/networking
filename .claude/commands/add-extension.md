@@ -32,13 +32,11 @@ failed attempt before they were understood.
 
 1. `manifest.json` — MV3.
 2. **Icons: always default to the shared set.** Every new extension in this
-   repo uses the same icons as `stall_guard`/`adblock` unless the user
-   explicitly asks for different artwork: copy
-   `adblock/assets/icon{16,48,128}.png` into `<dir>/assets/` and declare
-   both `icons` and `action.default_icon` in the manifest (see
-   `adblock/manifest.json` or `stall_guard/manifest.json` for the exact
-   wiring). Do not ship a new extension without icons, and do not invent new
-   ones.
+   repo uses the same icons as `adblock` unless the user explicitly asks for
+   different artwork: copy `adblock/assets/icon{16,48,128}.png` into
+   `<dir>/assets/` and declare both `icons` and `action.default_icon` in the
+   manifest (see `adblock/manifest.json` for the exact wiring). Do not ship a
+   new extension without icons, and do not invent new ones.
 3. Content script — write the logic as pure, testable functions and expose
    them for Jest with a CommonJS guard that returns before touching the page:
 

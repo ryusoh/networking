@@ -90,10 +90,10 @@ lint: depcheck
 lint-fix:
 	@npm run lint:fix
 
-# Dependency-structure gate (JS): no circular deps, no cross-subproject
-# imports, production source never imports tests. Rules: .dependency-cruiser.cjs
+# Dependency-structure gate (JS): no circular deps; production source never
+# imports tests. Rules: .dependency-cruiser.cjs
 depcheck:
-	npx --yes dependency-cruiser adblock gov_bypass jest.setup.js --config .dependency-cruiser.cjs
+	npx --yes dependency-cruiser adblock jest.setup.js --config .dependency-cruiser.cjs
 
 # Mutation testing (NON-BLOCKING scaffold — deliberately NOT wired into
 # precommit or CI gates; informational scores only).

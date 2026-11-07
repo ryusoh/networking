@@ -13,13 +13,12 @@ the reviewer accepts or closes it.
 ## The harness (already bootstrapped and blocking)
 
 JS type-checking runs through `jsconfig.json` (`checkJs`, `allowJs`, `noEmit`,
-`"strict": true`) over all first-party JS files (`adblock/*.js`, `gov_bypass/*.js`,
-`stall_guard/*.js`), invoked by `make type`. It is **strictly blocking**
-(`make type` runs `npx tsc -p jsconfig.json --noEmit` and gates CI). The Chrome
-extension API is typed via the `@types/chrome` dev-dependency (referenced in
-`jsconfig.json` `types`). First-party JS lives in `adblock/*.js`, `gov_bypass/*.js`,
-and `stall_guard/*.js`; test files (`__tests__/`, `tests/`, `jest.setup.js`,
-`*test*.js`) are never type-check targets.
+`"strict": true`) over all first-party JS files (`adblock/*.js`), invoked by
+`make type`. It is **strictly blocking** (`make type` runs
+`npx tsc -p jsconfig.json --noEmit` and gates CI). The Chrome extension API is
+typed via the `@types/chrome` dev-dependency (referenced in `jsconfig.json`
+`types`). First-party JS lives in `adblock/*.js`; test files (`__tests__/`,
+`tests/`, `jest.setup.js`, `*test*.js`) are never type-check targets.
 
 ## Mandate
 
@@ -60,7 +59,7 @@ behavior change, ever.**
 
 - Expansion scan: copy `jsconfig.json` to a temp file (delete it before
   committing) with `include` set to
-  `["adblock/*.js", "gov_bypass/*.js"]`, run
+  `["adblock/*.js"]`, run
   `npx tsc -p <temp> --noEmit`, and tally errors per file. Record the total —
   the PR body reports it before → after.
 - Resolve every error in TARGET with correct JSDoc / `@typedef`. Narrow DOM types

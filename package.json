@@ -31,9 +31,7 @@
       "/__tests__/helpers/"
     ],
     "collectCoverageFrom": [
-      "adblock/*.js",
-      "stall_guard/*.js",
-      "gov_bypass/*.js"
+      "adblock/*.js"
     ],
     "coverageReporters": [
       "text",
