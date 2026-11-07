@@ -88,23 +88,41 @@ def block_domain(domain):
     except Exception as e:
         print(f"[-] Resolution failed for {domain}: {e}")
 
+def _handle_status():
+    print("--- [ LOADED BPF PROGRAMS ] ---")
+    print(run_cmd("bpftool prog show"))
+
+def _handle_block(args):
+    if len(args) == 3:
+        add_to_blocklist(args[2])
+    else:
+        print("Unknown command.")
+
+def _handle_block_domain(args):
+    if len(args) == 3:
+        block_domain(args[2])
+    else:
+        print("Unknown command.")
+
+def _dispatch_command(cmd, args):
+    if cmd == "status":
+        _handle_status()
+    elif cmd == "dns":
+        show_dns_hits()
+    elif cmd == "block":
+        _handle_block(args)
+    elif cmd == "block-domain":
+        _handle_block_domain(args)
+    else:
+        print("Unknown command.")
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: ./monitor.py [status|dns|block <ip>|block-domain <domain>]")
         return
 
-    cmd = sys.argv[1]
-    if cmd == "status":
-        print("--- [ LOADED BPF PROGRAMS ] ---")
-        print(run_cmd("bpftool prog show"))
-    elif cmd == "dns":
-        show_dns_hits()
-    elif cmd == "block" and len(sys.argv) == 3:
-        add_to_blocklist(sys.argv[2])
-    elif cmd == "block-domain" and len(sys.argv) == 3:
-        block_domain(sys.argv[2])
-    else:
-        print("Unknown command.")
+    _dispatch_command(sys.argv[1], sys.argv)
+
 
 if __name__ == "__main__":
     main()
