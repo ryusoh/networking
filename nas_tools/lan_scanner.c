@@ -536,31 +536,34 @@ static void print_json(void) {
 
 /* --- Main --- */
 
-int main(int argc, char *argv[]) {
-    signal(SIGINT, sig_handler);
-    signal(SIGTERM, sig_handler);
 
-    int json_mode = 0;
-    int watch_interval = 0;
-    const char *iface = NULL;
-    const char *name_ip = NULL;
-    const char *name_label = NULL;
+typedef struct {
+    int json_mode;
+    int watch_interval;
+    const char *iface;
+    const char *name_ip;
+    const char *name_label;
+    int help_or_list_handled;
+} CliOptions;
 
+static int parse_cli_args(int argc, char *argv[], CliOptions *opts) {
+    memset(opts, 0, sizeof(CliOptions));
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-j") == 0 || strcmp(argv[i], "--json") == 0) {
-            json_mode = 1;
+            opts->json_mode = 1;
         } else if (strcmp(argv[i], "-w") == 0 || strcmp(argv[i], "--watch") == 0) {
-            if (i + 1 < argc) watch_interval = atoi(argv[++i]);
-            else watch_interval = 60;
+            if (i + 1 < argc) opts->watch_interval = atoi(argv[++i]);
+            else opts->watch_interval = 60;
         } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--interface") == 0) {
-            if (i + 1 < argc) iface = argv[++i];
+            if (i + 1 < argc) opts->iface = argv[++i];
         } else if (strcmp(argv[i], "-n") == 0 || strcmp(argv[i], "--name") == 0) {
-            if (i + 2 < argc) { name_ip = argv[++i]; name_label = argv[++i]; }
+            if (i + 2 < argc) { opts->name_ip = argv[++i]; opts->name_label = argv[++i]; }
         } else if (strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--list") == 0) {
             Device devs[MAX_DEVICES];
             int count = devices_load(devs, MAX_DEVICES);
             if (count == 0) {
                 printf("No saved devices. Run a scan first.\n");
+                opts->help_or_list_handled = 1;
                 return 0;
             }
             printf("\n%-12s %-16s %s\n", "Name", "IP", "MAC");
@@ -568,6 +571,7 @@ int main(int argc, char *argv[]) {
             for (int d = 0; d < count; d++)
                 printf("%-12s %-16s %s\n", devs[d].name, devs[d].ip, devs[d].mac);
             printf("\n");
+            opts->help_or_list_handled = 1;
             return 0;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("Usage: %s [options]\n", argv[0]);
@@ -576,11 +580,49 @@ int main(int argc, char *argv[]) {
             printf("  -i, --interface X    Use specific network interface\n");
             printf("  -n, --name IP LABEL  Name a device (e.g. --name 10.0.0.1 router)\n");
             printf("  -l, --list           Show saved device names\n");
+            opts->help_or_list_handled = 1;
             return 0;
         }
     }
+    return 0;
+}
 
-    /* Handle --name: label a device without scanning */
+static void report_changes(Host *prev_hosts, int prev_count, Host *current_hosts, int current_count) {
+    /* Find new devices */
+    for (int i = 0; i < current_count; i++) {
+        int found = 0;
+        for (int j = 0; j < prev_count; j++) {
+            if (strcmp(current_hosts[i].ip, prev_hosts[j].ip) == 0) {
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            printf("[NEW] %s %s %s\n", current_hosts[i].ip,
+                   current_hosts[i].mac[0] ? current_hosts[i].mac : "",
+                   current_hosts[i].hostname[0] ? current_hosts[i].hostname : "");
+        }
+    }
+
+    /* Find disappeared devices */
+    for (int j = 0; j < prev_count; j++) {
+        int found = 0;
+        for (int i = 0; i < current_count; i++) {
+            if (strcmp(current_hosts[i].ip, prev_hosts[j].ip) == 0) {
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            printf("[GONE] %s %s %s\n", prev_hosts[j].ip,
+                   prev_hosts[j].mac[0] ? prev_hosts[j].mac : "",
+                   prev_hosts[j].hostname[0] ? prev_hosts[j].hostname : "");
+        }
+    }
+}
+
+
+static int handle_name_command(const char *name_ip, const char *name_label) {
     if (name_ip && name_label) {
         Device devs[MAX_DEVICES];
         int count = devices_load(devs, MAX_DEVICES);
@@ -589,11 +631,29 @@ int main(int argc, char *argv[]) {
         count = devices_set(devs, count, name_label, name_ip, mac);
         devices_save(devs, count);
         printf("[scanner] Saved: %s -> %s\n", name_label, name_ip);
-        return 0;
+        return 1;
     }
+    return 0;
+}
+
+static void sleep_for_watch(int watch_interval) {
+    if (watch_interval > 0) {
+        for (int s = 0; s < watch_interval && g_running; s++) sleep(1);
+    }
+}
+
+int main(int argc, char *argv[]) {
+    signal(SIGINT, sig_handler);
+    signal(SIGTERM, sig_handler);
+
+    CliOptions opts;
+    parse_cli_args(argc, argv, &opts);
+
+    if (opts.help_or_list_handled) return 0;
+    if (handle_name_command(opts.name_ip, opts.name_label)) return 0;
 
     char base_ip[16];
-    if (detect_subnet(iface, base_ip, sizeof(base_ip)) != 0) {
+    if (detect_subnet(opts.iface, base_ip, sizeof(base_ip)) != 0) {
         fprintf(stderr, "[scanner] Could not detect subnet. Use -i to specify interface.\n");
         return 1;
     }
@@ -617,7 +677,7 @@ int main(int argc, char *argv[]) {
         /* Save discovered devices */
         save_devices();
 
-        if (json_mode) {
+        if (opts.json_mode) {
             print_json();
         } else {
             print_table();
@@ -625,49 +685,17 @@ int main(int argc, char *argv[]) {
         }
 
         /* Detect changes if watching */
-        if (watch_interval > 0 && prev_count > 0) {
-            /* Find new devices */
-            for (int i = 0; i < g_host_count; i++) {
-                int found = 0;
-                for (int j = 0; j < prev_count; j++) {
-                    if (strcmp(g_hosts[i].ip, prev_hosts[j].ip) == 0) {
-                        found = 1;
-                        break;
-                    }
-                }
-                if (!found) {
-                    printf("[NEW] %s %s %s\n", g_hosts[i].ip,
-                           g_hosts[i].mac[0] ? g_hosts[i].mac : "",
-                           g_hosts[i].hostname[0] ? g_hosts[i].hostname : "");
-                }
-            }
-
-            /* Find disappeared devices */
-            for (int j = 0; j < prev_count; j++) {
-                int found = 0;
-                for (int i = 0; i < g_host_count; i++) {
-                    if (strcmp(g_hosts[i].ip, prev_hosts[j].ip) == 0) {
-                        found = 1;
-                        break;
-                    }
-                }
-                if (!found) {
-                    printf("[GONE] %s %s %s\n", prev_hosts[j].ip,
-                           prev_hosts[j].mac[0] ? prev_hosts[j].mac : "",
-                           prev_hosts[j].hostname[0] ? prev_hosts[j].hostname : "");
-                }
-            }
+        if (opts.watch_interval > 0 && prev_count > 0) {
+            report_changes(prev_hosts, prev_count, g_hosts, g_host_count);
         }
 
         /* Save current scan for next comparison */
         memcpy(prev_hosts, g_hosts, sizeof(Host) * g_host_count);
         prev_count = g_host_count;
 
-        if (watch_interval > 0) {
-            for (int s = 0; s < watch_interval && g_running; s++) sleep(1);
-        }
+        sleep_for_watch(opts.watch_interval);
 
-    } while (watch_interval > 0 && g_running);
+    } while (opts.watch_interval > 0 && g_running);
 
     return 0;
 }
