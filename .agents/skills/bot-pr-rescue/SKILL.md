@@ -4,8 +4,8 @@ description: Diagnose and salvage a failing Jules/bot PR — identify which gate
 argument-hint: '[PR number, branch name, or Jules task id]'
 ---
 
-Rescue a failing bot PR (Jules routines here: architect, bolt, janitor,
-testpilot, typist). Pattern derived from the sibling fund repo's PR #692
+Rescue a failing bot PR (legacy Jules routines or automated PRs). Pattern
+derived from the sibling fund repo's PR #692
 (2026-09): a Testpilot PR red on the per-commit hygiene gate despite a clean
 final tree, plus a 474-line `verify_output.txt` shipped by `git add -A`.
 
@@ -130,7 +130,7 @@ Patch the root cause with **compounding mechanical fixes**, not ceremonial
 instruction:
 
 - **Anti-pattern — do NOT performatively cite PR numbers:** Do not append PR
-  citations (e.g. `(PR #XYZ failed...)`) to `.jules/*.md` personas just to
+  citations (e.g. `(PR #XYZ failed...)`) to agent prompt or skill files just to
   "do something". Citing past failures in LLM prompt files creates prompt bloat
   and warning fatigue without improving agent compliance. Fixes must be
   mechanical and structural.
@@ -144,12 +144,9 @@ instruction:
   `test_all_stray_artifact_patterns_are_gitignored` in
   `tools/__tests__/test_check_bot_pr_hygiene.py` passes so the gate and
   `.gitignore` never drift out of sync.
-- **Level 3: Persona instruction (structural, not ceremonial):** Only edit
-  `.jules/<routine>.md` if an operational rule or workflow step was genuinely
-  missing or incorrect — never add incident tombstones.
 
 Run `python3 tools/sync_commands.py` after editing any skill to keep
 `.claude/commands/` in sync. Run `make precommit` green before committing
 (`make precommit-docker` on macOS for CI parity — it exits 0 amid
 alarming-looking noise; judge by exit code, see `docs/ci-gotchas.md`). Note in
-the commit body when the edit touches a persona or skill file.
+the commit body when the edit touches a skill file.

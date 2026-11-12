@@ -22,9 +22,7 @@ repos:
   `.pre-commit-config.yaml`; CI gate = `make precommit SKIP=1` (fmt-check lint
   typecheck-js quality-py check sync-check); aliases via package.json
   `imports` (`#js/*`, `#ui/*`); Python addon dirs are REAL packages
-  (`__init__.py` present) — import-linter works there. Its architect-lane
-  persona is `.jules/refactoring.md` — there is no `architect.md` (verified
-  2026-09).
+  (`__init__.py` present) — import-linter works there.
 - `~/dev/ryusoh.github.io` — JS-only static site; default branch is `master`,
   not `main`; has `.pre-commit-config.yaml`; CI-parity gate = `make
 precommit-fix` (Prettier, ESLint, Stylelint, tsc, Jest + coverage) — it stages
@@ -86,8 +84,7 @@ Delegate one subagent per repo, in parallel. Brief each with:
    into the repo root (add to .gitignore or delete).
 8. **Finish per repo:** run prettier/fmt over new config files, run the repo's
    own full CI-parity gate green, update its AGENTS.md (command table + short
-   note), update the `.jules/` persona whose lane owns the new metric (if
-   any). **Never commit** — leave changes uncommitted and report: violation
+   note). **Never commit** — leave changes uncommitted and report: violation
    counts, resolution proof, files changed, probe exit codes, gate result,
    skip decisions with evidence.
 

@@ -1,6 +1,6 @@
 """Verify that tool and script files referenced in agent docs and skills exist on disk.
 
-Ensures automated cleanup bots (e.g. Janitor) and refactors never delete
+Ensures automated cleanup routines and refactors never delete
 standalone CLI tools or helper scripts that are referenced by agent workflows,
 skills, or documentation.
 """
@@ -17,12 +17,8 @@ SCRIPT_REF_PATTERN = re.compile(
 
 
 def _collect_markdown_files() -> list[Path]:
-    """Collect AGENTS.md, .jules persona docs, and agent skill definitions."""
+    """Collect AGENTS.md and agent skill definitions."""
     md_files = [REPO_ROOT / "AGENTS.md"]
-
-    jules_dir = REPO_ROOT / ".jules"
-    if jules_dir.is_dir():
-        md_files.extend(jules_dir.glob("*.md"))
 
     skills_dir = REPO_ROOT / ".agents" / "skills"
     if skills_dir.is_dir():

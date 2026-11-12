@@ -1,5 +1,9 @@
 # Why CI's ESLint warnings and `make type` errors never block the build
 
+> **Historical note (2026-11):** Unattended Jules routines (including Typist) were
+> retired in November 2026; see the retirement note in `docs/gates.md`. This document
+> preserves the rationale and history of the type and lint debt during the active Typist era.
+
 ## The question
 
 CI consistently prints two categories of persistent problems that never fail the

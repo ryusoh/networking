@@ -6,22 +6,15 @@ live in `.agents/skills/<name>/SKILL.md` (canonical — the open Agent Skills
 format); `.claude/commands/` is generated from it by `tools/sync_commands.py`,
 `.claude/skills` is symlinked to `.agents/skills`, and the gate drift-checks it via `make sync-check`.
 
-## Two audiences (do not mix these up)
+## Audience
 
-- **Unattended Jules routines** (`.jules/` personas): these bots run without a
-  human in the loop and open PRs. A human only does a binary approve/close on the
-  result — they will **not** leave review comments or iterate with you. So every
-  PR must be self-evidently correct and approvable at a glance. Optimize for
-  **approve rate**, not for volume. The sections from "Non-negotiables" through
-  "Lanes" are binding on Jules routines.
-- **Interactive coding agents** (Claude Code, Kimi, Cursor, etc.): you work
-  directly with the user in a chat session. The project conventions below still
-  apply, but the Jules-only **PR/branch/lane restrictions do not**. You may edit
-  build files, Makefiles, configs, dependencies, and even `.jules/` persona files
-  (no explicit permission needed — the user reviews the result; see the editing
-  rules below). You may commit to `main` or open PRs as directed by the user.
-  Do not invent Jules-style lane boundaries for normal interactive
-  work — if the user asks you to change something, change it.
+Guidance here is for **interactive coding agents** (Claude Code, Kimi,
+Antigravity, Cursor, etc.) working directly with the user in a chat session.
+The Jules routines (`.jules/` personas) were retired in November 2026 — see
+`docs/gates.md`. Unattended automation is now limited to scheduled GitHub
+Actions workflows. You may edit build files, Makefiles, configs, and
+dependencies, and commit to `main` or open PRs as directed by the user.
+If the user asks you to change something, change it.
 
 This repo (net-tools) is a collection of **independent networking and browser
 tooling subprojects** spanning several languages: a Chrome MV3 extension
@@ -30,7 +23,7 @@ tooling subprojects** spanning several languages: a Chrome MV3 extension
 tooling (`nas_proxy/`, `nas_tools/`, `bin/*.c`, compiled with `-lcurl`), and
 eBPF (`vps_kernel_proxy/`, Docker-only).
 
-## Non-negotiables (a PR that violates any of these will be closed)
+## Non-negotiables (apply to every change and PR)
 
 1. **Open a PR only if `make precommit` is green.** That is the exact CI gate
    (`.github/workflows/ci.yml` runs `make precommit` on `ubuntu-latest`), and the
@@ -44,22 +37,23 @@ eBPF (`vps_kernel_proxy/`, Docker-only).
 2. **One concern, one subproject, smallest possible diff.** These subprojects are
    independent; do not span more than one in a single PR, and no drive-by edits.
    Diff size is inversely proportional to approval.
-3. **Stay in your lane** (see "Lanes"). If two routines touch the same files, one
-   PR gets closed. Don't fix something another lane owns.
-4. **Don't commit to `main`.** Branch off `main`, open a PR.
+3. **Keep file sets disjoint.** If concurrent agents or workflows touch the same
+   files, one change gets clobbered or conflicts. Don't fix things outside your
+   task scope.
+4. **Branch off `main` for PRs.** Don't push to `main` unless the user directs it.
 5. **Do not upgrade `jest` or `jest-environment-jsdom`.** They are pinned to v29
    on purpose; v30/v26 break the `window.location` mocking used across the
    `adblock` suite (rationale in "Jest & jsdom version pin" below). A
    dependency bump that touches these will be closed.
-6. **Don't add dependencies or change build/lint/test config** unless your lane
-   explicitly allows it. No new npm or pip packages, no edits to `package.json`
-   scripts, `eslint.config.cjs`, `pyproject.toml`, or the Makefile, except where a
-   lane names them.
+6. **Dependency and build-config discipline.** Do not add dependencies or change
+   build/lint/test config without explicit task need. No gratuitous npm or pip
+   packages, and no unrequested edits to `package.json` scripts, `eslint.config.cjs`,
+   `pyproject.toml`, or the Makefile.
 7. **Don't write a command/example you haven't actually run this session.** Verify
    behaviour; don't infer it from a name or a target label.
 8. **Check open and recently-closed PRs before you start, and don't repeat them.**
    Run `python3 tools/prior_prs.py` (lists number, state, labels, title;
-   `--stats` prints per-lane accept rates). A closed PR
+   `--stats` prints bot accept rates). A closed PR
    was closed for a reason; an open one already claims that work. Pick something new.
 9. **No stream-of-consciousness in the diff.** Your reasoning stays out of
    committed code: no thinking-out-loud comments ("Wait, ...", "Ah, ..."), no
@@ -85,12 +79,12 @@ eBPF (`vps_kernel_proxy/`, Docker-only).
     commits by `tools/check_bot_pr_hygiene.py` (`make bot-pr-check`, part of
     `make precommit`, plus the "Reject bot PR hygiene violations" step in
     `ci.yml`): the gate fails on bot commits that are empty, add zero-content
-    files, or delete lines from test files — bot lanes are append-only in
-    tests (Testpilot owns `__tests__/` and `tests/`). It also fails on stray
-    bot artifacts (`pr_body.txt`, `*.log`, `*_output.txt` / `*_out.json`
-    verification-run dumps, scratch/temp files, `*.diff` / `*.patch`) — the sibling
-    fund repo's PR #695 shipped ~6 MB of `eslint_out.json` that the patterns then
-    missed; PR #212 shipped a 158-line `patch.diff`.
+    files, or delete lines from test files — bot changes are append-only in
+    tests. It also fails on stray bot artifacts (`pr_body.txt`, `*.log`,
+    `*_output.txt` / `*_out.json` verification-run dumps, scratch/temp files,
+    `*.diff` / `*.patch`) — the sibling fund repo's PR #695 shipped ~6 MB of
+    `eslint_out.json` that the patterns then missed; PR #212 shipped a 158-line
+    `patch.diff`.
     **Publish as a single commit by default.** Commit the finished change once,
     run the gate on that exact tree, then push; on any revision, amend or
     squash (`git reset --soft $(git merge-base origin/main HEAD) && git commit`)
@@ -131,9 +125,9 @@ hardware, open the PR as **draft** and say so.
 Make the approve decision take ten seconds. Every PR description must include:
 
 - **What & why** — one or two sentences.
-- **Lane & subproject** — which routine/lane, and which subproject.
+- **Subproject** — which subproject (e.g. `adblock`, `nas_proxy`, `retriever`, etc.).
 - **Verification** — the exact command(s) you ran and their result, pasted:
-  `make precommit` green, or the scoped proof for your lane (a before/after
+  `make precommit` green, or the scoped proof for your change (a before/after
   coverage number, a strict-error count, a measurement).
 - **Live/hardware?** — "fully covered by tests" or "needs human/hardware review
   (draft)."
@@ -162,8 +156,7 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   `test`, `docs`, `chore`, `build`, `ci`; scope is the subproject or area
   (`adblock`, `nas_proxy`, `retriever`, `vps_kernel_proxy`, `nas_tools`,
   `types`, `deps`); summary imperative, lower-case, no trailing period, ≤ 72 chars.
-- **No emoji, and no routine-name prefix in the subject.** Routine attribution
-  rides on the `Co-authored-by: google-labs-jules[bot]` trailer.
+- **No emoji, and no routine-name prefix in the subject.** Keep the subject clean.
 - **Body**: wrap at ~72 cols; explain what and why. State severity, metrics, or
   measurements here, not in the subject.
 
@@ -177,14 +170,14 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
 | JS lint / format                         | `make lint` / `make fmt-check`           |
 | Dependency-structure gate (JS)           | `make depcheck`                          |
 | Stream-of-consciousness gate             | `make thinking-check`                    |
-| Bot PR hygiene gate (Jules commits)      | `make bot-pr-check`                      |
+| Bot PR hygiene gate (bot commits)        | `make bot-pr-check`                      |
 | Jest with coverage (floor-gated)         | `make test`                              |
 | Python tests + coverage (floor-gated)    | `make test-py`                           |
-| JS type-check (JSDoc, non-blocking)      | `make type`                              |
+| JS type-check (JSDoc, blocking)          | `make type`                              |
 | Mutation smoke, JS / Python (non-gated)  | `make mutate-js` / `make mutate-py`      |
-| Rank least-covered files (Testpilot)     | `python3 bin/coverage_rank.py --limit 5` |
+| Rank least-covered files                 | `python3 bin/coverage_rank.py --limit 5` |
 | Worktree snapshot guard (unchanged tree) | `python3 tools/gate_guard.py snapshot`   |
-| Prior PRs / Jules lane accept rates      | `python3 tools/prior_prs.py [--stats]`   |
+| Prior PRs / bot accept rates             | `python3 tools/prior_prs.py [--stats]`   |
 | Scoped Jest while iterating              | `npx jest <path>`                        |
 | Pull an extension (retriever)            | `make pull ID=<extension_id>`            |
 | Regenerate / drift-check Claude commands | `python3 tools/sync_commands.py`         |
@@ -199,6 +192,8 @@ subject, so the **PR title must be a valid Conventional Commit subject**.
   `complexity` errors above 20 with `eslint-suppressions.json` baselining legacy
   violations. All legacy violations have been eliminated (`{}`); the baseline is
   now frozen at 0. Any new suppression or count increase fails `bot-pr-check`.
+  Radon targets can be surveyed via `python3 -m radon cc nas_proxy retriever vps_kernel_proxy nas_tools bin -s -n B`,
+  and JS warnings via `npx eslint . --rule '{"complexity": ["warn", 10]}'`.
   `xenon` freezes Python's complexity ranks (`--max-average A --max-modules C
 --max-absolute C` over the `make test-py` source dirs). Never raise the
   ceilings or hand-edit the suppressions file.
@@ -265,11 +260,11 @@ detection. Zero-baseline and purely preventive. Detector mechanics:
 `tools/check_bot_pr_hygiene.py` over bot-authored commits in
 `origin/main..HEAD`, enforcing non-negotiable #11: no empty commits, no
 zero-content files, no deleted test lines (`__tests__/`, `tests/`,
-`test_*.py`, `*.test.js` — bot lanes are append-only in tests), no stray
+`test_*.py`, `*.test.js` — bot changes are append-only in tests), no stray
 bot artifacts (`pr_body.txt`, `*.log`, `*_output.txt`, scratch/temp files),
 and no complexity ratchet
-violations (no added suppressions in `eslint-suppressions.json`; only Architect
-may touch it to prune). Human-authored commits are skipped. Full rules and
+violations (no added suppressions in `eslint-suppressions.json`; only a
+complexity-reduction change may prune it). Human-authored commits are skipped. Full rules and
 history: `docs/gates.md`.
 
 ### Mutation testing (NON-BLOCKING scaffold)
@@ -308,12 +303,12 @@ three-extension set (87.42/81.18/85.96/87.35; adblock alone measured
 a ratchet against regression, not a target — raising a floor is a deliberate
 Testpilot PR, lowering one is a red flag. New JS extensions are added to
 `collectCoverageFrom` when created so their gaps stay visible to
-`bin/coverage_rank.py` (and therefore to Testpilot); the floor absorbs them
+`bin/coverage_rank.py`; the floor absorbs them
 because it is set on the aggregate.
 
 **`make precommit` runs `fmt-check` (`prettier --check .`) first, and it scans
 the whole tree.** Generated output dirs are excluded via `.prettierignore`
-(`coverage/`, `.pytest_cache/`, `nas_proxy/out/`, `.jules/`). If you add a
+(`coverage/`, `.pytest_cache/`, `nas_proxy/out/`). If you add a
 reporter that writes files to disk (e.g. an html/lcov coverage reporter) or any
 new generated dir, add it to `.prettierignore` or the gate fails on a non-source
 file — a confusing `fmt-check Error 1` that looks like a formatting bug but
@@ -430,15 +425,45 @@ hygiene notes live in `docs/ci-gotchas.md`.
   when assigning or retrieving dynamic, un-typed properties. This satisfies both
   ESLint and `make type` without requiring verbose casting.
 
-### Jules routine harnesses
+### Test coverage and typing harnesses
 
-- **Testpilot** ranks least-covered files with `python3 bin/coverage_rank.py`
+- **Coverage ranking:** Rank least-covered files with `python3 bin/coverage_rank.py`
   (auto-detects Jest `coverage-summary.json` vs coverage.py JSON; tested in
-  `bin/__tests__/test_coverage_rank.py`, run by `make test-py`).
-- **Typist** drove `make type` toward zero errors via JSDoc on
-  first-party JS (`adblock/*.js`). The harness — `typescript` +
-  `@types/chrome` dev-deps and `jsconfig.json` — is
-  complete and strictly blocking in `make type` and `make precommit` (see `.jules/typist.md`).
+  `bin/__tests__/test_coverage_rank.py`, run by `make test-py`). Machine-readable
+  reports can be generated via `npx jest --coverage --coverageReporters=json-summary --coverageReporters=text`
+  (JS) or `python3 -m coverage json -o coverage/coverage.json` after `make test-py` (Python).
+- **JS strict-typing via JSDoc:** `make type` runs through `jsconfig.json` (`checkJs`,
+  `allowJs`, `noEmit`, `"strict": true`) over first-party JS (`adblock/*.js`).
+  The Chrome extension API is typed via `@types/chrome`.
+
+### Performance & Stack Reality
+
+- **Stack reality:** This repo is not a typical web or backend app — no bundler, no JS
+  build step, no SQL database, and no pandas/dataframe code in Python.
+- **Hot surfaces:**
+  - `nas_proxy` C (`conn_pool.c`, etc.): connection-pooling proxy and tile cache.
+    Cost center is per-request `malloc`/`memcpy`. Avoid redundant copies; reuse
+    pooled structures.
+  - `adblock/*.js` content scripts: `MutationObserver` callbacks fire on live DOM
+    mutations. Hoist invariant `querySelector` calls and compiled `RegExp` out of
+    callbacks; early-return when mutations cannot match; debounce/throttle high-frequency
+    feeds.
+  - `nas_tools`/`retriever`/`vps_kernel_proxy` Python: small CLI/monitor scripts.
+    Avoid repeated file reads or redundant subprocess calls; cache with
+    `functools.lru_cache` where appropriate; prefer set/dict lookups over linear scans.
+- **Anti-patterns:** Do not inline `.forEach` into `for` loops in monolithic functions
+  (aggregates branch conditions and trips the complexity ratchet > 20). Do not
+  micro-optimize tiny DOM collections (0-5 elements) at the expense of readability.
+
+### Dead code removal and reference searches
+
+- **Mandatory reference search:** Before removing symbols, functions, or files, search
+  with `git grep -n <target>` across **all** tracked files (including `.md`, `.sh`,
+  `.yml`, `Makefile`, `.agents/`, `.js`, `.py`, `.c`/`.h`).
+- A symbol or script is NOT dead code if it is referenced in markdown documentation,
+  skill workflows, shell scripts, or CI configs. Re-exported public APIs, `background.js`
+  message listeners, CLI entry points, and script utilities referenced by agent workflows
+  are not dead just because tests or doc workflows are the only in-repo caller.
 
 ### Shipping multiple open PRs
 
@@ -512,58 +537,16 @@ re-anchor working memory directly from authoritative ground truth (`git status`,
 - **Skill schema validation:** `tools/__tests__/test_skills.py` (run by `make test-py`)
   enforces schema validity, non-empty descriptions, directory-name matching, and
   symlink resolution across all skills.
-- **Jules scheduled routines (unattended)** are a separate system from the
-  interactive skills above: their shared contract is this file and their
-  per-routine personas live in `.jules/<name>.md` (currently `testpilot`,
-  `typist`, `janitor`, `architect`, `bolt`).
-- **Keep the scheduled-task UI prompt generic.** A stale task-specific prompt is
-  worse than the generic one: Typist's schedule once kept an old goal after it
-  was done and produced zero-file PRs the owner had to close by hand (#75, #78).
-  With a generic invocation the persona decides what work exists; with a stale
-  goal the routine satisfies it vacuously and still publishes the empty PR. If a
-  lane is finished, pause its schedule — don't leave a satisfied goal running.
 
-## Lanes (keep PRs disjoint to avoid collisions)
+## Quality gates summary
 
-| Routine   | Owns                                                                                                         | Must NOT touch                                    |
-| --------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
-| Sentinel  | security + error-handling (proxy/SSRF, C memory safety, secrets, silent catches, jsdom unhandled exceptions) | complexity refactors, perf, tests as a feature    |
-| Testpilot | test-only additions/coverage across Jest and pytest                                                          | production source under any subproject            |
-| Architect | behaviour-preserving complexity/readability refactors                                                        | error-handling, security, tests, features         |
-| Janitor   | dead code, stale deps, real TODOs within subprojects                                                         | tools/, bin/, docs, .jules/, complexity, Jest pin |
-| Bolt      | one measurable performance/efficiency win per run                                                            | complexity-only refactors, security, dead code    |
-| Typist    | incremental JS strict-typing via JSDoc on `adblock/*.js`                                                     | runtime logic, tests, Python, C                   |
-
-If your finding belongs to another lane, **skip it** — that lane will get it.
-
-> **Enforcement note:** cyclomatic complexity **is** machine-gated — ESLint
-> `complexity: ['error', { max: 20 }]` with the legacy violations baselined in
-> `eslint-suppressions.json`, and `xenon` freezing Python's ranks in `make lint`
-> (see "Complexity ratchet" above). So is the JS dependency-structure gate
-> (`make depcheck`, wired into `make lint` — see "Dependency-structure gate"
-> above). Whole-suite coverage **is** gated — a global Jest
-> `coverageThreshold` (94/85/94/94) and pytest `--cov-fail-under=94`, both
-> ~1 point under the day-one measurement (see "Coverage reports" above).
-> Bot-authored commit hygiene **is** machine-gated too (`make bot-pr-check`,
-> in `make precommit` and CI — see "Bot PR hygiene gate" above). The JS
-> type-check (`make type`) is **blocking**. The Testpilot targets are therefore
-> judgment-guided, not machine-gated. Your real gate is a green `make precommit`
-> plus the scoped proof your lane requires.
-
-## `.jules/` personas — editing rules
-
-The files in `.jules/<name>.md` are **persona definitions** for the unattended
-Jules routines: they encode identity, lane, and constraints, read at the start of
-an unattended run. They are **not logs**.
-
-- **Unattended Jules routines** must treat `.jules/` as read-only. They may **not**
-  append to, modify, or create files under `.jules/`. A PR from a Jules routine
-  that changes a `.jules/` file is out of scope and will be closed.
-- **Interactive coding agents** (Claude Code, Kimi, etc.) **may** edit `.jules/`
-  persona files whenever they spot a harness bug or unclear guidance — no
-  explicit user direction needed; the user reviews the result. The change must
-  still be a single-concern PR with a green `make precommit`, and the agent must
-  note in the PR body that the edit is to a persona file.
-
-Capture durable learnings in this file or `docs/` instead of leaving the persona
-files as the only source of truth.
+- **Cyclomatic complexity** is machine-gated: ESLint `complexity: ['error', { max: 20 }]`
+  with legacy violations baselined in `eslint-suppressions.json` (frozen at 0), and
+  `xenon` freezing Python's ranks in `make lint` (`--max-average A --max-modules C --max-absolute C`).
+- **Dependency structure:** `make depcheck` (wired into `make lint`) prevents circular
+  dependencies and production imports of tests.
+- **Whole-suite coverage floor:** Global Jest `coverageThreshold` in `package.json`
+  (statements/lines 86, branches 80, functions 85) and pytest `--cov-fail-under=94` in `make test-py`.
+- **Bot commit hygiene:** `make bot-pr-check` (in `make precommit` and CI) enforces
+  non-negotiable #11 on bot commits.
+- **JS type-check:** `make type` is blocking (`npx tsc -p jsconfig.json --noEmit`).

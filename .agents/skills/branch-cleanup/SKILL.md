@@ -65,7 +65,7 @@ git diff origin/main...<ref> --stat
 Decide one of three outcomes per branch:
 
 - **Already on main** — the net diff is empty or every hunk is superseded by
-  current `main` (common for stale Jules/bot PRs; see the bot-pr-rescue skill's
+  current `main` (common for stale bot PRs; see the bot-pr-rescue skill's
   duplicate check). Delete like step 2, noting the evidence.
 - **Worth merging** — the diff adds real value and is not superseded. Salvage
   it with the **ship skill's branch mode**: squash-merge into `main`, run

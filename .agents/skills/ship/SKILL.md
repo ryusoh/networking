@@ -8,14 +8,12 @@ argument-hint: '<branch_name>'
 
 Ship a completed branch, or ship uncommitted changes from the primary branch.
 
-## Audience check (read `AGENTS.md` first)
+## Working mode (read `AGENTS.md` first)
 
-- **Unattended Jules routines** must branch off the primary branch, open a PR,
-  and never push to the primary branch directly.
-- **Interactive coding agents** (Claude Code, Kimi, etc.) work with the user.
-  If the user says "ship it" while you are on the primary branch with
-  uncommitted changes, commit and push directly. Do not force a branch/PR
-  workflow unless the user asks for one.
+Interactive coding agents (Claude Code, Kimi, Antigravity, etc.) work directly
+with the user in a chat session. If the user says "ship it" while you are on the
+primary branch with uncommitted changes, commit and push directly when
+requested. Do not force a branch/PR workflow unless the user asks for one.
 
 ## Branch mode (when `<branch_name>` is given)
 

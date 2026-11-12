@@ -51,11 +51,10 @@ thinking-check:
 	@$(PY) tools/check_thinking_comments.py
 
 # Bot PR hygiene gate (AGENTS.md non-negotiable #11): deterministic check that
-# every Jules-bot-authored commit in origin/main..HEAD is real — no empty
+# every bot-authored commit in origin/main..HEAD is real — no empty
 # commits, no zero-content placeholder files, no deletions in test files (bot
-# lanes are append-only in tests; Testpilot owns __tests__/ and tests/).
-# Wording alone did not stop the empty Typist PRs (#75, #78) or the anki
-# repo's PR #494 churn commits; this fails the gate instead. Human commits are
+# lanes are append-only in tests). Wording alone did not stop empty bot PRs
+# (#75, #78) or churn commits; this fails the gate instead. Human commits are
 # skipped. Detector: tools/check_bot_pr_hygiene.py (tests in tools/__tests__/,
 # run by test-py). Check-only: precommit-fix runs the same check.
 bot-pr-check:
@@ -107,8 +106,8 @@ mutate-js:
 mutate-py:
 	$(PY) -m mutmut run
 
-# JS strict-typing via JSDoc (Typist lane). Blocking: `make type` gates once the
-# included first-party JS is clean (see .jules/typist.md).
+# JS strict-typing via JSDoc. Blocking: `make type` gates once the
+# included first-party JS is clean.
 type:
 	@npx tsc -p jsconfig.json --noEmit
 

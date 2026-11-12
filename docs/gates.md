@@ -14,7 +14,7 @@ dependencies, fully resolved — no `couldNotResolve`), so no baseline was
 needed; the gate is purely preventive. Probe-tested: a prod→test import fails
 the gate; `git restore` returns green. This
 wiring was done by an interactive agent explicitly directed to change
-build/lint config (non-negotiable #6 binds Jules routines, not interactive
+build/lint config (non-negotiable #6 binds automated bot routines, not interactive
 agents).
 
 - **No alias config, on purpose:** this repo has no path aliases (no import
@@ -50,7 +50,7 @@ test) — fixed in place, no baseline needed; the gate is purely preventive.
 Probe-tested: a thinking comment plus an abandoned `pass`-only test appended
 to a tracked file fails the gate; `git restore` returns green. This wiring was
 done by an interactive agent explicitly directed to change
-build/lint config (non-negotiable #6 binds Jules routines, not interactive
+build/lint config (non-negotiable #6 binds automated bot routines, not interactive
 agents).
 
 ## Bot PR hygiene gate (`make bot-pr-check`)
@@ -63,12 +63,12 @@ Typist PRs (#75, #78) here, the sibling anki repo's PR #494 (test deletions / du
 files), or PR #178 (complexity ratchet suppression and committed pr_body.txt), so the
 gate fails on bot commits that: change no files (empty commit), touch a file with zero
 content lines (the placeholder/dummy pattern), delete lines from a test file — test
-paths are `__tests__/` and `tests/` dirs, `test_*.py`, and `*.test.js`; bot lanes are
-append-only in tests (Testpilot owns them), commit stray bot artifacts (e.g.
+paths are `__tests__/` and `tests/` dirs, `test_*.py`, and `*.test.js`; bot commits
+are append-only in tests, commit stray bot artifacts (e.g.
 `pr_body.txt`, scratch/temp files, `*.log` or `*_output.txt` / `*_out.json` verification-run
 dumps — the sibling fund repo's PR #692 shipped a 474-line `verify_output.txt` and its
-PR #695 shipped ~6 MB of `eslint_out.json`), or touch `eslint-suppressions.json` from a
-non-refactor lane or increase suppressions (complexity ratchet violation). Human-authored
+PR #695 shipped ~6 MB of `eslint_out.json`), or touch `eslint-suppressions.json` without
+refactoring or increase suppressions (complexity ratchet violation). Human-authored
 commits are skipped: interactive agents may legitimately rewrite tests on request. CI
 runs the same check on every PR (the "Reject bot PR hygiene violations" step in `ci.yml`,
 next to the empty-PR guard; the checkout uses `fetch-depth: 0` so the branch commits are
@@ -78,7 +78,7 @@ repos in `tmp_path`, run by `make test-py`). Probe-tested: a bot-authored
 empty commit fails the wired gate and a clean range passes it, with exit-code
 propagation through `make` verified on a synthetic fixture repo. This wiring
 was done by an interactive agent explicitly directed to change
-build/lint config (non-negotiable #6 binds Jules routines, not interactive
+build/lint config (non-negotiable #6 binds automated bot routines, not interactive
 agents).
 
 ## Mutation testing (NON-BLOCKING scaffold)
@@ -107,3 +107,22 @@ scores are signal for humans, not thresholds.
   are git- and prettier-ignored; delete them freely, they regenerate.
 - `mutmut` is pinned in `requirements-dev.txt`, so it is also present in the
   `Dockerfile.precommit` image (installed, never run by the gate).
+
+## Jules retirement note
+
+- **Cutoff:** Jules sessions could finish through 2026-11-11; the product is
+  read-only until it winds down on 2026-12-31.
+- **Final Jules-era revision:** `990e3d6` — the last commit whose tree still
+  contains `.jules/` personas (`architect`, `bolt`, `janitor`, `testpilot`, `typist`).
+  Recover any of them with `git show 990e3d6:<path>`.
+- **Replacement workflow:** interactive agents (Antigravity, Claude Code, Kimi, Cursor)
+  per `AGENTS.md` and the shared skills in `.agents/skills/`. No persona was
+  ported; recreate one only for a concrete recurring workflow.
+- **Drain state at cleanup:** no open pull requests (`gh pr list --state open`
+  returned none on 2026-11-12).
+- **Knowledge migrated:** Stack realities, performance anti-patterns, and
+  dead-code reference search discipline migrated to `AGENTS.md` and `docs/`;
+  remaining persona content (dated incidents, routine mechanics) stays in Git history.
+- **Retained tooling:** `tools/check_bot_pr_hygiene.py` (`make bot-pr-check` in CI),
+  `tools/prior_prs.py`, `tools/gate_guard.py`, `tools/check_thinking_comments.py`,
+  and the `bot-pr-rescue` skill (stale persona references removed).
