@@ -14,8 +14,8 @@ dependencies, fully resolved — no `couldNotResolve`), so no baseline was
 needed; the gate is purely preventive. Probe-tested: a prod→test import fails
 the gate; `git restore` returns green. This
 wiring was done by an interactive agent explicitly directed to change
-build/lint config (non-negotiable #6 binds automated bot routines, not interactive
-agents).
+build/lint config (non-negotiable #6 permits this explicitly requested build/lint
+change).
 
 - **No alias config, on purpose:** this repo has no path aliases (no import
   map, no `jsconfig.json` `paths`, no bare specifiers). If aliases are ever
@@ -50,8 +50,8 @@ test) — fixed in place, no baseline needed; the gate is purely preventive.
 Probe-tested: a thinking comment plus an abandoned `pass`-only test appended
 to a tracked file fails the gate; `git restore` returns green. This wiring was
 done by an interactive agent explicitly directed to change
-build/lint config (non-negotiable #6 binds automated bot routines, not interactive
-agents).
+build/lint config (non-negotiable #6 permits this explicitly requested build/lint
+change).
 
 ## Bot PR hygiene gate (`make bot-pr-check`)
 
@@ -78,8 +78,8 @@ repos in `tmp_path`, run by `make test-py`). Probe-tested: a bot-authored
 empty commit fails the wired gate and a clean range passes it, with exit-code
 propagation through `make` verified on a synthetic fixture repo. This wiring
 was done by an interactive agent explicitly directed to change
-build/lint config (non-negotiable #6 binds automated bot routines, not interactive
-agents).
+build/lint config (non-negotiable #6 permits this explicitly requested build/lint
+change).
 
 ## Mutation testing (NON-BLOCKING scaffold)
 

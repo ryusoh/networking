@@ -301,7 +301,7 @@ Jest floor sits ~1 point under the day-one measurement over the widened
 three-extension set (87.42/81.18/85.96/87.35; adblock alone measured
 95.08/86.27/95.61/95.04 when the scope was adblock-only), so the gate is
 a ratchet against regression, not a target — raising a floor is a deliberate
-Testpilot PR, lowering one is a red flag. New JS extensions are added to
+coverage-policy change, lowering one is a red flag. New JS extensions are added to
 `collectCoverageFrom` when created so their gaps stay visible to
 `bin/coverage_rank.py`; the floor absorbs them
 because it is set on the aggregate.
