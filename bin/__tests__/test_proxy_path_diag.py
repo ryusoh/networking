@@ -161,3 +161,23 @@ def test_verdict_real_dns_and_failure_is_proxy_path():
 def test_main_usage_error_without_args(capsys):
     assert ppd.main(["proxy_path_diag.py"]) == 2
     assert "usage" in capsys.readouterr().err.lower()
+
+
+def _geo_run(stdout, returncode=0):
+    return subprocess.CompletedProcess(args=[], returncode=returncode,
+                                       stdout=stdout, stderr="")
+
+
+def test_exit_geo_parses_success(monkeypatch):
+    monkeypatch.setattr(ppd.subprocess, "run",
+                        lambda *a, **k: _geo_run('{"status":"success","countryCode":"US","query":"1.2.3.4"}'))
+    assert ppd.exit_geo("http://127.0.0.1:1082") == {"country": "US", "ip": "1.2.3.4"}
+
+
+def test_exit_geo_none_on_failure(monkeypatch):
+    monkeypatch.setattr(ppd.subprocess, "run",
+                        lambda *a, **k: _geo_run('{"status":"fail"}'))
+    assert ppd.exit_geo("http://127.0.0.1:1082") is None
+    monkeypatch.setattr(ppd.subprocess, "run",
+                        lambda *a, **k: _geo_run("not json"))
+    assert ppd.exit_geo("") is None

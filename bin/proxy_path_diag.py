@@ -136,6 +136,33 @@ def discover_proxies():
     return found
 
 
+EXIT_GEO_URL = "http://ip-api.com/json/?fields=status,countryCode,query"
+
+
+def exit_geo(proxy, timeout=12):
+    """Egress IP geolocation seen through proxy (ip-api.com).
+
+    Returns {country, ip} or None when the lookup failed — the lookup host
+    itself may be unreachable through a sick node, which is signal too.
+    """
+    cmd = ["curl", "-sS", "-m", str(timeout), EXIT_GEO_URL]
+    if proxy:
+        cmd += ["-x", proxy]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 5)
+    except subprocess.TimeoutExpired:
+        return None
+    if out.returncode != 0:
+        return None
+    try:
+        data = json.loads(out.stdout)
+    except ValueError:
+        return None
+    if data.get("status") != "success":
+        return None
+    return {"country": data.get("countryCode"), "ip": data.get("query")}
+
+
 def probe(url, proxy, connect_timeout=CONNECT_TIMEOUT, total_timeout=TOTAL_TIMEOUT):
     """curl one URL, optionally through proxy; return a timing/status dict.
 
@@ -224,6 +251,13 @@ def main(argv):
         print("  %s: %s" % (label, url))
 
     proxy = proxies[0][1] if proxies else ""
+    if proxy:
+        geo = exit_geo(proxy)
+        if geo:
+            print("exit: %s (%s)" % (geo["country"], geo["ip"]))
+        else:
+            print("exit: (geo lookup failed through this proxy)")
+
     print("== probes via %s ==" % (proxy or "direct"))
     results = {}
     for url in paths:
