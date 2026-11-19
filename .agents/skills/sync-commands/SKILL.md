@@ -3,5 +3,6 @@ name: sync-commands
 description: Regenerate .claude/commands (Claude Code) from the canonical .agents/skills sources
 ---
 
-`.agents/skills/` is canonical — edit skills there, never `.claude/commands/`.
-Then execute the sync script: `python3 tools/sync_commands.py`.
+Edit canonical skills in `.agents/skills/<name>/SKILL.md`, regenerate
+`.claude/commands/` with `python3 tools/sync_commands.py`, and confirm freshness
+with `make sync-check`.

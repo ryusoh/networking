@@ -6,201 +6,133 @@ argument-hint: '[workflow run number, run URL, or workflow name]'
 
 Rescue this failed GitHub Actions workflow end to end: **{{args}}**
 
-Invocation explicitly authorizes edits, tests, commits, pushes, PR creation,
-squash merges, workflow dispatches/reruns, and cleanup. Do not ask for further
-confirmation. Stop only for a real blocker such as unavailable authentication,
-missing required secrets, or an upstream outage/vulnerability with no safe
-automated remediation; report that blocker precisely.
+Invocation authorizes the full loop — edits, tests, commits, pushes, PR
+creation, squash merge, workflow dispatch/rerun, and cleanup — without pausing
+for confirmation. Stop only on a real blocker (missing auth/secrets or an
+upstream outage/vulnerability with no safe automated fix) and report it
+precisely.
 
-## 1. Anchor the target and current state
+## 1. Anchor target and state
 
-Re-resolve the run from GitHub rather than trusting a stale page or run title.
-A workflow `run_number` (for example #523) is not the API `run.id`.
+Resolve the run live from GitHub (`run_number` like `#523` differs from the API
+`run.id`). Use authenticated `gh` when available, or public GitHub APIs for
+metadata plus an authenticated browser for logs, PRs, and manual dispatch; keep
+credentials out of command output and URLs.
 
-```bash
-git status --short
-git branch --show-current
-git log --oneline -3
-```
+- Run `git status --short`, `git branch --show-current`, and
+  `git log --oneline -3`.
+- Record workflow path, run number/ID, head SHA/branch, failing jobs/steps, and
+  URL. Compare recent runs across the last-success → first-failure boundary
+  (runtime/dependency versions and error signatures).
+- Read the workflow YAML and governing docs (`AGENTS.md`, `docs/gates.md`,
+  `docs/ci-gotchas.md`).
+- Check overlapping PRs with `python3 tools/prior_prs.py` (or the public pulls
+  API if `gh` is unauthenticated).
 
-- Record the workflow name/path, run number and ID, head SHA/branch, failing
-  jobs/steps, conclusion, and HTML URL.
-- Check recent runs to find the last success and first consecutive failure.
-  Compare dependency/runtime versions and error signatures across that boundary.
-- Read the workflow YAML and the docs governing its gates and runtime
-  constraints (`AGENTS.md`, `docs/gates.md`, `docs/ci-gotchas.md`) before
-  editing.
-- Check open/recently closed PRs for overlapping work. Use
-  `python3 tools/prior_prs.py`; if unauthenticated `gh` makes it fail, query the
-  public pulls API instead.
-- Create a todo list covering diagnosis, fix/regression tests, shipping, fresh
-  workflow execution, and output/state verification. Keep exactly one item in
-  progress.
+## 2. Reproduce before theorizing
 
-Use authenticated `gh` when available. Otherwise use public GitHub APIs for run
-metadata and an authenticated browser for logs, PR creation/merge, and manual
-dispatch. Never print credentials or place API keys in URLs.
+Read the failing step log bottom-up: Actions echoes every shell line in cyan
+(including untaken `if` branches with `echo "::error::..."`), so anchor on the
+step ending in `##[error]Process completed with exit code 1`. Check
+`docs/ci-gotchas.md` for expected benign noise in `make precommit` (such as
+ignored `test-ebpf` or negative-path `curl_easy_perform()` output) and judge by
+exit codes. A fast failure in `ci.yml` usually hits `Reject empty pull request`
+or `Reject bot PR hygiene violations` before `make precommit`; a segfault or
+binary error before the first test print points to native C builds (`-lcurl`,
+architecture mismatch) or imports.
 
-## 2. Establish the failure before theorizing
+Build the tightest deterministic local loop (watch it fail before the fix, pass
+after):
 
-Read the actual failing step log bottom-up. Capture the first actionable error,
-final exit status, runtime/dependency versions, and whether the step started
-producing output. Do not mistake echoed shell text or annotations for the root
-error (Actions echoes `run:` lines in cyan, including `echo "::error::..."`
-branches that did not execute). Also check `docs/ci-gotchas.md` for known
-benign noise in `make precommit` (such as ignored `test-ebpf` errors or expected
-`curl_easy_perform()` negative-path output) and judge by step exit codes. A
-fast failure in `ci.yml` usually hits the PR guards (`Reject empty pull
-request`, `Reject bot PR hygiene violations`) before `make precommit`; a segfault
-or binary error before the first test print points to native C builds (`-lcurl`,
-architecture mismatch) or imports rather than test logic.
+1. Scoped regression test (`npx jest <path>`, `python3 -m pytest <path>`, or
+   `make -C nas_proxy test`).
+2. Direct gate or tool invocation (`make lint`, `make type`,
+   `pip-audit -r requirements-dev.txt`, `python3 tools/check_bot_pr_hygiene.py`).
+3. Clean isolated env matching `requirements-dev.txt` / `package-lock.json`.
+4. Linux/CI-parity container via `make precommit-docker` when macOS host limits
+   (raw-socket permissions, `SIGALRM` timing, Linux headers) diverge from
+   `ubuntu-latest`.
+5. Workflow rerun only when no local seam exists.
 
-Build the tightest deterministic loop that exercises this exact symptom:
+Keep temp venvs and diagnostic logs out of git (delete afterward or write under
+gitignored `coverage/`).
 
-1. scoped regression test at the real call site (`npx jest <path>`,
-   `python3 -m pytest <path>`, or `make -C nas_proxy test`);
-2. direct gate, audit, or tool invocation (`make lint`, `make type`,
-   `pip-audit -r requirements-dev.txt`, `python3 tools/check_bot_pr_hygiene.py`);
-3. clean isolated environment reproducing resolved Node/Python dependency
-   versions (`requirements-dev.txt`, `package-lock.json`);
-4. Linux/CI-parity reproduction via `make precommit-docker` when macOS host
-   constraints (raw-socket permissions, `SIGALRM` timing, Linux headers) differ
-   from `ubuntu-latest`;
-5. workflow rerun only when no local seam exists.
+Classify before editing:
 
-Watch the loop fail before the fix and pass afterward. Keep temporary virtual
-environments, logs, and diagnostic outputs out of git (delete them afterward or
-write logs under `.gitignore`'d `coverage/`). For a difficult diagnosis, rank
-3–5 falsifiable hypotheses before probing; for Linux/CI-only failures, check
-`docs/ci-gotchas.md` and reproduce in `make precommit-docker`.
+- **Repository defect:** minimal root-cause fix + regression test.
+- **Runtime/dependency rollover:** correlate versions at the failure boundary;
+  pin a supported runtime (workflow-local over global when sufficient) or
+  upgrade/replace the incompatible dependency. Keep `jest` and
+  `jest-environment-jsdom` pinned at v29 (`AGENTS.md` #5), and verify action
+  major tags via `gh api` before bumping `uses:`.
+- **Upstream advisory (`pip-audit.yml`):** update `requirements-dev.txt` safely
+  and verify tests/gates; for transient registry/GitHub outages, rerun without
+  inventing code changes or empty PRs.
+- **Validation rejection:** keep coverage floors, complexity ceilings
+  (ESLint/`xenon`), `depcheck`, `thinking-check`, `bot-pr-check`, and
+  `pip-audit` intact; fix the underlying cause.
+- **Red Dependabot/PR check:** reproduce with `npm ci` on the PR lockfile in a
+  worktree (respecting `AGENTS.md` #5), then accept fixer output or exclude the
+  file citing the upstream issue; push an additive commit so Dependabot's
+  signed commit stays intact. When `gh pr edit` hits GraphQL `read:org` scope
+  errors, patch the PR title via
+  `gh api -X PATCH repos/<owner>/<repo>/pulls/<N> -f title="..."`.
 
-Classify the result before changing files:
+## 3. Fix, prove, and ship
 
-- **Repository defect:** fix the smallest root cause and add a regression test.
-- **Runtime/dependency rollover:** correlate the first failure with resolved
-  versions; pin a supported runtime/action or upgrade/replace the incompatible
-  dependency rather than hiding the error. Respect `AGENTS.md` pins (never
-  upgrade `jest` or `jest-environment-jsdom` past v29, and verify action major
-  tags via `gh api` before bumping `uses:`).
-- **Upstream advisory or external service rollover:** for `pip-audit.yml`
-  advisories, update `requirements-dev.txt` safely and verify tests/gates; for
-  transient GitHub/registry outages, rerun without inventing code edits.
-- **Transient GitHub/infrastructure failure with no code defect:** rerun the
-  failed jobs; do not invent a code change or open an empty PR.
-- **Validation rejection:** preserve the gate. Never weaken coverage floors,
-  complexity ceilings (ESLint/`xenon`), `depcheck`, `thinking-check`,
-  `bot-pr-check`, or `pip-audit` checks to obtain green.
+Follow `AGENTS.md` (shared checkout, one concern/subproject on a branch off
+`main`, one Conventional Commit ≤ 72 chars, PR body with What & why /
+Subproject / Verification / Live/hardware?).
 
-## 3. Fix and prove it
+- Prefer structural prevention over prose: runtime/action pins, `.gitignore` +
+  `tools/check_bot_pr_hygiene.py`, or `Makefile` gate checks (keep checks in
+  `Makefile`, not solely in `ci.yml`).
+- Exercise the real recovery path (`make` target, `pip-audit`, or
+  `make precommit-docker` when network/Docker allow), distinguishing mocked
+  tests from live/container evidence.
+- If edits touch `.agents/skills/`, run `python3 tools/sync_commands.py`.
+- Verify the finished tree with `make precommit` (iterate with
+  `make precommit-fix`; use `make precommit-docker` on macOS for CI parity;
+  change something before retrying per `python3 tools/gate_guard.py`). If a
+  local command hits a timeout, finish remaining phases separately and report
+  that explicitly.
+- Push, open a PR (draft only if live browser/hardware review is needed), wait
+  for required checks (`ci.yml`, plus `pip-audit.yml` when triggered; amend and
+  `--force-with-lease` on fixes), then squash-merge and confirm the merged SHA
+  on GitHub.
+- Return to a clean `main` (`git pull --rebase origin main`), keeping any
+  branch or worktree holding unshipped or foreign work.
 
-Make one concern-sized change (scoped to one subproject when applicable) on a
-branch off current `main`. Stage only files owned by this rescue; concurrent
-agents and the user may share the worktree. Never discard foreign changes or use
-destructive git cleanup.
+## 4. Execute on merged `main` and verify post-fix state
 
-For each behavior fix, include a test that fails before and passes after.
-Prefer structural prevention over prose: runtime/action pins, dependency fixes,
-schema checks, or Makefile gate validation (keep checks in `Makefile`, not
-duplicated solely in `.github/workflows/ci.yml`). Avoid global version pins when
-a workflow-local pin fixes the incompatibility with less collateral risk.
+Observe or dispatch the fixed workflow on merged `main` (or the target PR event
+for PR-only workflows like `dependabot-auto-merge.yml` or `claude*.yml` —
+rerunning the old failed SHA only replays the broken state):
 
-Exercise the real recovery path, not just mocks (for example, run the actual
-`make` target, `pip-audit -r requirements-dev.txt`, or `make precommit-docker`
-when credentials/network/Docker allow). Clearly distinguish mocked test coverage
-from live or container execution evidence.
+- **`push` workflows (`ci.yml`, `pip-audit.yml`):** locate the run for the
+  merge commit SHA on `main` and confirm green.
+- **`workflow_dispatch` / scheduled (`mutation.yml`):** dispatch on `main`,
+  resolve the new run from its head SHA, and inspect individual step conclusions
+  for `make mutate-js` and `make mutate-py` (`mutation.yml` sets
+  `continue-on-error: true`, so job status alone is insufficient).
+- Monitor every material stage with bounded backoff; if it fails, loop back to
+  step 2 automatically.
+- Confirm any blocked open PRs (e.g. Dependabot) recover on rerun/rebase, and
+  keep generated outputs (`coverage/`, `adblock/dist/`, `nas_proxy/out/`,
+  `.stryker-tmp/`, `reports/`, `mutants/`, `.mutmut-cache/`, C binaries)
+  untracked.
 
-If the fix touches `.agents/skills/`, run `python3 tools/sync_commands.py` so
-`.claude/commands/` stays in sync.
+## 5. Evidence report
 
-Run `make precommit` (check-only, matching `ci.yml` — use `make precommit-fix`
-while iterating, then re-verify with `make precommit`; on macOS use
-`make precommit-docker` for Linux/CI parity) on the finished tree before opening
-a PR. Remember `python3 tools/gate_guard.py` when retrying a failed gate: do not
-rerun a red gate on an unchanged tree. If a local command exceeds its execution
-cap, complete every remaining phase separately and report exactly that — never
-claim a capped command returned green. Check the final diff for formatter
-damage, scratch artifacts, and unrelated edits.
+The rescue finishes only when the fixed workflow succeeds on the merged fix (or
+target PR event) and step-level outcomes are verified. Clean up temp files — if
+`make precommit-docker` left Linux C binaries in the tree, run
+`make -C nas_tools clean && make -C nas_proxy clean` before host tests —
+re-anchor from `git status` and `git log`, and report:
 
-## 4. Ship without pausing
-
-- Create one real Conventional Commit (no emoji, `<= 72` chars, lower-case
-  scope, no conversational wrappers); do not push empty or no-op commits.
-- Push the branch and open a non-draft PR unless live browser or real hardware
-  review is required.
-- Use a valid Conventional Commit PR title and include **What & why**,
-  **Subproject**, **Verification** (exact commands and results pasted), and
-  **Live/hardware?** status in the body.
-- Wait for all required PR checks (`ci.yml` guards + `make precommit`, and
-  `pip-audit.yml` when triggered). If red, inspect logs, fix on the same branch,
-  rerun `make precommit`, amend/squash into one commit, and force-push with
-  lease.
-- Squash-merge only after required checks pass. Confirm the merged SHA through
-  GitHub rather than inferring success from a button click.
-- Confirm the local tree is clean, switch to `main`, and run:
-
-```bash
-git pull --rebase origin main
-```
-
-Do not delete branches or worktrees while they contain unshipped or foreign work.
-
-## 5. Execute the fixed workflow
-
-Trigger or observe the fixed workflow on merged `main` (or on the target PR
-event for PR-only workflows such as `dependabot-auto-merge.yml` or
-`claude*.yml`); do not treat rerunning the old failed SHA as proof of the fix.
-
-- For `push`-triggered workflows (`ci.yml`, `pip-audit.yml`), locate the run
-  spawned by the merge commit SHA on `main` and record its run number and ID.
-- For `workflow_dispatch` workflows (such as `mutation.yml`), dispatch on
-  `main` and resolve the new run number and ID from its head SHA.
-- Monitor every material stage: checkout/guards, dependency installation,
-  gate/audit/mutation execution, and any automated follow-up action (such as
-  Dependabot formatting pushes or auto-merge). Remember `mutation.yml` sets
-  `continue-on-error: true`, so inspect individual step conclusions rather than
-  trusting overall job status alone.
-
-If this run fails, return to step 2 with its new logs and continue automatically.
-Respect GitHub/registry rate limits and use bounded backoff rather than tight
-polling or retry loops. Do not weaken checks or manually mark a run successful.
-
-## 6. Verify post-fix workflow state and downstream impact
-
-Verify that the workflow's expected outputs and repository invariants hold on
-`main`:
-
-- Confirm `ci.yml` and `pip-audit.yml` are green on the merge commit on `main`.
-- For non-blocking scheduled workflows (`mutation.yml`), confirm both
-  `make mutate-js` and `make mutate-py` steps succeeded and produced valid
-  mutation summaries without unexpected crashes.
-- If the outage blocked open PRs (such as Dependabot PRs waiting on `ci.yml` or
-  `pip-audit.yml`), verify whether affected PR checks recover on rerun/rebase
-  or report which PRs remain blocked.
-- Never hand-edit or commit generated outputs (`.claude/commands/` is generated
-  only by `python3 tools/sync_commands.py`; `coverage/`, `adblock/dist/`,
-  `nas_proxy/out/`, `.stryker-tmp/`, `reports/`, `mutants/`, `.mutmut-cache/`,
-  and compiled C binaries stay untracked/ignored).
-
-## 7. Finish only with evidence
-
-The rescue is incomplete until the fixed workflow has actually succeeded on the
-merged fix (or target PR event) and its step-level outcomes are verified. If an
-external registry, advisory database, or runner limitation prevents full
-recovery, report the exact failing check and remaining blocker rather than
-claiming resolution.
-
-Respond with:
-
-1. root cause and failing step;
-2. code/config fix and regression evidence;
-3. PR number and merge commit;
-4. fresh run number, ID, head SHA, and step-level results;
-5. verified post-fix state or unblocked PRs/outputs;
-6. any external limitation or remaining risk, without guarantees that future
-   third-party outages cannot recur.
-
-Clean up temporary environments and diagnostic files (if `make precommit-docker`
-left Linux C binaries in the tree, run
-`make -C nas_tools clean && make -C nas_proxy clean` before host tests). Update
-the todo list and re-anchor from `git status` and `git log` before reporting
-completion.
+1. Root cause and failing step.
+2. Code/config fix and regression evidence.
+3. PR number and merge commit.
+4. Fresh run number, ID, head SHA, and step-level results.
+5. Verified post-fix state and unblocked PRs/outputs.
+6. Any external limitation or remaining risk.

@@ -5,138 +5,98 @@ description: Automatically generates and ingests 5 high-quality, Chinese-primary
 
 # Autonomous Anki Flashcard Ingestion Skill (/anki)
 
-Executes the complete Anki card generation and ingestion pipeline over
-`research/` courseware, generating 5 high-density, non-duplicate,
-citation-anchored flashcards into the target Anki deck (**金融**).
+Generate and import up to 5 high-density, deduplicated, citation-anchored
+Chinese-primary flashcards from `research/` courseware into the **金融** deck.
 
-## Core rule
+## Core contract
 
-**Code never writes card prose. The LLM authors cards; code only retrieves,
-validates, tracks, and imports.** The generator emits candidate chunks; the
-agent reads them and writes `research/anki_cards.jsonl`; the validator and
-`--import` gate imports.
+**LLM authors card prose; code retrieves, validates, tracks, and imports.**
+`anki_generator.py` emits candidate chunks to `research/anki_candidates.jsonl`,
+you author `research/anki_cards.jsonl`, and the validator, density gate, and
+`--import` command gate what enters Anki.
 
-## Quick execution command
+## Pipeline commands
 
 ```bash
-# 1. Emit candidate chunks (JSONL) — marks chunks as "candidate"
+# 1. Emit candidate chunks (marks chunks "candidate"; checks .anki_coverage.json + AnkiConnect/SQLite dedup)
 python3 tools/research/anki_generator.py --count 5 --deck "金融"
 
-# 2. Read research/anki_candidates.jsonl and author cards to research/anki_cards.jsonl
-#    One JSON object per line: {chunk_id, front, back, tags, citation}
+# 2. Read research/anki_candidates.jsonl in full and overwrite research/anki_cards.jsonl
+#    Schema per line: {chunk_id, front, back, tags, citation}
 
-# 3. Validate structural formatting (hard gate — --import refuses while issues exist)
+# 3. Structural validation (hard gate — --import refuses while issues exist)
 python3 tools/research/anki_card_validator.py research/anki_cards.jsonl
 
-# 4. Evaluate information density against deck baseline (emits research/anki_density_verdicts.jsonl)
+# 4. Density gate against deck baseline (emits research/anki_density_verdicts.jsonl)
 python3 tools/research/anki_density_gate.py --cards research/anki_cards.jsonl
 
-# 5. Reject junk chunks by id (requires --reason CATEGORY)
-python3 tools/research/anki_generator.py --reject-chunk <chunk_id> --reason <CATEGORY>
+# 5. Reject junk chunks in batch (requires --reason CATEGORY)
+python3 tools/research/anki_generator.py --reject-chunk <id1> <id2> --reason <CATEGORY>
 
-# 6. Import reviewed & density-accepted cards via AnkiConnect (marks chunks "imported")
+# 6. Import reviewed, density-accepted cards via AnkiConnect (pass --auto-launch if Anki is closed)
 python3 tools/research/anki_generator.py --import --deck "金融"
+
+# 7. Verify imported notes
+python3 tools/research/anki_import_verifier.py
 ```
 
-`--reason` must be one of:
-`title-slide | metadata-dump | author-block | diagram | ocr-fragment |
-date-stamp | outline | qa-mismatch | duplicate | other`.
+Valid `--reason` categories:
+`title-slide | metadata-dump | author-block | diagram | ocr-fragment | date-stamp | outline | qa-mismatch | duplicate | other`.
 
-## Workflow execution protocol
+## Authoring and batch-loop workflow
 
-### 1. Quality & deduplication check
+1. **Read every candidate in full** (`content` and `citation`). Reject
+   unrescuable junk chunks (`--reject-chunk id1 id2 ... --reason <CATEGORY>` in
+   one call) instead of authoring thin cards.
+2. **Budget regeneration to at most 2 rounds per run.** If round 2 still yields
+   no usable candidates, author cards from the best candidates seen (fewer than
+   5 is fine) or report the region exhausted.
+3. **Mixed keep/reject batches are two-phase:** `--count` refuses while any
+   chunk stays in `"candidate"` or `"pending_import"` status. Author, validate,
+   and `--import` the keepers first, then request `--count <remaining>` for
+   replacements in a fresh batch.
+4. **Enrich brief high-density concepts** with `search_web` when textbook/RFC
+   specifics add concrete mechanism detail.
 
-- Select unvisited chunks using `research/.anki_coverage.json`.
-- Inspect local SQLite `collection.anki2` and active AnkiConnect
-  (`http://127.0.0.1:8765`) to ensure zero title collision.
-  - Enforce the **Quality Gate** (`is_high_quality_chunk`) to reject
-    zero-info outlines, TOC dots, presenter lists, build/test instructions,
-    figure captions, or low-density metadata.
+## Card format and substance contract
 
-### 2. Agent authoring (the only card-writing step)
+Enforced by `anki_card_validator.py` and `anki_density_gate.py`:
 
-- Read every candidate in `research/anki_candidates.jsonl` in full,
-  including its `content` and `citation`.
-  - Author each card as one JSON line in `research/anki_cards.jsonl` with
-    fields: `chunk_id`, `front`, `back`, `tags`, `citation`.
-  - Front must be a real question (not a topic label or paper title). Back
-    must be Chinese-primary HTML with LaTeX `\(...\)` where useful and a
-    line-anchored citation (`[path#Lstart-Lend](file://...)`).
-  - If a candidate is too fragmented to rescue, **reject it** with
-    `--reject-chunk <chunk_id> --reason <CATEGORY>` instead of writing a bad
-    card.
-  - **Batch rejections and budget the loop.** Reject ALL junk from a round in
-    ONE call — `--reject-chunk id1 id2 id3 --reason <CATEGORY>` accepts
-    multiple ids. Then regenerate. **At most 2 regeneration rounds per run**:
-    if round 2 still yields no usable candidates, stop regenerating — author
-    cards from the best candidates seen (fewer than 5 is acceptable) or
-    report that the region is exhausted. Never loop reject→regenerate more
-    than twice; each round costs a full review and the loop otherwise burns
-    the whole session's quota on junk regions.
-  - **Partial rejection does not unblock regeneration.** Rejecting some
-    candidates leaves the keepers in `"candidate"` status, and the generator
-    still refuses `--count` while any chunk is unresolved. So a mixed batch
-    is a two-phase flow: author + validate + import the keepers first, then
-    run `--count <remaining>` for replacements and author a second
-    `anki_cards.jsonl` batch.
+- **Mechanism-first technical substance:** explain concrete engineering
+  mechanisms — state transitions, message flows, packet headers/bitfields,
+  algorithm steps, LaTeX formulas (`\(...\)`), complexity `O(...)`, hardware
+  architectures, or quantitative trade-offs. Skip definitional fluff, survey
+  bullets, or open-ended taxonomy prompts ("什么是上下文感知？"); reject
+  shallow outline chunks (`--reason outline`) or enrich with primary specs.
+- **Front:** `<strong>中文概念</strong>: 具体机制问题？` — Chinese concept title
+  plus a concrete mechanism question (e.g.
+  `<strong>TCP 拥塞控制</strong>: TCP Reno 在快速恢复阶段收到重复 ACK 时如何调整 \(cwnd\)？`).
+  English in the title is restricted to acronyms, single-token standard names
+  (`FFT`, `CSMA/CD`, `Dijkstra`), or acronym expansions
+  (`WSN (Wireless Sensor Network)`). Multi-word translated glosses
+  (`(Analytic Deployment Problem)`) fail validation; default to pure Chinese.
+- **Back:** at least 2 dense sections (ideally 3+), each headed by
+  `<b>section name:</b>`, in Chinese prose with `<b>` highlighting key Chinese
+  terms.
+- **English annotations (cap = 2 per back):** add English parentheticals only
+  for acronym expansions (exempt from the cap) and rare specialized terms with
+  no settled Chinese rendering (`时谐场 (time-harmonic field)`). Omit basic
+  vocabulary (`latency`, `deadline`, `aggregation`, `overhead`).
+- **Acronyms:** expand every acronym on first use anywhere on the card via an
+  English parenthetical whose word initials subsequence-match
+  (`GPS (Global Positioning System)` — Chinese parentheticals do not match).
+  Only `COMMON_ACRONYMS` in `anki_card_validator.py` (TCP, DNS, GSM, LTE, WiFi,
+  GPS, ...) are exempt; coinages like `LBS`, `LPWAN`, `DIKW` require expansion.
+  Prefer Chinese over hyphenated Latin tokens (`cell-ID` extracts a bare `ID` →
+  write `蜂窝小区标识`).
+- **Citation:** end the back with `源码与文档引用 (Source Citation):` and a
+  line-anchored link `[path#Lstart-Lend](file://...)`.
+- **Tags (`CANONICAL_TAGS` in `tools/research/anki_card_validator.py`):**
+  `research` + flat course code (`cs231`/`cs232`/`cs233`/`cs234`) + 0–2
+  canonical concept tags (`tcp`, `routing`, `congestion_control`,
+  `distributed_systems`, `consensus`, ...).
 
-#### Card format & substance contract (enforce on every card)
-
-The validator and density gate enforce these rules; the import refuses cards that violate
-them. Author cards to this density target:
-
-- **Technical Substance & Mechanism-First (Mandatory):**
-  - Every card must explain a **concrete engineering mechanism**: state machine transitions, message sequence flows, packet headers/bitfields, algorithm steps, mathematical formulas ($\LaTeX$), asymptotic complexity $O(...)$, hardware architectures, or quantitative trade-offs.
-  - **Ban on Definitional Fluff:** Never write cards that merely state general taxonomy classifications, dictionary definitions, marketing bullet points, or broad goals (e.g. _"减轻用户认知负荷"_, _"自动执行规则"_, _"根据环境配置系统"_). If a candidate chunk is a shallow slide bullet or survey outline without concrete mechanisms, **reject it immediately** (`--reject-chunk <id> --reason outline`) or enrich it with technical specifics from the textbook/paper via `search_web`.
-  - **Question Design:** The front question must ask about a concrete mechanism or quantitative property (e.g. _"<strong>TCP 拥塞控制</strong>: TCP Reno 在快速恢复阶段收到重复 ACK 时如何调整 \\(cwnd\\)？"_, _"<strong>Paxos 决议</strong>: Proposer 收到多数派 Promise 响应后如何选取提案值 \\(v\\)？"_), never an open-ended survey question (_"什么是上下文感知？"_, _"上下文应用有哪些目标？"_).
-- **Front:** `<strong>中文概念</strong>: 具体机制问题？` — a Chinese title plus a
-  concrete question. English in the title is limited to **acronyms and
-  single-token standard names** (`FFT`, `CSMA/CD`, `Dijkstra`) or acronym
-  expansions (`WSN (Wireless Sensor Network)`). **Multi-word English glosses
-  are machine-banned** (`Front title carries a multi-word English gloss`) —
-  phrases like `(Analytic Deployment Problem)` or `(IoT Analytics Knowledge
-Hierarchy)` are translated titles, not terminology, even when the words
-  come from the source slides. When in doubt, the title is Chinese-only.
-- **Back:** at least 2 dense sections (the validator gate), ideally 3 or
-  more, each introduced by a `<b>section name:</b>` header. Write the body in
-  Chinese prose; use `<b>` to emphasize key **Chinese** terms. Do not append
-  English glosses.
-- **English annotations (machine-gated, cap = 2 per back):** annotate a term
-  in English ONLY if a domain reader would not already know it — i.e.
-  acronym expansions on first use (exempt from the cap) and rare specialized
-  nomenclature with no settled Chinese rendering (e.g. `时谐场 (time-harmonic
-field)`). Basic vocabulary — `latency`, `deadline`, `aggregation`,
-  `overhead`, `real-time system` — needs no annotation; the reader is a
-  networking professional. The validator rejects any back with more than 2
-  non-acronym English parentheticals (`Back sprinkles N English
-annotations`). When in doubt, do NOT annotate.
-- **Acronyms:** expand every acronym on first use, in the front or in the
-  back (e.g. `NITRD (Networking and Information Technology Research and
-Development)`). The validator scans the **whole card** — an acronym that
-  appears anywhere without an expansion (e.g. a bare `DIKW`) is a reject.
-  Expansion gotchas (each cost a validator round-trip):
-  - The expansion must be an **English parenthetical whose word initials
-    subsequence-match** the acronym (`GPS (Global Positioning System)`). A
-    Chinese gloss in parentheses does **not** count.
-  - The acronym extractor pulls uppercase runs out of hyphenated tokens:
-    `cell-ID` surfaces a bare `ID` that you cannot expand naturally. Prefer
-    the plain Chinese rendering (`蜂窝小区标识三角测量`) over keeping the
-    Latin token.
-  - Only `COMMON_ACRONYMS` in `anki_card_validator.py` are exempt (TCP, DNS,
-    GSM, LTE, WiFi, GPS, ...). Anything else — `LBS`, `LPWAN`, and similar
-    coinages — needs an expansion even if it feels standard.
-- **End with** a `源码与文档引用 (Source Citation):` section containing the
-  line-anchored Markdown link.
-- **Tags (machine-gated, canonical vocabulary only):** tag every card with
-  `research` plus the flat course code (`cs231`/`cs232`/`cs233`/`cs234`), and
-  optionally one or two concept tags from `CANONICAL_TAGS` in
-  `tools/research/anki_card_validator.py` (e.g. `tcp`, `routing`,
-  `congestion_control`, `distributed_systems`, `consensus`). Never invent
-  variants — `tcp_protocol`, `distributed-system`, `cs231-distributed-systems`
-  are all synonyms of canonical tags. The validator rejects any tag outside
-  the vocabulary (`Unknown tag '...'`); pick the closest existing tag instead.
-
-Example (good):
+Example:
 
 ```json
 {
@@ -148,77 +108,33 @@ Example (good):
 }
 ```
 
-Example (bad — low density, no sections, English summary paragraph):
+## Pre-import review
 
-```json
-{
-  "front": "并行二维 FFT 中，如何将矩阵分配给多个处理器？",
-  "back": "将矩阵划分为方块，每个处理器负责一行。Data Distribution: an n×n matrix is partitioned into blocks.<br><br>来源：[...](file://...)"
-}
-```
+Before running `--import`, read every card's front and back in full (skipping
+truncated summaries), run both `anki_card_validator.py` and
+`anki_density_gate.py`, and rewrite any card flagged `enrich`/`consolidate`.
+Reject bad artifacts regardless of topic prestige, applying the same bar to the
+last card as the first:
 
-### 3. Agent quality & density review (mandatory before import)
+- Presentation titles/slide numbers (`Network Layer 4-107`, `BGP basics`),
+  slide date stamps (`8/13/2008`), or topic labels without a concrete question.
+- PDF/OCR artifacts (control chars, router ID dumps `1b 1d 1c 1a...`, garbled
+  OCR like `limi e due to the`), ASCII diagrams/tables, slide footers.
+- Paper metadata dumps (author blocks, `Categories and Subject Descriptors`,
+  `General Terms:`, `1. INTRODUCTION` spillover), context-free code/build
+  snippets, or Q/A mismatches.
+- Invented multi-word English glosses or unexpanded acronyms.
 
-- Immediately inspect the authored `research/anki_cards.jsonl`. **Read every
-  card's front AND back in full — never approve from a truncated print.**
-  - Run the automated structural validator:
-    `python3 tools/research/anki_card_validator.py research/anki_cards.jsonl`.
-    Any reported issue is a hard reject unless you rewrite the card.
-  - Run the information density gate:
-    `python3 tools/research/anki_density_gate.py --cards research/anki_cards.jsonl`.
-    Cards flagged with `enrich` or `consolidate` must be re-authored with concrete
-    mechanisms/equations/algorithms from the source chunks (or consolidated)
-    before import.
-  - Reject cards with **low technical density / superficial prose**: cards that merely
-    translate high-level survey bullets without concrete formulas, mechanisms,
-    algorithms, or protocol specifications must be enriched or rejected.
-  - Reject a card for a **bad artifact, not a bad topic**: a famous concept
-    does not redeem a card whose front is a raw title or whose back is an
-    abstract/metadata dump. Judge the last card of the batch as strictly as
-    the first.
-  - Reject categories include:
-    - Presentation titles / slide numbers
-      (`Network Layer 4-107`, `Wireless, Mobile Networks 6-58`, `BGP basics`).
-    - Generic outline summaries or topic labels without a concrete question.
-    - Slide date stamps (`8/13/2008`, `Winter 2001 ICS 243E`).
-    - PDF extraction artifacts: control characters, router ID lists
-      (`1b 1d 1c 1a...`), slide footer text.
-    - ASCII diagrams / tables.
-    - OCR fragments (`limi e due to the`, `q frequent`, `Ø Dynamics`).
-    - Paper metadata dumps: author/affiliation blocks,
-      `Categories and Subject Descriptors`, `General Terms:`,
-      `1. INTRODUCTION` spilling into the back.
-    - Code fragments without context, build instructions, boilerplate fallback.
-    - Question/answer mismatch.
-    - Invented English glosses: a front-title parenthetical that translates
-      the Chinese title word-by-word instead of naming a standard term
-      (e.g. `(IoT Analytics Knowledge Hierarchy)`), and any bare acronym
-      the card never expands (e.g. `DIKW`).
-  - **Never import to Anki without completing this review step.**
-  - For brief or high-density concepts, use `search_web` to enrich the card.
+## State and database safety
 
-### 4. Import & state hygiene
-
-- Import only with `python3 tools/research/anki_generator.py --import --deck "金融"`.
-- **`--import` consumes every line in `research/anki_cards.jsonl` blindly.**
-  The file survives across runs, so before writing a new batch, overwrite it
-  (never append) and confirm no stale cards from a previous run remain —
-  already-imported cards would be re-imported as duplicates.
-- The generator refuses to emit new candidates while any chunks are in
-  `"candidate"` or `"pending_import"` status. Resolve the current batch
-  first.
-  - **Never hand-edit `research/.anki_coverage.json`.** Use CLI verbs only
-    (`--import`, `--reject-chunk`, verifier). This is the same discipline as
-    never writing raw SQLite to `collection.anki2`.
-  - Verify imports with `python3 tools/research/anki_import_verifier.py`.
-  - `--import` requires AnkiConnect. If Anki is not running, pass `--auto-launch`
-    to start it. The one-off `--front/--back` path falls back to the legacy TSV
-    file when AnkiConnect is unreachable.
-
-### 5. Database safety non-negotiable
-
-- **Never** run raw SQLite `INSERT`/`UPDATE` on live
-  `collection.anki2` / `collection.anki21b` files.
-  - Use only AnkiConnect `addNotes` or the TSV package export path.
-  - Profile backups live at
-    `~/Library/Application Support/Anki2/<profile>/backups/*.colpkg`.
+- **Overwrite `research/anki_cards.jsonl` fresh each run:** `--import` consumes
+  every line in the file, so stale lines from prior runs would import as
+  duplicates.
+- **State mutations via CLI only:** mutate `research/.anki_coverage.json`
+  exclusively through `anki_generator.py` (`--import`, `--reject-chunk`) and
+  `anki_import_verifier.py`.
+- **Database safety:** write to Anki exclusively via AnkiConnect `addNotes`
+  (`--import`, with `--auto-launch` if Anki is closed) or the legacy TSV export
+  fallback (`--front`/`--back`); keep live `collection.anki2` /
+  `collection.anki21b` untouched by raw SQLite writes. Backups live at
+  `~/Library/Application Support/Anki2/<profile>/backups/*.colpkg`.

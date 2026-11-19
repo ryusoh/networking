@@ -6,87 +6,58 @@ argument-hint: '<branch_name>'
 
 # Ship Branch
 
-Ship a completed branch, or ship uncommitted changes from the primary branch.
+Ship a completed `<branch_name>`, or ship uncommitted changes directly from
+`<primary-branch>` (`main`).
 
-## Working mode (read `AGENTS.md` first)
+## Working mode
 
-Interactive coding agents (Claude Code, Kimi, Antigravity, etc.) work directly
-with the user in a chat session. If the user says "ship it" while you are on the
-primary branch with uncommitted changes, commit and push directly when
-requested. Do not force a branch/PR workflow unless the user asks for one.
+Read `AGENTS.md` first. If the user says "ship it" while on `<primary-branch>`
+with uncommitted changes and no `<branch_name>` argument, use Direct-push mode
+rather than creating an unrequested branch/PR.
 
 ## Branch mode (when `<branch_name>` is given)
 
-1. **Checkout and Sync:**
-   - Fetch all branches: `git fetch origin`
-   - Checkout the target branch.
-   - Ensure it's up to date: `git pull origin <branch_name>`
+1. **Checkout and sync:**
+   - `git fetch origin && git checkout <branch_name> && git pull origin <branch_name>`
+2. **Verify and fix quality:**
+   - Run `make lint`, `make fmt` (if formatting fails), `make test`, and
+     `make precommit` (use `make precommit-docker` on macOS if privileged
+     `nas_tools` socket tests fail).
+   - Commit any quality fixes with a Conventional Commit message.
+3. **Squash-merge into `<primary-branch>`** for one clean commit on `main`:
+   - `git checkout <primary-branch> && git pull origin <primary-branch>`
+   - `git merge --squash <branch_name>`
+   - Resolve any conflicts (`git status`, edit, `git add <file>`), then commit
+     with one Conventional Commit message describing the whole change.
+4. **Final verification:** run `make precommit` (or `make precommit-docker` on
+   macOS) on merged `<primary-branch>`.
+5. **Push and clean up:**
+   - **Ask for explicit user acknowledgement before pushing.**
+   - `git push origin <primary-branch>`
+   - Delete local branch: `git branch -d <branch_name>` (after a squash merge,
+     confirm everything is pushed and use `git branch -D <branch_name>`).
+   - Delete remote branch if it exists: `git push origin --delete <branch_name>`.
 
-2. **Fix Quality and CI Failures:**
-   - Run checks: `make lint`.
-   - If it fails due to formatting, fix it: `make fmt`.
-   - Run all tests: `make test`.
-   - Verify everything is clean: `make precommit`.
-   - If changes were made, commit them: `git commit -am "style: fix quality failures"`.
+## Direct-push mode (on `<primary-branch>` with uncommitted changes)
 
-3. **Merge into the primary branch** — prefer a squash merge, so the primary
-   branch gets one clean commit no matter how messy the branch history is:
-   - Switch to the primary branch (usually `main` or `master`).
-   - Pull latest: `git pull origin <primary-branch>`
-   - Squash-merge the branch: `git merge --squash <branch_name>`
-   - Commit with a single Conventional Commit message describing the whole
-     change (e.g. reuse the branch's main commit subject): `git commit`.
-   - **Conflict Resolution:** If conflicts occur:
-     - List conflicted files: `git status`.
-     - Read and resolve each conflict manually or using tools.
-     - Add resolved files: `git add <file>`.
-     - Complete the merge: `git commit`.
-
-4. **Final Verification:**
-   - Run `make precommit` on the merged primary branch to ensure no regressions.
-
-5. **Cleanup:**
-   - **Ask for acknowledgement before pushing changes.**
-   - Push the primary branch: `git push origin <primary-branch>`.
-   - Delete the local branch: `git branch -d <branch_name>`. After a squash
-     merge Git does not consider the branch merged, so `-d` refuses; use
-     `git branch -D <branch_name>` once the squash commit is pushed and you
-     are sure nothing unshipped remains.
-   - Delete the remote branch: `git push origin --delete <branch_name>`. If a
-     pre-push hook mistakes the delete for history rewriting, retry the
-     delete alone with `git push --no-verify origin --delete <branch_name>`.
-
-## Direct-push mode (when on the primary branch with uncommitted changes)
-
-Use this when no `<branch_name>` is given and the user has told you to ship.
-
-1. Stage and commit the changes with a Conventional Commit message.
-2. Run `make lint`, `make fmt` (if needed), and `make precommit`.
-   - If `make precommit` fails on macOS due to `nas_tools`-style privileged
-     socket tests (`Operation not permitted`), use `make precommit-docker`
-     instead for Linux-container parity with CI.
-3. **Ask for acknowledgement before pushing.**
+1. Stage changed files by name (`git add <file>`) and commit with a
+   Conventional Commit message.
+2. Run `make precommit` (or `make precommit-docker` on macOS if `nas_tools`
+   privileged socket tests fail with `Operation not permitted`).
+3. **Ask for explicit user acknowledgement before pushing.**
 4. Push: `git push origin <primary-branch>`.
 
 ## Shipping multiple open PRs
 
-When tasked with "shipping all open PRs", follow this consolidation strategy to
-minimize conflicts:
-
-1. **Discovery:** identify all open PR branches (e.g.
-   `gh pr list --state open`).
-2. **Consolidation:**
-   - Create a temporary integration branch: `git checkout -b ship-all-prs`.
-   - Merge each PR branch into it one-by-one: `git merge <branch>`.
-3. **Conflict resolution (massive lockfile conflicts):**
-   - If `package-lock.json` has massive conflicts, do not resolve them manually.
-   - Manually edit `package.json` to include the target versions from all
-     branches.
-   - Run `npm install` to regenerate a clean lockfile.
-   - `git add package.json package-lock.json && git commit`.
-4. **Verification:** run `make precommit` on the integration branch.
-5. **Final merge:** merge the integration branch into `main` using `--no-ff`.
+1. List open PR branches (`gh pr list --state open`).
+2. Create an integration branch (`git checkout -b ship-all-prs`) and merge each
+   PR branch one by one (`git merge <branch>`).
+3. For heavy `package-lock.json` conflicts, reconcile `package.json` manually,
+   regenerate the lockfile with `npm install`, and commit both files.
+4. Verify with `make precommit` on the integration branch.
+5. Merge into `main` with `--no-ff` after user acknowledgement.
 
 ## Report
 
-- Summarize the actions taken, including any conflicts resolved.
+Summarize the mode used, commits created, gate results, conflicts resolved, and
+branches cleaned up.

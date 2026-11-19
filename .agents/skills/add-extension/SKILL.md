@@ -6,40 +6,32 @@ argument-hint: '<extension-dir-name>'
 
 # Add a new Chrome extension subproject
 
-Scaffold `<extension-dir-name>/` as an MV3 extension that passes this repo's
-gates on the first try. Hard-won gotchas are listed first — they all cost a
-failed attempt before they were understood.
+Scaffold `<extension-dir-name>/` as a self-contained Chrome MV3 extension that
+passes this repo's gates on the first try.
 
-## Naming and directory gotchas (do these right the first time)
+## Directory and git conventions
 
-- **No underscore-prefixed dirs inside the extension folder.** Chrome refuses
-  to load an extension containing `_anything` ("Filenames starting with '_' are
-  reserved"; `_locales` is the one allowed exception). So the repo's usual
-  `__tests__/` convention is **not** usable here — put tests in `tests/`
-  (plain). Jest finds them by the `*.test.js` filename pattern regardless of
-  directory name. If the subproject already contains `__tests__/` (e.g.
-  `adblock`) or a stray `_metadata/`, do **not** load the checkout
-  directly — run `bin/pack-extension <dir>` and load `<dir>/dist` instead
-  (generated, git- and prettier-ignored).
-- **`.gitignore` ignores bare build-artifact names** (`tests`, `lan_scanner`,
-  ...). `tests` is scoped to `/nas_proxy/tests`, so `tests/` directories are
-  trackable — but if you add a file that shares a name with a C binary target,
-  check `git check-ignore -v <path>` before wondering why `git add` fails.
-- New subprojects are independent: keep everything inside the one directory,
-  no imports from other subprojects (`make depcheck` enforces this for the
-  dirs it covers).
+- **Plain directory names only inside the extension folder:** Chrome reserves
+  leading underscores (`_locales` is the sole exception), so put tests in
+  `tests/` rather than `__tests__/` (Jest matches `*.test.js` in any dir). For
+  an existing extension that contains `__tests__/` (e.g. `adblock`) or
+  `_metadata/`, build a clean package with `bin/pack-extension <dir>` and load
+  `<dir>/dist` (git- and prettier-ignored).
+- **`.gitignore` collision check:** `.gitignore` ignores bare C-binary names
+  (`lan_scanner`, etc.; `/nas_proxy/tests` is scoped so `tests/` is trackable).
+  If `git add` rejects a new file, inspect with `git check-ignore -v <path>`.
+- **Subproject isolation:** keep everything inside `<extension-dir-name>/` with
+  zero cross-subproject imports (`make depcheck` enforces isolation).
 
 ## Scaffold
 
-1. `manifest.json` — MV3.
-2. **Icons: always default to the shared set.** Every new extension in this
-   repo uses the same icons as `adblock` unless the user explicitly asks for
-   different artwork: copy `adblock/assets/icon{16,48,128}.png` into
-   `<dir>/assets/` and declare both `icons` and `action.default_icon` in the
-   manifest (see `adblock/manifest.json` for the exact wiring). Do not ship a
-   new extension without icons, and do not invent new ones.
-3. Content script — write the logic as pure, testable functions and expose
-   them for Jest with a CommonJS guard that returns before touching the page:
+1. `manifest.json` — Manifest V3.
+2. **Shared icons by default:** copy `adblock/assets/icon{16,48,128}.png` into
+   `<dir>/assets/` and wire both `icons` and `action.default_icon` in
+   `manifest.json` (match `adblock/manifest.json`) unless the user requests
+   custom artwork.
+3. **Content script:** keep logic in pure, testable functions and export them
+   behind a CommonJS guard that returns early in Jest before touching the DOM:
 
    ```js
    /* global module */
@@ -49,34 +41,30 @@ failed attempt before they were understood.
      const api = {/* exported internals */};
      if (typeof module !== 'undefined' && module.exports) {
        module.exports = api;
-       return; // unit-test context: do not touch the page
+       return; // unit-test context
      }
      // ... content-script runtime (observers, intervals) ...
    })();
    ```
 
-   If the script registers a `MutationObserver`, the callback must start with
-   the `typeof document === 'undefined' || !document` guard (see AGENTS.md —
-   observers fire after jsdom teardown).
+   Start any `MutationObserver` callback touching `document` with
+   `if (typeof document === 'undefined' || !document) { return; }`
+   (`AGENTS.md`).
 
-4. `tests/<name>.test.js` — `require('../<script>.js')` and drive the exported
-   functions with plain fake objects (e.g. a fake `video` element literal).
-5. **Register the extension in `collectCoverageFrom`** (`package.json` jest
-   config, e.g. `"<dir>/*.js"`). The global `coverageThreshold` is an aggregate
-   over all registered extensions, so a new extension's gaps are absorbed by
-   the floor while remaining visible to `bin/coverage_rank.py` — that
-   visibility is what lets Testpilot pick them up later. Leaving a new
-   extension unregistered hides its coverage gaps permanently.
+4. `tests/<name>.test.js` — `require('../<script>.js')` and exercise exported
+   functions with plain fake objects.
+5. **Register coverage:** add `"<dir>/*.js"` to `collectCoverageFrom` in
+   `package.json` so `bin/coverage_rank.py` tracks gaps while the aggregate
+   `coverageThreshold` absorbs the new extension.
 
-## Code style (matches what eslint/prettier enforce here)
+## Code style
 
-- `const`/`let`, never `var` (`no-var` is on; adblock is warning-free —
-  keep new code the same).
-- Browser globals come from the limited `eslint.config.cjs` set; anything else
-  (`module`, extra DOM constructors) needs an inline `/* global ... */`.
-- Run prettier before declaring done.
+- Use `const`/`let` (`no-var` is enabled; keep new code warning-free).
+- `eslint.config.cjs` defines a limited browser-global set; declare extras
+  (`module`, DOM constructors) with inline `/* global ... */` or `window.<Name>`.
+- Format with Prettier before finishing.
 
-## Verify (scoped, fast — full `make precommit` only before a PR)
+## Verify (scoped; run `make precommit` before a PR)
 
 ```bash
 npx jest <dir>
@@ -85,13 +73,12 @@ npx prettier --check <dir>
 python3 -m json.tool <dir>/manifest.json >/dev/null
 ```
 
-Then have the user load it: `chrome://extensions` → Developer mode → Load
-unpacked → select the dir. Per repo policy, never claim it "works in Chrome" —
-only the user can observe that. If the payoff is browser-visible only, note it.
+Hand off to the user to load via `chrome://extensions` → Developer mode → Load
+unpacked → select `<dir>`. Report objectively verifiable test/lint results and
+flag browser-visible behaviour for human verification.
 
 ## Commit
 
-Single-concern Conventional Commit, e.g.
-`feat(<scope>): add MV3 extension to <do the thing>`. Include every file —
-manifest, script, tests, assets — and any `.gitignore` fix that was needed to
-make them trackable.
+Single-concern Conventional Commit — e.g.
+`feat(<scope>): add MV3 extension to <do the thing>` — including manifest,
+script, tests, assets, `package.json`, and any `.gitignore` adjustment.

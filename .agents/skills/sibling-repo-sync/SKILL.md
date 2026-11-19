@@ -4,117 +4,100 @@ description: Propagate a tooling/gate improvement from this repo to the sibling 
 argument-hint: "[what to sync, e.g. 'the complexity gate' or 'depcheck']"
 ---
 
-Propagate an improvement made in this repo (`~/dev/networking`) to the sibling
-repos:
+Propagate an improvement from `~/dev/networking` to the sibling repos (verify
+against each repo's current `AGENTS.md` and `Makefile`, as details drift).
 
-- `~/dev/fund` — static vanilla-JS/CSS dashboard + Python data pipeline; CI
-  gate = `make precommit-fix` (web-ci job runs the `.pre-commit-config.yaml`
-  hooks, whose eslint hook uses `--max-warnings=0`); `make verify` is NOT a
-  superset of it (adds mypy/bandit/sync-check but skips the pre-commit hooks);
-  diff-coverage gate on changed lines; commands sync via
-  `scripts/sync_commands.py` (not `tools/`). Fund has a PR-title gate
-  (`.github/workflows/commit-lint.yml` +
-  `scripts/agents/check_commit_message.py` — ≤72 chars, scope regex
-  lower-case `[a-z0-9._/-]` only) that exists in NO sibling (verified in all
-  three 2026-09): when porting fund persona lessons about commit titles
-  (e.g. fund#695), keep the ≤72-char / lower-case-scope guidance generic and
-  do NOT cite fund's checker command or regex.
-- `~/dev/anki` — monorepo of Anki add-ons (Python) + JS/graph pipeline; **no**
-  `.pre-commit-config.yaml`; CI gate = `make precommit SKIP=1` (fmt-check lint
-  typecheck-js quality-py check sync-check); aliases via package.json
-  `imports` (`#js/*`, `#ui/*`); Python addon dirs are REAL packages
-  (`__init__.py` present) — import-linter works there.
-- `~/dev/ryusoh.github.io` — JS-only static site; default branch is `master`,
-  not `main`; has `.pre-commit-config.yaml`; CI-parity gate = `make
-precommit-fix` (Prettier, ESLint, Stylelint, tsc, Jest + coverage) — it stages
-  auto-fixes via `git add -u`, so use `make gate` (non-staging variant) when
-  the tree holds uncommitted work; its pytest suite (`tools/__tests__/`) runs
-  in NO Makefile gate but IS wired into a pre-push pre-commit hook
-  (`pytest -q || [ $? -eq 5 ]`; checked 2026-08);
-  `package-lock.json` is authoritative and `pnpm-lock.yaml` drifts by
-  convention — don't regenerate it.
+## Shared sibling traits vs. fund-only quirks
 
-Verify these facts against each repo's current AGENTS.md/Makefile before
-relying on them — they drift.
+- **`networking`, `anki`, and `ryusoh.github.io`** generate `.claude/commands/`
+  via `tools/sync_commands.py` with a naive `content.split("---", 2)` parser —
+  omit `---` horizontal rules in skill bodies (`anki` also expects single-line
+  `description`/`argument-hint` frontmatter). `fund` uses
+  `scripts/sync_commands.py` with proper frontmatter parsing.
+- **Fund-only (absent in `networking`, `anki`, `ryusoh.github.io`):**
+  `.husky/pre-push` fast-forward/deletion guard,
+  `.github/workflows/commit-lint.yml` +
+  `scripts/agents/check_commit_message.py` (keep commit-title guidance generic
+  per target `AGENTS.md`). Jules routines were retired across all four repos in
+  November 2026.
+- This skill exists in all four repos with perspective flipped to the home
+  repo; sync improvements to this skill back to the other three copies.
+
+## Sibling repo profiles
+
+- **`~/dev/fund`** — static vanilla-JS/CSS dashboard + Python data pipeline;
+  Python tools live in `venv/bin/`. Default branch: **`main`**. CI gate:
+  `make precommit-fix` (runs `.pre-commit-config.yaml` hooks including eslint
+  `--max-warnings=0`, plus JS/Python tests); `make verify` adds mypy, bandit,
+  and `sync-check` without the pre-commit hooks. 90% diff-coverage gate on
+  added executable lines. Commands sync via `scripts/sync_commands.py`.
+- **`~/dev/ryusoh.github.io`** — JS-only static site (plain `<script>`, no ES
+  modules, no Python data pipeline); Python tooling lives under
+  `tools/sync_commands.py` + `tools/__tests__/` (pytest via
+  `/Users/lz/dev/.venv`, wired into a pre-push hook `pytest -q || [ $? -eq 5 ]`,
+  unwired in Makefile; mypy hook targets `^scripts/|^tests/python/` which
+  matches nothing). Default branch: **`master`**. CI gate: `make precommit-fix`
+  (runs `.pre-commit-config.yaml` hooks, `sync-check`, `bot-pr-check`,
+  Jest+coverage, and `git add -u` — use `make gate` while iterating or with
+  dirty trees). `lint-js` uses `--max-warnings=0`; prettier runs via
+  `./scripts/run-npx.sh prettier`. `package-lock.json` is authoritative
+  (`pnpm-lock.yaml` drifts out-of-band). Its `ship` skill is a single `master`
+  flow (`make check` + `make test`, asks before push). No screenshot/smoke/serve
+  targets.
+- **`~/dev/anki`** — JS + Python Anki addons; no `.pre-commit-config.yaml`. CI
+  gate: `make precommit SKIP=1` (`fmt-check lint typecheck-js quality-py check
+sync-check thinking-check bot-pr-check`); `precommit-fix` with `YOLO=1`/
+  `MSG=` runs `git add -A`. Aliases via `package.json` `imports` (`#js/*`,
+  `#ui/*`). Addon dirs are real Python packages (`__init__.py` present —
+  import-linter works). Has a generated `data/` dir (`data/anki/`) and
+  Conventional Commits. Jest runs only under `review_heatmap/tests/`; scoped
+  Python tests run from repo root (`conftest.py` mocks `aqt`/`anki`) via
+  `make test-py SUITE=<addon>/tests` or `make test-addon ADDON=<dir>`. Durable
+  guidance: `AGENTS.md`, `docs/lint-and-quality.md`, `docs/gotchas.md`.
 
 ## Process
 
-Delegate one subagent per repo, in parallel. Brief each with:
+Delegate one subagent per sibling repo in parallel. Brief each with:
 
-1. **The reference implementation** — point at the concrete files in THIS repo
-   that carry the pattern (config, Makefile target, hook, doc status block).
-2. **Adapt, don't copy.** Every rule/ceiling must map to the target repo's own
-   structure and stated beliefs (its AGENTS.md non-negotiables), measured
-   against its code — not networking's. Precedent: fund's `no-cross-page-imports`
-   rule was correctly dropped in both JS siblings (no `js/pages/` there), and
-   fund's Python import-linter skip was correctly REVERSED in anki (real
-   packages, real edges). A rule that fires zero times AND maps to nothing the
-   repo believes is decorative; a rule that fires on an accepted pattern is
-   false — measure first, then decide.
-3. **Find the REAL gate first.** Read `.github/workflows`, Makefile
-   `precommit*` targets, and `.pre-commit-config.yaml` BEFORE designing —
-   `make verify`-green is not CI-green (fund learned this the hard way: the
-   eslint pre-commit hook ran `--max-warnings=0`). Wire the new check into the
-   path CI actually executes. Note the target repos do not all share this
-   repo's Makefile layout — fund and ryusoh.github.io gate on
-   `make precommit-fix`, anki on `make precommit SKIP=1`, and anki/this repo
-   have no `.pre-commit-config.yaml` at all.
-4. **Baselines and ratchets.** If the new check fires on legacy code: prefer
-   error-severity + a baseline file (ESLint bulk suppressions model) over
-   warning budgets; the baseline only ratchets down. If it fires zero times,
-   ship it baseline-free as a preventive gate — that's a fine outcome.
-5. **Probe protocol.** Append the probe to a TRACKED file → gate must fail →
-   `git restore` → gate must pass → `git status` clean. Never create new files
-   for probes; never mask backup/restore errors with `|| true`.
-6. **Resolution proof for dependency tooling.** When wiring alias resolution
-   for dependency-cruiser: use a webpack-config stub, NEVER `options.tsConfig`
-   (typescript v7 repos get a spurious "missing-typescript-transpiler"
-   warning); `enhancedResolveOptions` rejects alias keys. Prove resolution by
-   comparing "N modules, M dependencies" with and without alias config —
-   dependency count must be identical and module count must match the
-   tsConfig-route count; an inflated module count means unresolved aliases are
-   fake external nodes and path-based rules silently don't match them. If the
-   repo has no aliases at all, ship an empty-alias stub with a comment, or no
-   stub — don't add decorative config.
-7. **Python import-linter check.** grimp has no PEP 420 namespace-package
-   support. Check `__init__.py` presence and whether the interesting import
-   edges are visible to grimp before wiring a contract; if the graph is
-   invisible or empty, document the skip WITH the measurement evidence and the
-   unblock condition (fund §3 model). Beware: `python -m importlinter.cli`
-   silently no-ops — call the click entry point; grimp writes `.grimp_cache/`
-   into the repo root (add to .gitignore or delete).
-8. **Finish per repo:** run prettier/fmt over new config files, run the repo's
-   own full CI-parity gate green, update its AGENTS.md (command table + short
-   note). **Never commit** — leave changes uncommitted and report: violation
-   counts, resolution proof, files changed, probe exit codes, gate result,
-   skip decisions with evidence.
+1. **Reference implementation:** concrete files in `~/dev/networking` carrying
+   the pattern (config, Makefile target, hook, doc).
+2. **Adapt to the target:** measure rules/ceilings against the target's own
+   structure and `AGENTS.md` — drop decorative rules that match nothing it
+   cares about, and enable checks that fit (e.g. `no-cross-page-imports`
+   dropped where no `js/pages/` exists; Python import-linter enabled in `anki`
+   where real packages exist).
+3. **Wire into the real CI gate:** read `.github/workflows`, `Makefile`, and
+   `.pre-commit-config.yaml` first so the check runs in the actual CI path.
+4. **Baselines and ratchets:** for legacy violations, pair error severity with
+   a shrink-only baseline (ESLint bulk suppressions model); zero violations
+   ships baseline-free.
+5. **Probe protocol:** append a violating probe to a tracked file → confirm
+   gate fails → `git restore` → confirm gate passes and `git status` is clean
+   (let restore errors surface rather than masking with `|| true`).
+6. **Dependency-cruiser alias proof:** wire aliases via a webpack-config stub
+   (avoids TS v7's `missing-typescript-transpiler` warning on
+   `options.tsConfig`; `enhancedResolveOptions` rejects alias keys). Prove
+   resolution by comparing `"N modules, M dependencies"` with and without
+   aliases — identical dependency counts and no inflated external-node count.
+   Skip stubs when a repo has no aliases.
+7. **Python import-linter:** `grimp` lacks PEP 420 namespace-package support,
+   so check `__init__.py` and edge visibility first; if invisible, document the
+   skip with measurements and unblock criteria. Invoke via the click entry point
+   (`python -m importlinter.cli` silently no-ops) and gitignore/delete
+   `.grimp_cache/`.
+8. **Finish per repo:** iterate with scoped checks, then run the full
+   CI-parity gate once at the end (start Docker early if targeting a
+   containerized gate; for docs-only changes decide whether a container run is
+   warranted). Format new config files, update the repo's `AGENTS.md` and gate
+   docs, leave changes uncommitted, and report: violation counts, resolution
+   proof, files changed, probe exit codes, gate result, and evidenced skip
+   decisions.
 
-**Verification budget.** Scoped checks while iterating (the touched test
-file, prettier, sync-check); run the full CI-parity gate exactly once, at the
-end — it is the wall-clock pole, and a containerized one (this repo's
-`precommit-docker`) doubly so. Start Docker early so it warms while you work;
-for docs/persona-only changes, decide whether the container run is warranted
-before queueing it. (2026-09 sync: the networking agent's gate run dwarfed
-the rest of its work.)
+## After the sync & resilience
 
-## After the sync
-
-Update this skill's repo profiles above with anything the run learned that
-contradicts them, and record the sync in each repo's own docs (they each keep
-their own AGENTS.md/tooling docs — the knowledge lives in the repo it
-concerns, not here).
-
-## Fleet resilience (learned running 5 parallel sync agents)
-
-A provider quota/error event can kill background agents mid-flight (4 of 5
-died at once in the 2026-07 run). Recovery pattern that worked cleanly:
-`Agent(resume=...)` retains the agent's full context — resume each failed
-agent with "audit what you already did (git status / git log), then
-continue"; commits it made are fine, uncommitted partial work gets assessed
-before it proceeds. The per-repo isolation of this skill's delegation pattern
-is what makes partial failure cheap: one dead agent never poisons another
-repo's tree.
-
-Parallel agents that touch THIS repo share one worktree — follow AGENTS.md
-"Concurrent agents sharing one worktree": stage only files you changed, never
-`git add -A` / `git stash` / `git reset --hard`, keep file sets disjoint.
+- Update the sibling profiles above with any newly discovered drift; keep
+  repo-specific docs inside each sibling repo.
+- Because each subagent is isolated to its own repo, if a provider error kills
+  parallel workers mid-flight, resume each failed worker to audit `git status`
+  / `git log` and continue. Any parallel work touching `~/dev/networking`
+  follows `AGENTS.md` #12 (shared checkout safety).

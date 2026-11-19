@@ -124,5 +124,7 @@ scores are signal for humans, not thresholds.
   dead-code reference search discipline migrated to `AGENTS.md` and `docs/`;
   remaining persona content (dated incidents, routine mechanics) stays in Git history.
 - **Retained tooling:** `tools/check_bot_pr_hygiene.py` (`make bot-pr-check` in CI),
-  `tools/prior_prs.py`, `tools/gate_guard.py`, `tools/check_thinking_comments.py`,
-  and the `bot-pr-rescue` skill (stale persona references removed).
+  `tools/prior_prs.py`, `tools/gate_guard.py`, and
+  `tools/check_thinking_comments.py`. The `bot-pr-rescue` skill was retired on
+  2026-11-19 (no open PRs); its Dependabot and PR-title tips moved to
+  `gh-action-rescue`.
