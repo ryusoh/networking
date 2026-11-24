@@ -100,6 +100,7 @@ for it.
 | Full gate in Docker (macOS/CI parity)    | `make precommit-docker`                  |
 | JS lint / format                         | `make lint` / `make fmt-check`           |
 | Markdown box-alignment check / fix       | `make md-box-check` / `make lint-fix`    |
+| Markdown LaTeX formatting check / fix    | `make md-latex-check` / `make lint-fix`  |
 | Dependency-structure gate (JS)           | `make depcheck`                          |
 | Stream-of-consciousness gate             | `make thinking-check`                    |
 | Bot PR hygiene gate (bot commits)        | `make bot-pr-check`                      |
@@ -180,9 +181,10 @@ Full gate internals live in `docs/gates.md`. Key invariants:
   `gates.md`, `ci-gotchas.md`, `ebpf-research.md`, `nas-strategy.md`, and
   `docs/research/*.md`.
 - `tools/` — shared repo tooling (`gate_guard.py`, `check_thinking_comments.py`,
-  `check_bot_pr_hygiene.py`, `check_md_boxes.py`, `sync_commands.py`,
-  `prior_prs.py`, `task_harness.py`, `tools/research/`). Script paths in
-  `AGENTS.md` and skills are verified by `tools/__tests__/test_doc_tool_references.py`.
+  `check_bot_pr_hygiene.py`, `check_md_boxes.py`, `check_md_latex.py`,
+  `sync_commands.py`, `prior_prs.py`, `task_harness.py`, `tools/research/`).
+  Script paths in `AGENTS.md` and skills are verified by
+  `tools/__tests__/test_doc_tool_references.py`.
 - `research/` — courseware data, chunk manifests, Anki pipeline state, and
   durable memory. DB safety and state hygiene rules live in `research/README.md`.
 

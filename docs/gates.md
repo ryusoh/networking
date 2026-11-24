@@ -101,6 +101,22 @@ files on day one (`--fix` required zero file edits). Tests live in
   restricts unrequested package/config additions), and Prettier via
   `make fmt-check` already formats Markdown pipe tables.
 
+## Markdown LaTeX formatting gate (`make md-latex-check`)
+
+`make md-latex-check` (wired into `make lint`, hence into `make precommit`, with
+`--fix` wired into `make lint-fix` and `make precommit-fix`) runs
+`tools/check_md_latex.py`, a stdlib-only deterministic scan of tracked and
+untracked Markdown files (using the same `EXCLUDED_PREFIXES` as
+`tools/check_md_boxes.py`, including `research/`). It enforces GitHub GFM math
+(`cmark-gfm`) compatibility: standalone `$$` fence lines separated by blank
+lines for display math, no stray/unclosed `$$` delimiters, no indented `$$`
+blocks inside list items, and `^{\ast}` instead of `^*` inside `$...$`/`$$...$$`
+(while leaving fenced code blocks, inline code spans, and currency `$` prose
+untouched). Measured **1 violation** on day one
+(`docs/research/research-agent-spec.md:145`, single-line `$$S = ...$$`) — fixed
+in place via `--fix`, zero violations afterwards. Tests live in
+`tools/__tests__/test_check_md_latex.py` (run by `make test-py`).
+
 ## Mutation testing (NON-BLOCKING scaffold)
 
 `make mutate-js` (StrykerJS, `stryker.config.mjs`) and `make mutate-py`

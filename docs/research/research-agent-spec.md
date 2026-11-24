@@ -142,7 +142,9 @@ This diagram is the **target** flow. In the current implementation the actual fl
 
 A Study Scene $S$ is a deterministic payload constructed by the Host prior to model invocation:
 
-$$S = \{ R_{\text{primary}}, C_{\text{prereq}}, A_{\text{code}}, M_{\text{episode}}, B_{\text{token}} \}$$
+$$
+S = \{ R_{\text{primary}}, C_{\text{prereq}}, A_{\text{code}}, M_{\text{episode}}, B_{\text{token}} \}
+$$
 
 Where:
 

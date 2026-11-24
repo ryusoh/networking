@@ -1,5 +1,5 @@
 # Usage: make pull ID=<extension_id>
-.PHONY: pull precommit precommit-fix precommit-docker fmt fmt-check lint depcheck lint-fix md-box-check install-dev test test-py type tm-repair sync-check thinking-check bot-pr-check mutate-js mutate-py
+.PHONY: pull precommit precommit-fix precommit-docker fmt fmt-check lint depcheck lint-fix md-box-check md-latex-check install-dev test test-py type tm-repair sync-check thinking-check bot-pr-check mutate-js mutate-py
 
 tm-repair:
 	@./bin/tm-repair
@@ -80,7 +80,7 @@ fmt:
 fmt-check:
 	@npm run fmt:check
 
-lint: depcheck md-box-check
+lint: depcheck md-box-check md-latex-check
 	@npm run lint
 	@# Complexity ratchet: xenon fails if the average/worst cyclomatic-complexity
 	@# rank regresses past these ceilings (current: average A, worst block C).
@@ -89,12 +89,17 @@ lint: depcheck md-box-check
 lint-fix:
 	@npm run lint:fix
 	@$(PY) tools/check_md_boxes.py --fix
+	@$(PY) tools/check_md_latex.py --fix
 
 # Markdown Unicode box-drawing alignment gate (stdlib-only).
 # Note: markdownlint-cli2 (MD060) is skipped because networking has no
 # markdownlint dependency; Prettier via `make fmt-check` handles pipe tables.
 md-box-check:
 	@$(PY) tools/check_md_boxes.py
+
+# Markdown LaTeX formatting gate (stdlib-only).
+md-latex-check:
+	@$(PY) tools/check_md_latex.py
 
 # Dependency-structure gate (JS): no circular deps; production source never
 # imports tests. Rules: .dependency-cruiser.cjs
