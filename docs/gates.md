@@ -81,6 +81,26 @@ was done by an interactive agent explicitly directed to change
 build/lint config (non-negotiable #6 permits this explicitly requested build/lint
 change).
 
+## Markdown Unicode box-drawing gate (`make md-box-check`)
+
+`make md-box-check` (wired into `make lint`, hence into `make precommit`, with
+`--fix` wired into `make lint-fix` and `make precommit-fix`) runs
+`tools/check_md_boxes.py`, a stdlib-only deterministic scan of tracked and
+untracked Markdown files (excluding `node_modules/`, `venv/`, `.venv/`,
+`.claude/`, `.qwen/`, `mutants/`, `reports/`, `.stryker-tmp/`, `coverage/`,
+`.pytest_cache/`, `adblock/dist/`, `nas_proxy/out/`, and `research/`). It checks
+closed Unicode box rectangles (`┌─┐ / │ │ / └─┘`) inside fenced code blocks for
+uniform terminal display widths (accounting for wide CJK and combining
+characters), while leaving open tree listings (`├──` / `└──`) and unclosed
+arrows untouched. Measured **0 violations** across all non-excluded Markdown
+files on day one (`--fix` required zero file edits). Tests live in
+`tools/__tests__/test_check_md_boxes.py` (run by `make test-py`).
+
+- **`markdownlint-cli2` / `MD060` deliberately skipped:** `networking` has no
+  `markdownlint-cli2` dependency or `.markdownlint*` config (non-negotiable #6
+  restricts unrequested package/config additions), and Prettier via
+  `make fmt-check` already formats Markdown pipe tables.
+
 ## Mutation testing (NON-BLOCKING scaffold)
 
 `make mutate-js` (StrykerJS, `stryker.config.mjs`) and `make mutate-py`

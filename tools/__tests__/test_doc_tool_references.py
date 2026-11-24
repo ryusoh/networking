@@ -56,6 +56,7 @@ def test_core_infrastructure_tools_exist():
     core_tools = [
         "tools/gate_guard.py",
         "tools/check_thinking_comments.py",
+        "tools/check_md_boxes.py",
         "tools/sync_commands.py",
         "bin/coverage_rank.py",
     ]
