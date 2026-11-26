@@ -1,6 +1,9 @@
 # Usage: make pull ID=<extension_id>
 .PHONY: pull precommit precommit-fix precommit-docker fmt fmt-check lint depcheck lint-fix md-box-check md-latex-check install-dev test test-py type tm-repair sync-check thinking-check bot-pr-check mutate-js mutate-py
 
+NODE_BIN = $(if $(wildcard ./node_modules/.bin/$(1)),./node_modules/.bin/$(1),npx --yes $(1))
+PRETTIER_CACHE := --cache --cache-location node_modules/.cache/prettiercache
+
 tm-repair:
 	@./bin/tm-repair
 
@@ -75,19 +78,19 @@ sync-check:
 	fi
 
 fmt:
-	@npm run fmt
+	@$(call NODE_BIN,prettier) --write $(PRETTIER_CACHE) .
 
 fmt-check:
-	@npm run fmt:check
+	@$(call NODE_BIN,prettier) --check $(PRETTIER_CACHE) .
 
 lint: depcheck md-box-check md-latex-check
-	@npm run lint
+	@$(call NODE_BIN,eslint) .
 	@# Complexity ratchet: xenon fails if the average/worst cyclomatic-complexity
 	@# rank regresses past these ceilings (current: average A, worst block C).
 	$(PY) -m xenon --max-average A --max-modules C --max-absolute C nas_proxy retriever vps_kernel_proxy nas_tools bin
 
 lint-fix:
-	@npm run lint:fix
+	@$(call NODE_BIN,eslint) . --fix
 	@$(PY) tools/check_md_boxes.py --fix
 	@$(PY) tools/check_md_latex.py --fix
 
@@ -104,7 +107,7 @@ md-latex-check:
 # Dependency-structure gate (JS): no circular deps; production source never
 # imports tests. Rules: .dependency-cruiser.cjs
 depcheck:
-	npx --yes dependency-cruiser adblock jest.setup.js --config .dependency-cruiser.cjs
+	$(call NODE_BIN,dependency-cruiser) adblock jest.setup.js --config .dependency-cruiser.cjs
 
 # Mutation testing (NON-BLOCKING scaffold — deliberately NOT wired into
 # precommit or CI gates; informational scores only).
@@ -121,10 +124,10 @@ mutate-py:
 # JS strict-typing via JSDoc. Blocking: `make type` gates once the
 # included first-party JS is clean.
 type:
-	@npx tsc -p jsconfig.json --noEmit
+	@$(call NODE_BIN,tsc) -p jsconfig.json --noEmit
 
 test:
-	@npm run test:coverage
+	@$(call NODE_BIN,jest) --coverage
 
 # Python unit tests + coverage (term-missing), mirroring the Jest coverage report.
 # Coverage is scoped to the three importable packages (the source modules);

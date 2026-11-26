@@ -101,9 +101,15 @@ def format_generated_commands() -> None:
     the committed files. Degrade gracefully if prettier/npx is unavailable
     (script stays stdlib-only).
     """
+    local_prettier = os.path.join(WORKSPACE_ROOT, "node_modules", ".bin", "prettier")
+    cmd = (
+        [local_prettier, "--write", CLAUDE_DIR]
+        if os.path.isfile(local_prettier)
+        else ["npx", "prettier", "--write", CLAUDE_DIR]
+    )
     try:
         subprocess.run(
-            ["npx", "prettier", "--write", CLAUDE_DIR],
+            cmd,
             cwd=WORKSPACE_ROOT,
             check=True,
             capture_output=True,

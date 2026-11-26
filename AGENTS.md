@@ -37,7 +37,10 @@ for it.
    single source of truth for checks. Iterate with `make precommit-fix`, then
    verify with `make precommit` (`make precommit-docker` on macOS for Linux/CI
    parity). Change the tree before retrying a red gate
-   (`python3 tools/gate_guard.py snapshot`, then `check <hash>`).
+   (`python3 tools/gate_guard.py snapshot`, then `check <hash>`). Run full
+   verification gates solo — never batch them in the same turn with heavy scans
+   or concurrent sibling-repo gates on the same host (CPU oversubscription
+   multiplies wall time).
 2. **One concern, one subproject, smallest diff.** Subprojects are independent;
    scope each PR to one subproject and one concern.
 3. **Keep file sets disjoint** across concurrent agents and workflows.

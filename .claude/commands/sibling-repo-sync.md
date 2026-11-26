@@ -56,7 +56,10 @@ sync-check thinking-check bot-pr-check`); `precommit-fix` with `YOLO=1`/
 
 ## Process
 
-Delegate one subagent per sibling repo in parallel. Brief each with:
+Delegate one subagent per sibling repo to research, edit, and run scoped fast
+checks in parallel, **but serialize/stagger the final full-repo CI-parity gate
+(one repo at a time) to avoid CPU oversubscription on the shared host**. Brief
+each with:
 
 1. **Reference implementation:** concrete files in `~/dev/networking` carrying
    the pattern (config, Makefile target, hook, doc).
@@ -85,9 +88,10 @@ Delegate one subagent per sibling repo in parallel. Brief each with:
    (`python -m importlinter.cli` silently no-ops) and gitignore/delete
    `.grimp_cache/`.
 8. **Finish per repo:** iterate with scoped checks, then run the full
-   CI-parity gate once at the end (start Docker early if targeting a
-   containerized gate; for docs-only changes decide whether a container run is
-   warranted). Format new config files, update the repo's `AGENTS.md` and gate
+   CI-parity gate once at the end sequentially across repos after parallel
+   scoped edits finish (start Docker early if targeting a containerized gate;
+   for docs-only changes decide whether a container run is warranted). Format
+   new config files, update the repo's `AGENTS.md` and gate
    docs, leave changes uncommitted, and report: violation counts, resolution
    proof, files changed, probe exit codes, gate result, and evidenced skip
    decisions.
