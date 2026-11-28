@@ -42,6 +42,10 @@ fi
 
 problems=0
 repaired=0
+upstream_degraded=0
+upstream_loss=""
+upstream_server=""
+phys_if=""
 say()  { echo "$@"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
@@ -124,6 +128,7 @@ for ifn in $DEFAULT_IFS; do
             fi
             ;;
         *)
+            [[ -z "$phys_if" ]] && phys_if="$ifn"
             say "  $ifn: physical interface, fine"
             ;;
     esac
@@ -240,6 +245,28 @@ if [[ ${#zombie_ifs[@]} -gt 0 ]]; then
     fi
 fi
 
+# Probe the active VPN server directly over the physical interface so userspace
+# TUN stubs that synthesize local 0.5 ms ICMP replies cannot mask upstream loss.
+vpn_uuid=$(scutil --nc list 2>/dev/null | awk '/^\*.*\(Connected\)/ {print $3; exit}')
+if [[ -n "$vpn_uuid" && -n "$phys_if" ]]; then
+    remote_raw=$(scutil --nc show "$vpn_uuid" 2>/dev/null | awk 'tolower($1) == "remoteaddress" {print $NF; exit}')
+    remote_host=$(echo "$remote_raw" | sed 's/:[0-9]*$//')
+    if [[ -n "$remote_host" ]]; then
+        upstream_server="$remote_host"
+        ping_out=$(ping -c 5 -i 0.2 -t 4 -b "$phys_if" "$remote_host" 2>&1 || true)
+        loss=$(echo "$ping_out" | awk '/packet loss/ {for (i=1; i<=NF; i++) if ($i ~ /%$/) {gsub(/%/, "", $i); print $i; exit}}')
+        if [[ -n "$loss" ]]; then
+            upstream_loss="$loss"
+            say "  VPN server $remote_host via $phys_if: ${loss}% packet loss"
+            if awk -v l="$loss" 'BEGIN {exit !(l+0 >= 5)}'; then
+                say "  WARNING: high packet loss (${loss}%) to VPN server $remote_host — TCP/TLS will stall even if tunnel ping looks fine"
+                say "  run 'bin/vpn_node_rank.py' to benchmark sibling nodes and pick a 0%-loss server"
+                upstream_degraded=1
+            fi
+        fi
+    fi
+fi
+
 # ---------------------------------------------------------------------------
 say
 if [[ $FIX -eq 0 ]]; then
@@ -247,8 +274,13 @@ if [[ $FIX -eq 0 ]]; then
         say "verdict: problems found — run 'vpn-recover --fix' to repair local issues."
         if [[ $verify_failed -eq 1 ]]; then
             say "  connectivity verification also failed; this may be a dead remote node rather than a local route/DNS problem."
+            say "  - run 'bin/vpn_node_rank.py' to check upstream packet loss and find a clean sibling node."
             say "  - JustMySocks: compare the client's server/port with the service page; if it changed, update/re-add the subscription."
         fi
+        exit 1
+    fi
+    if [[ $upstream_degraded -eq 1 ]]; then
+        say "verdict: VPN upstream server ($upstream_server) is degraded (${upstream_loss}% loss) — local routes/DNS are fine; switch VPN node (run 'bin/vpn_node_rank.py')."
         exit 1
     fi
     say "verdict: no stale-route/DNS leftovers detected."
@@ -256,6 +288,10 @@ if [[ $FIX -eq 0 ]]; then
 fi
 
 if [[ $verify_failed -eq 0 ]]; then
+    if [[ $upstream_degraded -eq 1 ]]; then
+        say "verdict: local routes/DNS are healthy, but VPN server ($upstream_server) has ${upstream_loss}% loss — switch VPN node (run 'bin/vpn_node_rank.py')."
+        exit 1
+    fi
     if [[ $repaired -eq 1 ]]; then
         say "verdict: network recovered. Now reconnect your SS/vmess profile."
     else
@@ -266,6 +302,7 @@ fi
 
 say "verdict: repairs applied but connectivity still failing."
 say "next steps:"
+say "  - run 'bin/vpn_node_rank.py' to check upstream packet loss and pick a 0%-loss node"
 say "  - quit and relaunch the SS/vmess client (Clash Verge, Shadowrocket), or toggle its TUN mode"
 say "  - JustMySocks: compare the client's server/port with the service page; if it changed, update/re-add the subscription."
 say "  - if only direct-routed (domestic) domains time out while proxied sites work:"

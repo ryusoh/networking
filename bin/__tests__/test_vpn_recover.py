@@ -220,3 +220,63 @@ def test_stale_fix_deletes_route_without_killing(tmp_path):
     assert "removing default route via utun8" in res.stdout
     assert "delete" in (tmp_path / "route.log").read_text()
     assert not (tmp_path / "kill.log").exists()
+
+
+def test_upstream_high_packet_loss_flags_degraded_vpn_server(tmp_path):
+    env = _make_env(tmp_path, curl_mode="ok")
+    stub = tmp_path / "bin"
+    _write_stub(
+        stub,
+        "scutil",
+        'if [[ "$1" == "--nc" && "$2" == "list" ]]; then\n'
+        '    echo \'* (Connected) 0FC13490-0000 VPN "c62s2.portablesubmarines.com"\'\n'
+        'elif [[ "$1" == "--nc" && "$2" == "show" ]]; then\n'
+        "    echo '  RemoteAddress : 144.34.180.123:443'\n"
+        "else\n"
+        "    echo 'resolver #1'\n"
+        "    echo '  nameserver[0] : 1.1.1.1'\n"
+        "fi\n",
+    )
+    _write_stub(
+        stub,
+        "ping",
+        'if [[ "$*" == *"144.34.180.123"* ]]; then\n'
+        "    echo '5 packets transmitted, 4 packets received, 20.0% packet loss'\n"
+        "fi\n"
+        "exit 0\n",
+    )
+    res = _run(env)
+    assert res.returncode == 1, res.stdout
+    assert "VPN server 144.34.180.123 via en0: 20.0% packet loss" in res.stdout
+    assert "high packet loss" in res.stdout
+    assert "vpn_node_rank.py" in res.stdout
+    assert "run 'vpn-recover --fix'" not in res.stdout
+
+
+def test_upstream_zero_packet_loss_stays_healthy(tmp_path):
+    env = _make_env(tmp_path, curl_mode="ok")
+    stub = tmp_path / "bin"
+    _write_stub(
+        stub,
+        "scutil",
+        'if [[ "$1" == "--nc" && "$2" == "list" ]]; then\n'
+        '    echo \'* (Connected) 0FC13490-0000 VPN "c62s5.portablesubmarines.com"\'\n'
+        'elif [[ "$1" == "--nc" && "$2" == "show" ]]; then\n'
+        "    echo '  RemoteAddress : 104.193.9.150:443'\n"
+        "else\n"
+        "    echo 'resolver #1'\n"
+        "    echo '  nameserver[0] : 1.1.1.1'\n"
+        "fi\n",
+    )
+    _write_stub(
+        stub,
+        "ping",
+        'if [[ "$*" == *"104.193.9.150"* ]]; then\n'
+        "    echo '5 packets transmitted, 5 packets received, 0.0% packet loss'\n"
+        "fi\n"
+        "exit 0\n",
+    )
+    res = _run(env)
+    assert res.returncode == 0, res.stdout
+    assert "VPN server 104.193.9.150 via en0: 0.0% packet loss" in res.stdout
+    assert "no stale-route/DNS leftovers detected" in res.stdout
