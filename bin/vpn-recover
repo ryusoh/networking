@@ -41,6 +41,7 @@ if [[ $FIX -eq 1 && $EUID -ne 0 ]]; then
 fi
 
 problems=0
+repaired=0
 say()  { echo "$@"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
@@ -113,9 +114,8 @@ for ifn in $DEFAULT_IFS; do
                 if utun_has_upstream; then
                     say "  $ifn: tunnel answers ping and has upstream connections, keeping"
                 else
-                    say "  $ifn: ZOMBIE — tunnel answers ping but has zero upstream connections (dead proxy node)"
+                    say "  $ifn: tunnel answers ping, zero observed upstream TCP connections (idle/UDP or possible zombie — checking connectivity)"
                     zombie_ifs+=("$ifn")
-                    problems=1
                 fi
             else
                 say "  $ifn: STALE — default route into a dead tunnel (typical Astrill leftover)"
@@ -138,6 +138,7 @@ if [[ $FIX -eq 1 && ${#stale_ifs[@]} -gt 0 ]]; then
             || $SUDO route -n delete default >/dev/null 2>&1 \
             || say "  WARNING: could not delete default route via $ifn"
     done
+    repaired=1
 fi
 
 # ---------------------------------------------------------------------------
@@ -153,6 +154,7 @@ if [[ -n "$DEAD_DNS" && "$ANY_VPN" -eq 0 ]]; then
     say "dead tunnel DNS present with no VPN connected:"
     echo "$DEAD_DNS" | sed 's/^/  /'
     problems=1
+    [[ $FIX -eq 1 ]] && repaired=1
 elif [[ -n "$DEAD_DNS" ]]; then
     say "tunnel DNS in use (a VPN is connected, so this is expected):"
     echo "$DEAD_DNS" | sed 's/^/  /'
@@ -183,6 +185,7 @@ if have pfctl; then
                 say "  flushing anchor: $a"
                 $SUDO pfctl -a "$a" -F all >/dev/null 2>&1 || true
             done <<< "$ANCHORS"
+            repaired=1
         fi
     else
         say "no suspicious pf anchors"
@@ -216,16 +219,25 @@ verify() {
 verify_failed=0
 verify || verify_failed=1
 
-# Only kill the tunnel provider once verification has proven the zombie is
-# actually breaking connectivity — an idle-but-healthy tunnel also shows zero
-# upstream connections at any given instant.
-if [[ $FIX -eq 1 && $verify_failed -eq 1 && ${#zombie_ifs[@]} -gt 0 ]]; then
-    say
-    say "== 4b. zombie tunnel provider teardown =="
-    kill_zombie_providers
-    say "  re-running verification"
-    verify_failed=0
-    verify || verify_failed=1
+# Only treat a zero-upstream utun as a confirmed ZOMBIE once verification has
+# proven connectivity is actually broken — an idle or UDP tunnel also shows
+# zero established TCP connections at any given instant.
+if [[ ${#zombie_ifs[@]} -gt 0 ]]; then
+    if [[ $verify_failed -eq 1 ]]; then
+        say "  confirmed ZOMBIE tunnel(s): ${zombie_ifs[*]} (answers ping, zero upstream connections, and connectivity failed)"
+        problems=1
+        if [[ $FIX -eq 1 ]]; then
+            say
+            say "== 4b. zombie tunnel provider teardown =="
+            kill_zombie_providers
+            repaired=1
+            say "  re-running verification"
+            verify_failed=0
+            verify || verify_failed=1
+        fi
+    else
+        say "  note: ${zombie_ifs[*]} passed connectivity checks (idle or non-TCP tunnel, not a zombie)"
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -244,7 +256,11 @@ if [[ $FIX -eq 0 ]]; then
 fi
 
 if [[ $verify_failed -eq 0 ]]; then
-    say "verdict: network recovered. Now reconnect your SS/vmess profile."
+    if [[ $repaired -eq 1 ]]; then
+        say "verdict: network recovered. Now reconnect your SS/vmess profile."
+    else
+        say "verdict: network already healthy (no route/tunnel repairs needed; DNS cache flushed)."
+    fi
     exit 0
 fi
 

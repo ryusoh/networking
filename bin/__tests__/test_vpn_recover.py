@@ -189,11 +189,26 @@ def test_tunnel_with_upstream_is_kept(tmp_path):
 
 def test_healthy_zombie_is_not_killed(tmp_path):
     # Zero upstream connections but verification passes: an idle-but-healthy
-    # tunnel must survive --fix.
+    # tunnel must survive --fix and report already healthy.
     env = _make_env(tmp_path, curl_mode="ok")
     res = _run(env, "--fix")
     assert res.returncode == 0, res.stdout
-    assert "ZOMBIE" in res.stdout
+    assert "not a zombie" in res.stdout
+    assert "network already healthy" in res.stdout
+    assert "ZOMBIE" not in res.stdout
+    assert not (tmp_path / "kill.log").exists()
+
+
+def test_healthy_idle_tunnel_diagnose_reports_no_problems(tmp_path):
+    # Zero observed upstream TCP connections with passing verification must not
+    # be flagged as a ZOMBIE problem in diagnose mode.
+    env = _make_env(tmp_path, curl_mode="ok")
+    res = _run(env)
+    assert res.returncode == 0, res.stdout
+    assert "not a zombie" in res.stdout
+    assert "no stale-route/DNS leftovers detected" in res.stdout
+    assert "problems found" not in res.stdout
+    assert "ZOMBIE" not in res.stdout
     assert not (tmp_path / "kill.log").exists()
 
 
