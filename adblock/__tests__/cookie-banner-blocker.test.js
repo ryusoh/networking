@@ -553,7 +553,7 @@ describe('Cookie Banner Blocker - Extension configuration', () => {
     // Default mock is block, visible, opacity 1, offsetWidth 100, offsetHeight 20
     Object.defineProperty(btn, 'offsetWidth', { value: 0, configurable: true });
 
-    const acceptBtn = window.CookieBannerBlocker.dismissBanner(wrapper);
+    window.CookieBannerBlocker.dismissBanner(wrapper);
     // Because btn is invisible, dismissBanner will fall back to hiding the wrapper
     expect(wrapper.style.display).toBe('none');
   });
